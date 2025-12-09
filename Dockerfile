@@ -50,16 +50,19 @@ LABEL org.opencontainers.image.version="${VERSION}"
 # Install runtime dependencies for package managers
 # - git: for version control operations
 # - ca-certificates: for HTTPS requests
+# - curl: for API calls (PyPI, etc.)
 # - nodejs/npm: for JavaScript ecosystem (npm, pnpm, yarn)
-# - go: for Go modules
 # - php/composer: for PHP ecosystem
 # - python3/pip: for Python ecosystem
+# - dotnet8-sdk: for .NET ecosystem (msbuild, nuget) from Alpine community repo
+# - bash: required by some package managers
 RUN apk add --no-cache \
     git \
     ca-certificates \
+    curl \
+    bash \
     nodejs \
     npm \
-    go \
     php83 \
     php83-phar \
     php83-mbstring \
@@ -67,7 +70,22 @@ RUN apk add --no-cache \
     php83-curl \
     composer \
     python3 \
-    py3-pip
+    py3-pip \
+    && apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community \
+    dotnet8-sdk
+
+# Install JavaScript package managers (pnpm, yarn) globally
+RUN npm install -g pnpm yarn
+
+# Install Python tools (pipenv for Pipfile support)
+# Use --break-system-packages since we're in a container
+RUN pip3 install --break-system-packages pipenv
+
+# Copy Go from builder stage (Alpine's go package is too old - need 1.24+)
+COPY --from=builder /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/home/goupdate/go"
+ENV GOTOOLCHAIN="local"
 
 # Create non-root user for security
 RUN addgroup -g 1000 goupdate && \
