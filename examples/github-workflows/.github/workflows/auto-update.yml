@@ -7,10 +7,14 @@
 #   3. Push to your repository
 #
 # Requirements:
-#   The workflow installs the appropriate package manager tools based on PACKAGE_MANAGER:
+#   The workflow installs tools based on enabled package managers:
 #   - npm/yarn/pnpm: Requires Node.js (NODE_VERSION env var)
 #   - composer: Requires PHP (PHP_VERSION env var)
 #   - mod: Requires Go (GO_VERSION env var)
+#
+# Multiple Package Managers:
+#   Enable multiple package managers for projects like Laravel (composer + npm)
+#   or full-stack apps. Only the tools you enable will be installed.
 #
 # Update Policy:
 #   - Minor/Patch updates: Applied automatically
@@ -52,25 +56,42 @@ env:
   # Goupdate source (change to your org's fork if needed)
   GOUPDATE_REPO: 'ajxudir/goupdate'
 
-  # Package manager: npm, yarn, pnpm, composer, mod
-  PACKAGE_MANAGER: 'npm'
+  # -------------------------------------------------------------------------
+  # Package Managers - Enable the ones your project uses
+  # Set to 'true' to enable, 'false' or remove to disable
+  # -------------------------------------------------------------------------
+  ENABLE_NPM: 'true'
+  ENABLE_YARN: 'false'
+  ENABLE_PNPM: 'false'
+  ENABLE_COMPOSER: 'false'
+  ENABLE_GO: 'false'
 
-  # Language version (uncomment the one you need)
-  NODE_VERSION: '20'
-  # PHP_VERSION: '8.2'
-  # GO_VERSION: '1.24'
+  # -------------------------------------------------------------------------
+  # Language Versions - Configure versions for enabled package managers
+  # -------------------------------------------------------------------------
+  NODE_VERSION: '20'      # For npm, yarn, pnpm
+  PHP_VERSION: '8.2'      # For composer
+  GO_VERSION: '1.24'      # For go mod
 
-  # Branch settings
+  # -------------------------------------------------------------------------
+  # Branch Settings
+  # -------------------------------------------------------------------------
   UPDATE_BRANCH: 'goupdate/auto-update'
   TARGET_BRANCH: 'stage-updates'
 
-  # PR settings
+  # -------------------------------------------------------------------------
+  # PR Settings - use {date} for current date, {type} for update type
+  # -------------------------------------------------------------------------
   PR_TITLE: 'chore(deps): Auto update - {type} ({date})'
 
-  # Test command (set to empty to skip)
+  # -------------------------------------------------------------------------
+  # Test Command - runs after updates (set to empty to skip)
+  # -------------------------------------------------------------------------
   TEST_COMMAND: 'npm test'
 
+  # -------------------------------------------------------------------------
   # Packages to exclude (comma-separated)
+  # -------------------------------------------------------------------------
   EXCLUDE_PACKAGES: ''
 
 permissions:
@@ -84,6 +105,11 @@ jobs:
     outputs:
       run-updates: ${{ steps.config.outputs.run_updates }}
       update-type: ${{ steps.config.outputs.update_type }}
+      # Package manager flags for downstream jobs
+      use-node: ${{ steps.detect.outputs.use_node }}
+      use-php: ${{ steps.detect.outputs.use_php }}
+      use-go: ${{ steps.detect.outputs.use_go }}
+      package-managers: ${{ steps.detect.outputs.package_managers }}
     steps:
       - id: config
         run: |
@@ -102,13 +128,61 @@ jobs:
             echo "update_type=${TYPE:-minor}" >> $GITHUB_OUTPUT
           fi
 
+      - id: detect
+        env:
+          ENABLE_NPM: ${{ env.ENABLE_NPM }}
+          ENABLE_YARN: ${{ env.ENABLE_YARN }}
+          ENABLE_PNPM: ${{ env.ENABLE_PNPM }}
+          ENABLE_COMPOSER: ${{ env.ENABLE_COMPOSER }}
+          ENABLE_GO: ${{ env.ENABLE_GO }}
+        run: |
+          # Detect which language runtimes are needed
+          USE_NODE="false"
+          USE_PHP="false"
+          USE_GO="false"
+          MANAGERS=""
+
+          if [ "$ENABLE_NPM" = "true" ]; then
+            USE_NODE="true"
+            MANAGERS="${MANAGERS}npm,"
+          fi
+          if [ "$ENABLE_YARN" = "true" ]; then
+            USE_NODE="true"
+            MANAGERS="${MANAGERS}yarn,"
+          fi
+          if [ "$ENABLE_PNPM" = "true" ]; then
+            USE_NODE="true"
+            MANAGERS="${MANAGERS}pnpm,"
+          fi
+          if [ "$ENABLE_COMPOSER" = "true" ]; then
+            USE_PHP="true"
+            MANAGERS="${MANAGERS}composer,"
+          fi
+          if [ "$ENABLE_GO" = "true" ]; then
+            USE_GO="true"
+            MANAGERS="${MANAGERS}mod,"
+          fi
+
+          # Remove trailing comma
+          MANAGERS="${MANAGERS%,}"
+
+          echo "use_node=$USE_NODE" >> $GITHUB_OUTPUT
+          echo "use_php=$USE_PHP" >> $GITHUB_OUTPUT
+          echo "use_go=$USE_GO" >> $GITHUB_OUTPUT
+          echo "package_managers=$MANAGERS" >> $GITHUB_OUTPUT
+
+          echo "Detected package managers: $MANAGERS"
+          echo "Node.js needed: $USE_NODE"
+          echo "PHP needed: $USE_PHP"
+          echo "Go needed: $USE_GO"
+
   check:
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
-      has-updates: ${{ steps.check.outputs.has-updates }}
-      summary: ${{ steps.check.outputs.summary }}
+      has-updates: ${{ steps.aggregate.outputs.has_updates }}
+      summary: ${{ steps.aggregate.outputs.summary }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -123,40 +197,129 @@ jobs:
           create-if-missing: 'true'
           push: 'true'
 
-      # Setup for npm/yarn/pnpm
-      - if: contains('npm yarn pnpm', env.PACKAGE_MANAGER)
+      # -----------------------------------------------------------------------
+      # Setup Node.js (for npm, yarn, pnpm)
+      # -----------------------------------------------------------------------
+      - name: Setup Node.js
+        if: needs.prepare.outputs.use-node == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # Enable corepack for pnpm/yarn
-      - if: env.PACKAGE_MANAGER == 'pnpm' || env.PACKAGE_MANAGER == 'yarn'
+      - name: Enable corepack
+        if: env.ENABLE_YARN == 'true' || env.ENABLE_PNPM == 'true'
         run: corepack enable
 
-      # Setup for composer
-      - if: env.PACKAGE_MANAGER == 'composer'
+      # -----------------------------------------------------------------------
+      # Setup PHP (for composer)
+      # -----------------------------------------------------------------------
+      - name: Setup PHP
+        if: needs.prepare.outputs.use-php == 'true'
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
 
-      # Setup for go mod
-      - if: env.PACKAGE_MANAGER == 'mod'
+      # -----------------------------------------------------------------------
+      # Setup Go (for go mod)
+      # -----------------------------------------------------------------------
+      - name: Setup Go
+        if: needs.prepare.outputs.use-go == 'true'
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      # -----------------------------------------------------------------------
+      # Install goupdate
+      # -----------------------------------------------------------------------
       - name: Install goupdate
         uses: ./.github/actions/_goupdate-install
         with:
           goupdate-repo: ${{ env.GOUPDATE_REPO }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check for updates
-        id: check
+      # -----------------------------------------------------------------------
+      # Check for updates - each enabled package manager
+      # -----------------------------------------------------------------------
+      - name: Check npm updates
+        id: check-npm
+        if: env.ENABLE_NPM == 'true'
         uses: ./.github/actions/_goupdate-check
         with:
-          rule: ${{ env.PACKAGE_MANAGER }}
+          rule: npm
           exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+
+      - name: Check yarn updates
+        id: check-yarn
+        if: env.ENABLE_YARN == 'true'
+        uses: ./.github/actions/_goupdate-check
+        with:
+          rule: yarn
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+
+      - name: Check pnpm updates
+        id: check-pnpm
+        if: env.ENABLE_PNPM == 'true'
+        uses: ./.github/actions/_goupdate-check
+        with:
+          rule: pnpm
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+
+      - name: Check composer updates
+        id: check-composer
+        if: env.ENABLE_COMPOSER == 'true'
+        uses: ./.github/actions/_goupdate-check
+        with:
+          rule: composer
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+
+      - name: Check go mod updates
+        id: check-mod
+        if: env.ENABLE_GO == 'true'
+        uses: ./.github/actions/_goupdate-check
+        with:
+          rule: mod
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+
+      - name: Aggregate results
+        id: aggregate
+        env:
+          NPM_UPDATES: ${{ steps.check-npm.outputs.has-updates }}
+          YARN_UPDATES: ${{ steps.check-yarn.outputs.has-updates }}
+          PNPM_UPDATES: ${{ steps.check-pnpm.outputs.has-updates }}
+          COMPOSER_UPDATES: ${{ steps.check-composer.outputs.has-updates }}
+          MOD_UPDATES: ${{ steps.check-mod.outputs.has-updates }}
+          NPM_SUMMARY: ${{ steps.check-npm.outputs.summary }}
+          YARN_SUMMARY: ${{ steps.check-yarn.outputs.summary }}
+          PNPM_SUMMARY: ${{ steps.check-pnpm.outputs.summary }}
+          COMPOSER_SUMMARY: ${{ steps.check-composer.outputs.summary }}
+          MOD_SUMMARY: ${{ steps.check-mod.outputs.summary }}
+        run: |
+          HAS_UPDATES="false"
+          SUMMARY=""
+
+          if [ "$NPM_UPDATES" = "true" ]; then
+            HAS_UPDATES="true"
+            SUMMARY="${SUMMARY}npm: ${NPM_SUMMARY}; "
+          fi
+          if [ "$YARN_UPDATES" = "true" ]; then
+            HAS_UPDATES="true"
+            SUMMARY="${SUMMARY}yarn: ${YARN_SUMMARY}; "
+          fi
+          if [ "$PNPM_UPDATES" = "true" ]; then
+            HAS_UPDATES="true"
+            SUMMARY="${SUMMARY}pnpm: ${PNPM_SUMMARY}; "
+          fi
+          if [ "$COMPOSER_UPDATES" = "true" ]; then
+            HAS_UPDATES="true"
+            SUMMARY="${SUMMARY}composer: ${COMPOSER_SUMMARY}; "
+          fi
+          if [ "$MOD_UPDATES" = "true" ]; then
+            HAS_UPDATES="true"
+            SUMMARY="${SUMMARY}mod: ${MOD_SUMMARY}; "
+          fi
+
+          echo "has_updates=$HAS_UPDATES" >> $GITHUB_OUTPUT
+          echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
 
   update:
     needs: [prepare, check]
@@ -185,94 +348,208 @@ jobs:
           delete-remote: 'true'
           push: 'false'
 
-      # Setup for npm/yarn/pnpm
-      - if: contains('npm yarn pnpm', env.PACKAGE_MANAGER)
+      # -----------------------------------------------------------------------
+      # Setup Node.js (for npm, yarn, pnpm)
+      # -----------------------------------------------------------------------
+      - name: Setup Node.js
+        if: needs.prepare.outputs.use-node == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # Enable corepack for pnpm/yarn
-      - if: env.PACKAGE_MANAGER == 'pnpm' || env.PACKAGE_MANAGER == 'yarn'
+      - name: Enable corepack
+        if: env.ENABLE_YARN == 'true' || env.ENABLE_PNPM == 'true'
         run: corepack enable
 
-      - if: env.PACKAGE_MANAGER == 'npm'
+      - name: Install npm dependencies
+        if: env.ENABLE_NPM == 'true'
         run: npm ci
 
-      - if: env.PACKAGE_MANAGER == 'yarn'
+      - name: Install yarn dependencies
+        if: env.ENABLE_YARN == 'true'
         run: yarn install --frozen-lockfile
 
-      - if: env.PACKAGE_MANAGER == 'pnpm'
+      - name: Install pnpm dependencies
+        if: env.ENABLE_PNPM == 'true'
         run: pnpm install --frozen-lockfile
 
-      # Setup for composer
-      - if: env.PACKAGE_MANAGER == 'composer'
+      # -----------------------------------------------------------------------
+      # Setup PHP (for composer)
+      # -----------------------------------------------------------------------
+      - name: Setup PHP
+        if: needs.prepare.outputs.use-php == 'true'
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
 
-      - if: env.PACKAGE_MANAGER == 'composer'
+      - name: Install composer dependencies
+        if: env.ENABLE_COMPOSER == 'true'
         run: composer install --no-interaction
 
-      # Setup for go mod
-      - if: env.PACKAGE_MANAGER == 'mod'
+      # -----------------------------------------------------------------------
+      # Setup Go (for go mod)
+      # -----------------------------------------------------------------------
+      - name: Setup Go
+        if: needs.prepare.outputs.use-go == 'true'
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      # -----------------------------------------------------------------------
+      # Install goupdate
+      # -----------------------------------------------------------------------
       - name: Install goupdate
         uses: ./.github/actions/_goupdate-install
         with:
           goupdate-repo: ${{ env.GOUPDATE_REPO }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Apply updates
-        id: update
+      # -----------------------------------------------------------------------
+      # Apply updates - each enabled package manager
+      # -----------------------------------------------------------------------
+      - name: Update npm packages
+        id: update-npm
+        if: env.ENABLE_NPM == 'true'
         uses: ./.github/actions/_goupdate-update
         with:
-          rule: ${{ env.PACKAGE_MANAGER }}
+          rule: npm
           update-type: ${{ needs.prepare.outputs.update-type }}
           exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
           system-test-mode: 'none'
 
+      - name: Update yarn packages
+        id: update-yarn
+        if: env.ENABLE_YARN == 'true'
+        uses: ./.github/actions/_goupdate-update
+        with:
+          rule: yarn
+          update-type: ${{ needs.prepare.outputs.update-type }}
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+          system-test-mode: 'none'
+
+      - name: Update pnpm packages
+        id: update-pnpm
+        if: env.ENABLE_PNPM == 'true'
+        uses: ./.github/actions/_goupdate-update
+        with:
+          rule: pnpm
+          update-type: ${{ needs.prepare.outputs.update-type }}
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+          system-test-mode: 'none'
+
+      - name: Update composer packages
+        id: update-composer
+        if: env.ENABLE_COMPOSER == 'true'
+        uses: ./.github/actions/_goupdate-update
+        with:
+          rule: composer
+          update-type: ${{ needs.prepare.outputs.update-type }}
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+          system-test-mode: 'none'
+
+      - name: Update go modules
+        id: update-mod
+        if: env.ENABLE_GO == 'true'
+        uses: ./.github/actions/_goupdate-update
+        with:
+          rule: mod
+          update-type: ${{ needs.prepare.outputs.update-type }}
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+          system-test-mode: 'none'
+
+      # -----------------------------------------------------------------------
+      # Aggregate and commit
+      # -----------------------------------------------------------------------
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run tests
-        if: steps.update.outputs.has-changes == 'true' && env.TEST_COMMAND != ''
+        if: steps.changes.outputs.has_changes == 'true' && env.TEST_COMMAND != ''
         run: ${{ env.TEST_COMMAND }}
         continue-on-error: true
 
       - name: Commit and create PR
-        if: steps.update.outputs.has-changes == 'true'
+        if: steps.changes.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           UPDATE_TYPE: ${{ needs.prepare.outputs.update-type }}
-          UPDATE_OUTPUT: ${{ steps.update.outputs.update-output }}
+          NPM_OUTPUT: ${{ steps.update-npm.outputs.update-output }}
+          YARN_OUTPUT: ${{ steps.update-yarn.outputs.update-output }}
+          PNPM_OUTPUT: ${{ steps.update-pnpm.outputs.update-output }}
+          COMPOSER_OUTPUT: ${{ steps.update-composer.outputs.update-output }}
+          MOD_OUTPUT: ${{ steps.update-mod.outputs.update-output }}
         run: |
           DATE=$(date -u +%Y-%m-%d)
           TYPE=$(echo "$UPDATE_TYPE" | sed 's/\b\(.\)/\u\1/')
           TITLE=$(echo "${{ env.PR_TITLE }}" | sed "s/{date}/$DATE/g" | sed "s/{type}/$TYPE/g")
 
-          # Determine files to commit based on package manager
-          case "${{ env.PACKAGE_MANAGER }}" in
-            npm)     FILES="package.json package-lock.json" ;;
-            yarn)    FILES="package.json yarn.lock" ;;
-            pnpm)    FILES="package.json pnpm-lock.yaml" ;;
-            composer) FILES="composer.json composer.lock" ;;
-            mod)     FILES="go.mod go.sum" ;;
-          esac
+          # Add all possible dependency files
+          git add -A
 
-          git add $FILES
           git commit -m "$TITLE"
           git push -u origin "${{ env.UPDATE_BRANCH }}"
+
+          # Build PR body with all outputs
+          BODY="## Automated Dependency Update
+
+          This PR was automatically created by the dependency update workflow.
+          "
+
+          if [ -n "$NPM_OUTPUT" ]; then
+            BODY="${BODY}
+          ### npm
+          \`\`\`
+          $NPM_OUTPUT
+          \`\`\`
+          "
+          fi
+
+          if [ -n "$YARN_OUTPUT" ]; then
+            BODY="${BODY}
+          ### yarn
+          \`\`\`
+          $YARN_OUTPUT
+          \`\`\`
+          "
+          fi
+
+          if [ -n "$PNPM_OUTPUT" ]; then
+            BODY="${BODY}
+          ### pnpm
+          \`\`\`
+          $PNPM_OUTPUT
+          \`\`\`
+          "
+          fi
+
+          if [ -n "$COMPOSER_OUTPUT" ]; then
+            BODY="${BODY}
+          ### composer
+          \`\`\`
+          $COMPOSER_OUTPUT
+          \`\`\`
+          "
+          fi
+
+          if [ -n "$MOD_OUTPUT" ]; then
+            BODY="${BODY}
+          ### go mod
+          \`\`\`
+          $MOD_OUTPUT
+          \`\`\`
+          "
+          fi
 
           # Create PR
           gh pr create \
             --title "$TITLE" \
-            --body "## Automated Dependency Update
-
-          This PR was automatically created by the dependency update workflow.
-
-          \`\`\`
-          $UPDATE_OUTPUT
-          \`\`\`" \
+            --body "$BODY" \
             --base "${{ env.TARGET_BRANCH }}" \
             --head "${{ env.UPDATE_BRANCH }}"
 
@@ -284,9 +561,12 @@ jobs:
     steps:
       - env:
           CHECK_SUMMARY: ${{ needs.check.outputs.summary }}
+          PACKAGE_MANAGERS: ${{ needs.prepare.outputs.package-managers }}
         run: |
           echo "## Auto Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Package Managers:** $PACKAGE_MANAGERS" >> $GITHUB_STEP_SUMMARY
           if [ -n "$CHECK_SUMMARY" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Update check complete: $CHECK_SUMMARY" >> $GITHUB_STEP_SUMMARY
+            echo "**Updates:** $CHECK_SUMMARY" >> $GITHUB_STEP_SUMMARY
           fi

@@ -1,6 +1,6 @@
 # GoUpdate GitHub Actions Example
 
-Drop-in GitHub Actions workflow for automated dependency updates.
+Drop-in GitHub Actions workflow for automated dependency updates across multiple package managers.
 
 ## Quick Start
 
@@ -10,24 +10,42 @@ Drop-in GitHub Actions workflow for automated dependency updates.
 
 ## Configuration
 
-Edit the environment variables in the workflow:
+### Enable Package Managers
+
+Enable only the package managers your project uses. Only the required tools will be installed.
 
 ```yaml
 env:
-  # Goupdate source (change to your org's fork if needed)
-  GOUPDATE_REPO: 'ajxudir/goupdate'
+  # Package Managers - Enable the ones your project uses
+  # Set to 'true' to enable, 'false' to disable
+  ENABLE_NPM: 'true'
+  ENABLE_YARN: 'false'
+  ENABLE_PNPM: 'false'
+  ENABLE_COMPOSER: 'false'
+  ENABLE_GO: 'false'
+```
 
-  # Package manager: npm, yarn, pnpm, composer, mod
-  PACKAGE_MANAGER: 'npm'
+### Language Versions
 
-  # Language version (uncomment the one you need)
-  NODE_VERSION: '20'
-  # PHP_VERSION: '8.2'
-  # GO_VERSION: '1.24'
+Configure versions for the enabled package managers:
 
+```yaml
+env:
+  NODE_VERSION: '20'      # For npm, yarn, pnpm
+  PHP_VERSION: '8.2'      # For composer
+  GO_VERSION: '1.24'      # For go mod
+```
+
+### Other Settings
+
+```yaml
+env:
   # Branch settings
   UPDATE_BRANCH: 'goupdate/auto-update'
   TARGET_BRANCH: 'stage-updates'
+
+  # PR title template ({date} and {type} are replaced)
+  PR_TITLE: 'chore(deps): Auto update - {type} ({date})'
 
   # Test command (set to empty to skip)
   TEST_COMMAND: 'npm test'
@@ -36,15 +54,49 @@ env:
   EXCLUDE_PACKAGES: ''
 ```
 
+## Example Configurations
+
+### Node.js (npm)
+```yaml
+ENABLE_NPM: 'true'
+NODE_VERSION: '20'
+TEST_COMMAND: 'npm test'
+```
+
+### Node.js (pnpm)
+```yaml
+ENABLE_PNPM: 'true'
+NODE_VERSION: '20'
+TEST_COMMAND: 'pnpm test'
+```
+
+### Laravel (PHP + npm)
+```yaml
+ENABLE_NPM: 'true'
+ENABLE_COMPOSER: 'true'
+NODE_VERSION: '20'
+PHP_VERSION: '8.2'
+TEST_COMMAND: 'composer test && npm test'
+```
+
+### Full-stack (Go + pnpm)
+```yaml
+ENABLE_PNPM: 'true'
+ENABLE_GO: 'true'
+NODE_VERSION: '20'
+GO_VERSION: '1.24'
+TEST_COMMAND: 'go test ./... && pnpm test'
+```
+
 ## Supported Package Managers
 
-| Manager | Files |
-|---------|-------|
-| `npm` | package.json, package-lock.json |
-| `yarn` | package.json, yarn.lock |
-| `pnpm` | package.json, pnpm-lock.yaml |
-| `composer` | composer.json, composer.lock |
-| `mod` | go.mod, go.sum |
+| Flag | Manager | Language | Files |
+|------|---------|----------|-------|
+| `ENABLE_NPM` | npm | Node.js | package.json, package-lock.json |
+| `ENABLE_YARN` | yarn | Node.js | package.json, yarn.lock |
+| `ENABLE_PNPM` | pnpm | Node.js | package.json, pnpm-lock.yaml |
+| `ENABLE_COMPOSER` | composer | PHP | composer.json, composer.lock |
+| `ENABLE_GO` | go mod | Go | go.mod, go.sum |
 
 ## Update Policy
 
@@ -64,10 +116,11 @@ Go to Actions → Auto Update Dependencies → Run workflow:
 ```
 .github/
 ├── actions/
-│   ├── _goupdate-install/   # Download goupdate
+│   ├── _goupdate-install/   # Download goupdate binary
 │   ├── _goupdate-check/     # Check for updates
 │   ├── _goupdate-update/    # Apply updates
-│   └── _gh-pr/              # Create PRs
+│   ├── _gh-pr/              # Create pull requests
+│   └── _git-branch/         # Branch management
 └── workflows/
     └── auto-update.yml      # Main workflow
 ```

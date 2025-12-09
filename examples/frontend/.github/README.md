@@ -1,6 +1,6 @@
 # Frontend Auto Update Workflow
 
-Drop-in GitHub Actions workflow for automated dependency updates in pnpm/npm/yarn projects.
+Drop-in GitHub Actions workflow for automated dependency updates in frontend projects.
 
 Based on [matematikk-mooc/frontend](https://github.com/matematikk-mooc/frontend) project.
 
@@ -13,34 +13,62 @@ Based on [matematikk-mooc/frontend](https://github.com/matematikk-mooc/frontend)
 
 ## Configuration
 
-Edit environment variables in the workflow:
+### Enable Package Managers
+
+Enable only the package managers your project uses. This example defaults to pnpm.
 
 ```yaml
 env:
-  # Package manager: npm, yarn, pnpm
-  PACKAGE_MANAGER: 'pnpm'
-
-  # Node.js version
-  NODE_VERSION: '20'
-
-  # Branch settings
-  UPDATE_BRANCH: 'goupdate/auto-update'
-  TARGET_BRANCH: 'stage-updates'
-
-  # Test command (set to empty to skip)
-  TEST_COMMAND: ''
-
-  # Packages to exclude (comma-separated)
-  EXCLUDE_PACKAGES: ''
+  # Package Managers - Enable the ones your project uses
+  ENABLE_NPM: 'false'
+  ENABLE_YARN: 'false'
+  ENABLE_PNPM: 'true'      # Frontend uses pnpm
+  ENABLE_COMPOSER: 'false'
+  ENABLE_GO: 'false'
 ```
 
-## Package Manager Support
+### Language Versions
 
-| Manager | Files | Setup |
-|---------|-------|-------|
-| `npm` | package.json, package-lock.json | `npm ci` |
-| `yarn` | package.json, yarn.lock | corepack + `yarn install --frozen-lockfile` |
-| `pnpm` | package.json, pnpm-lock.yaml | corepack + `pnpm install --frozen-lockfile` |
+```yaml
+env:
+  NODE_VERSION: '20'      # For npm, yarn, pnpm
+  PHP_VERSION: '8.2'      # For composer
+  GO_VERSION: '1.24'      # For go mod
+```
+
+## Example Configurations
+
+### Vue.js with pnpm (this example)
+```yaml
+ENABLE_PNPM: 'true'
+NODE_VERSION: '20'
+```
+
+### React with npm
+```yaml
+ENABLE_NPM: 'true'
+NODE_VERSION: '20'
+TEST_COMMAND: 'npm test'
+```
+
+### Laravel + Vue (PHP + pnpm)
+```yaml
+ENABLE_PNPM: 'true'
+ENABLE_COMPOSER: 'true'
+NODE_VERSION: '20'
+PHP_VERSION: '8.2'
+TEST_COMMAND: 'composer test && pnpm test'
+```
+
+## Supported Package Managers
+
+| Flag | Manager | Language | Files |
+|------|---------|----------|-------|
+| `ENABLE_NPM` | npm | Node.js | package.json, package-lock.json |
+| `ENABLE_YARN` | yarn | Node.js | package.json, yarn.lock |
+| `ENABLE_PNPM` | pnpm | Node.js | package.json, pnpm-lock.yaml |
+| `ENABLE_COMPOSER` | composer | PHP | composer.json, composer.lock |
+| `ENABLE_GO` | go mod | Go | go.mod, go.sum |
 
 ## Update Policy
 
