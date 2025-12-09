@@ -195,9 +195,10 @@ rules:
       # Uses dotnet CLI which respects NuGet.config for private feeds
       commands: |
         dotnet package search {{package}} --exact-match --format json
-      format: json
+      format: raw
       extraction:
-        json_key: "searchResult[0].packages[0].version"
+        # Extract all version values from JSON array of package objects
+        pattern: '"version":\s*"(?P<version>[^"]+)"'
       timeout_seconds: 30
     update:
       # dotnet restore updates lock file based on csproj after version is changed
@@ -228,9 +229,10 @@ rules:
       # Uses dotnet CLI which respects NuGet.config for private feeds
       commands: |
         dotnet package search {{package}} --exact-match --format json
-      format: json
+      format: raw
       extraction:
-        json_key: "searchResult[0].packages[0].version"
+        # Extract all version values from JSON array of package objects
+        pattern: '"version":\s*"(?P<version>[^"]+)"'
       timeout_seconds: 30
     update:
       commands: |
