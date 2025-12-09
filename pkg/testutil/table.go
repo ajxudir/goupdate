@@ -1,7 +1,7 @@
 package testutil
 
 import (
-	"github.com/user/goupdate/pkg/output"
+	"github.com/ajxudir/goupdate/pkg/output"
 )
 
 // CreateUpdateTable creates a table for update tests with all standard columns.

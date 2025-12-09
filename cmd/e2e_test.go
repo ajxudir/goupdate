@@ -10,12 +10,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/errors"
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/outdated"
-	"github.com/user/goupdate/pkg/output"
-	"github.com/user/goupdate/pkg/update"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/errors"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/outdated"
+	"github.com/ajxudir/goupdate/pkg/output"
+	"github.com/ajxudir/goupdate/pkg/update"
 )
 
 // E2E tests simulating GitHub Actions workflow usage patterns.

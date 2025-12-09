@@ -1,7 +1,7 @@
 package filtering
 
 import (
-	"github.com/user/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/utils"
 )
 
 // FilterAll is the default filter value that matches all items.

@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/utils"
 )
 
 // shouldIgnorePackage checks if a package should be ignored based on configuration.

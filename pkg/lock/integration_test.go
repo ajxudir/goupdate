@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/packages"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/packages"
 )
 
 // TestIntegration_NPM tests the behavior of npm package resolution with real testdata.

@@ -7,11 +7,11 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/constants"
-	"github.com/user/goupdate/pkg/filtering"
-	"github.com/user/goupdate/pkg/output"
-	"github.com/user/goupdate/pkg/packages"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/constants"
+	"github.com/ajxudir/goupdate/pkg/filtering"
+	"github.com/ajxudir/goupdate/pkg/output"
+	"github.com/ajxudir/goupdate/pkg/packages"
 )
 
 var (

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/errors"
-	"github.com/user/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/errors"
+	"github.com/ajxudir/goupdate/pkg/formats"
 )
 
 // ResolveUpdateCfg returns the effective update configuration for a package.

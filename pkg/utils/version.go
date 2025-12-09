@@ -3,8 +3,8 @@ package utils
 import (
 	"strings"
 
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/warnings"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/warnings"
 )
 
 var supportedConstraints = map[string]bool{

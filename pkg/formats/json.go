@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/user/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/config"
 )
 
 // JSONParser parses JSON package files (e.g., package.json).

@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/constants"
-	pkgerrors "github.com/user/goupdate/pkg/errors"
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/lock"
-	"github.com/user/goupdate/pkg/testutil"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/constants"
+	pkgerrors "github.com/ajxudir/goupdate/pkg/errors"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/lock"
+	"github.com/ajxudir/goupdate/pkg/testutil"
 )
 
 // Note: mockUnsupportedTracker is defined in context_test.go

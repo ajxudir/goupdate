@@ -4,8 +4,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/formats"
 )
 
 // ApplyPackageGroups assigns group names to packages based on config rules.

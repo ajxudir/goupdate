@@ -418,9 +418,9 @@ Version information is embedded at build time using Go ldflags:
 
 ```bash
 # Build with version information
-go build -ldflags="-X github.com/user/goupdate/cmd.Version=1.0.0 \
-                   -X github.com/user/goupdate/cmd.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
-                   -X github.com/user/goupdate/cmd.GitCommit=$(git rev-parse --short HEAD)"
+go build -ldflags="-X github.com/ajxudir/goupdate/cmd.Version=1.0.0 \
+                   -X github.com/ajxudir/goupdate/cmd.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+                   -X github.com/ajxudir/goupdate/cmd.GitCommit=$(git rev-parse --short HEAD)"
 ```
 
 The Makefile automatically sets these values when using `make build`.

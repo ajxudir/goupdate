@@ -5,7 +5,7 @@
 // update package dependencies across various configuration file formats.
 package main
 
-import "github.com/user/goupdate/cmd"
+import "github.com/ajxudir/goupdate/cmd"
 
 // main initializes and runs the goupdate CLI application.
 //

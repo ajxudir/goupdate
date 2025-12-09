@@ -5,8 +5,8 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/formats"
 )
 
 // TestExtractCommands tests the behavior of command extraction from multi-line command strings.

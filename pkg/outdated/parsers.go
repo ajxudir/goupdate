@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/user/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/config"
 )
 
 // UTF-8 BOM bytes (EF BB BF)

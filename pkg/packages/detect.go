@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/utils"
-	"github.com/user/goupdate/pkg/warnings"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/warnings"
 )
 
 // DetectFiles discovers all manifest files matching configured include/exclude patterns.

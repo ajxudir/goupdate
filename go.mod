@@ -1,4 +1,4 @@
-module github.com/user/goupdate
+module github.com/ajxudir/goupdate
 
 go 1.24.0
 

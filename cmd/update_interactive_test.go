@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/formats"
 )
 
 // Interactive confirmation tests extracted from update_test.go

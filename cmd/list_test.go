@@ -10,15 +10,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/display"
-	"github.com/user/goupdate/pkg/filtering"
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/lock"
-	"github.com/user/goupdate/pkg/output"
-	"github.com/user/goupdate/pkg/packages"
-	"github.com/user/goupdate/pkg/supervision"
-	"github.com/user/goupdate/pkg/warnings"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/display"
+	"github.com/ajxudir/goupdate/pkg/filtering"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/lock"
+	"github.com/ajxudir/goupdate/pkg/output"
+	"github.com/ajxudir/goupdate/pkg/packages"
+	"github.com/ajxudir/goupdate/pkg/supervision"
+	"github.com/ajxudir/goupdate/pkg/warnings"
 )
 
 // TestListCommand tests the behavior of the list command.

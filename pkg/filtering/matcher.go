@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/user/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/utils"
 )
 
 // Matcher defines the interface for string matching strategies.

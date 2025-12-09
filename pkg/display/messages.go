@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/user/goupdate/pkg/constants"
+	"github.com/ajxudir/goupdate/pkg/constants"
 )
 
 // PrintWarnings prints warning messages to the writer.

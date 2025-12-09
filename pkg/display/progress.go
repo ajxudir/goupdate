@@ -4,7 +4,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/user/goupdate/pkg/output"
+	"github.com/ajxudir/goupdate/pkg/output"
 )
 
 // Progress re-exports output.Progress for convenience.

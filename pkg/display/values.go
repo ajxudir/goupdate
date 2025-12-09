@@ -3,7 +3,7 @@ package display
 import (
 	"strings"
 
-	"github.com/user/goupdate/pkg/constants"
+	"github.com/ajxudir/goupdate/pkg/constants"
 )
 
 // SafeInstalledValue returns a display-safe installed version.

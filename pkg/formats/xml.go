@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/utils"
 )
 
 // XMLParser parses XML package files (e.g., .csproj, packages.config).

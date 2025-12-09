@@ -8,8 +8,8 @@ import (
 	"github.com/iancoleman/orderedmap"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/formats"
 )
 
 // TestUpdateJSONVersionPreservesInequalityEncoding tests JSON inequality operator encoding.

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/user/goupdate/pkg/verbose"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
 // TestPersistentPreRunVerbose tests the behavior of PersistentPreRun with verbose flag.

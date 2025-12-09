@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/user/goupdate/pkg/constants"
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/lock"
-	"github.com/user/goupdate/pkg/outdated"
-	"github.com/user/goupdate/pkg/output"
-	"github.com/user/goupdate/pkg/systemtest"
-	"github.com/user/goupdate/pkg/testutil"
+	"github.com/ajxudir/goupdate/pkg/constants"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/lock"
+	"github.com/ajxudir/goupdate/pkg/outdated"
+	"github.com/ajxudir/goupdate/pkg/output"
+	"github.com/ajxudir/goupdate/pkg/systemtest"
+	"github.com/ajxudir/goupdate/pkg/testutil"
 )
 
 // Note: We use lock.InstallStatusNotConfigured and lock.InstallStatusFloating in tests

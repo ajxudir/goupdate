@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/user/goupdate/pkg/config"
-	pkgerrors "github.com/user/goupdate/pkg/errors"
-	"github.com/user/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/config"
+	pkgerrors "github.com/ajxudir/goupdate/pkg/errors"
+	"github.com/ajxudir/goupdate/pkg/formats"
 )
 
 // TestResolveOutdatedScope tests the behavior of resolveOutdatedScope.

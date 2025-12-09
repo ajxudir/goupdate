@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/user/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/formats"
 )
 
 // TestFilterPackagesWithFilters tests the FilterPackagesWithFilters function.

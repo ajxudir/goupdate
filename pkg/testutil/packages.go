@@ -1,9 +1,9 @@
 package testutil
 
 import (
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/systemtest"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/systemtest"
 )
 
 // PackageBuilder provides a fluent API for building test packages.

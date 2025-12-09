@@ -10,9 +10,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/errors"
-	"github.com/user/goupdate/pkg/verbose"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/errors"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
 // TestExecute tests the behavior of ExecuteTest with --help flag.

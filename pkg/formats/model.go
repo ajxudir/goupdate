@@ -3,7 +3,7 @@
 // with support for XPath/JSONPath-like field extraction.
 package formats
 
-import "github.com/user/goupdate/pkg/config"
+import "github.com/ajxudir/goupdate/pkg/config"
 
 // Package represents a declared dependency captured by a parser.
 //

@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/errors"
-	"github.com/user/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/errors"
+	"github.com/ajxudir/goupdate/pkg/formats"
 )
 
 // TestExecuteWithExitCodes tests the behavior of Execute with different exit codes.

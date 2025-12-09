@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/user/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/config"
 )
 
 // These tests ensure the test utility functions are covered.
