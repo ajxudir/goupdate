@@ -8,6 +8,7 @@ exclude_versions:
   - "(?i)[._-]alpha"
   - "(?i)[._-]beta"
   - "(?i)[._-]rc"
+  - "(?i)[._-]pre"
   - "(?i)[._-]canary"
   - "(?i)[._-]dev"
   - "(?i)[._-]snapshot"
@@ -191,12 +192,13 @@ rules:
       dev_element: "PrivateAssets"
       dev_element_value: "all"
     outdated:
+      # Uses dotnet CLI which respects NuGet.config for private feeds
       commands: |
-        dotnet package search {{package}} --exact-match
+        dotnet package search {{package}} --exact-match --format json
       format: raw
       extraction:
-        # Parse dotnet package search table output: | PackageName | Version | ... |
-        pattern: '(?m)^\|\s*[^|]+\|\s*(?P<version>\d[\w\.\-]*)\s*\|'
+        # Extract all version values from JSON array of package objects
+        pattern: '"version":\s*"(?P<version>[^"]+)"'
       timeout_seconds: 30
     update:
       # dotnet restore updates lock file based on csproj after version is changed
@@ -224,12 +226,13 @@ rules:
       dev_attr: "developmentDependency"
       dev_value: "true"
     outdated:
+      # Uses dotnet CLI which respects NuGet.config for private feeds
       commands: |
-        dotnet package search {{package}} --exact-match
+        dotnet package search {{package}} --exact-match --format json
       format: raw
       extraction:
-        # Parse dotnet package search table output: | PackageName | Version | ... |
-        pattern: '(?m)^\|\s*[^|]+\|\s*(?P<version>\d[\w\.\-]*)\s*\|'
+        # Extract all version values from JSON array of package objects
+        pattern: '"version":\s*"(?P<version>[^"]+)"'
       timeout_seconds: 30
     update:
       commands: |
