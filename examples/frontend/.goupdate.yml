@@ -17,6 +17,11 @@ rules:
         - "@vue/reactivity"
         - "@vueuse/core"
 
+      # React (used alongside Vue in this project)
+      react:
+        - react
+        - react-dom
+
       # Build tooling
       build:
         - webpack
@@ -25,12 +30,14 @@ rules:
         - vue-loader
         - sass
         - sass-loader
+        - babel-loader
+        - "@babel/core"
+        - "@babel/preset-env"
 
       # Testing tools
       testing:
-        - vitest
-        - "@vitest/coverage-v8"
         - playwright
+        - "@playwright/test"
 
       # Linting
       lint:
@@ -38,19 +45,15 @@ rules:
         - eslint-plugin-vue
         - prettier
 
-      # TypeScript
-      typescript:
-        - typescript
-        - "@types/node"
+      # RxJS
+      rxjs:
+        - rxjs
 
-    # Update Vue incrementally for stability
+    # Update Vue/React incrementally for stability
     incremental:
       - vue
       - vuex
-
-    # Skip type packages (often auto-updated by IDE tools)
-    ignore:
-      - "@types/*"
+      - react
 
     # Skip pre-release versions
     exclude_versions:

@@ -103,7 +103,7 @@ env:
   # -------------------------------------------------------------------------
   # Test Command - runs after updates (set to empty to skip)
   # -------------------------------------------------------------------------
-  TEST_COMMAND: 'npm test'
+  TEST_COMMAND: 'pnpm run build'
 
   # -------------------------------------------------------------------------
   # Packages to exclude (comma-separated)
