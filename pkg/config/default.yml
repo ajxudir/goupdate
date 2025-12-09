@@ -192,13 +192,12 @@ rules:
       dev_element: "PrivateAssets"
       dev_element_value: "all"
     outdated:
-      # Use NuGet API for cross-platform compatibility (works without dotnet SDK)
-      # Package name is lowercased as required by NuGet API
+      # Uses dotnet CLI which respects NuGet.config for private feeds
       commands: |
-        curl -s "https://api.nuget.org/v3-flatcontainer/$(echo '{{package}}' | tr '[:upper:]' '[:lower:]')/index.json"
+        dotnet package search {{package}} --exact-match --format json
       format: json
       extraction:
-        json_key: "versions"
+        json_key: "searchResult[0].packages[0].version"
       timeout_seconds: 30
     update:
       # dotnet restore updates lock file based on csproj after version is changed
@@ -226,13 +225,12 @@ rules:
       dev_attr: "developmentDependency"
       dev_value: "true"
     outdated:
-      # Use NuGet API for cross-platform compatibility (works without dotnet SDK)
-      # Package name is lowercased as required by NuGet API
+      # Uses dotnet CLI which respects NuGet.config for private feeds
       commands: |
-        curl -s "https://api.nuget.org/v3-flatcontainer/$(echo '{{package}}' | tr '[:upper:]' '[:lower:]')/index.json"
+        dotnet package search {{package}} --exact-match --format json
       format: json
       extraction:
-        json_key: "versions"
+        json_key: "searchResult[0].packages[0].version"
       timeout_seconds: 30
     update:
       commands: |

@@ -153,7 +153,7 @@ rules:
   #       extraction:
   #         pattern: '(?m)^(?P<n>\S+)\s+(?P<version>v[^\s]+)'
 
-  # Example: .NET MSBuild projects (uses NuGet API for cross-platform support)
+  # Example: .NET MSBuild projects (uses dotnet CLI, respects NuGet.config for private feeds)
   # msbuild:
   #   manager: dotnet
   #   include: ["**/*.csproj", "**/*.vbproj", "**/*.fsproj"]
@@ -161,12 +161,12 @@ rules:
   #   fields:
   #     ItemGroup/PackageReference: prod
   #   outdated:
-  #     # NuGet API requires lowercase package names
+  #     # Uses dotnet CLI which respects NuGet.config for private feeds
   #     commands: |
-  #       curl -s "https://api.nuget.org/v3-flatcontainer/$(echo '{{package}}' | tr '[:upper:]' '[:lower:]')/index.json"
+  #       dotnet package search {{package}} --exact-match --format json
   #     format: json
   #     extraction:
-  #       json_key: "versions"                    # NuGet API returns versions array
+  #       json_key: "searchResult[0].packages[0].version"
   #     timeout_seconds: 30
   #   update:
   #     commands: |
