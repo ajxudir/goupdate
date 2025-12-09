@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/lock"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/lock"
 )
 
 // TestNewUnsupportedTracker tests the behavior of NewUnsupportedTracker.

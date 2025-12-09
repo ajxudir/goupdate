@@ -11,11 +11,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/errors"
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/verbose"
-	"github.com/user/goupdate/pkg/warnings"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/errors"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/verbose"
+	"github.com/ajxudir/goupdate/pkg/warnings"
 )
 
 var (

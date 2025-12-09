@@ -1,7 +1,7 @@
 package filtering
 
 import (
-	"github.com/user/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/formats"
 )
 
 // PackageFilter defines the interface for filtering packages.

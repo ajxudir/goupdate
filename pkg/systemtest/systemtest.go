@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/user/goupdate/pkg/cmdexec"
-	"github.com/user/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/cmdexec"
+	"github.com/ajxudir/goupdate/pkg/config"
 )
 
 // DefaultTimeoutSeconds is the default timeout for system tests (5 minutes).

@@ -3,7 +3,7 @@ package formats
 import (
 	"fmt"
 
-	"github.com/user/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/config"
 	"gopkg.in/yaml.v3"
 )
 

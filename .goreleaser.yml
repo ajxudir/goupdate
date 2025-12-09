@@ -31,17 +31,18 @@ builds:
         goarch: arm
     ldflags:
       - -s -w
-      - -X github.com/user/goupdate/cmd.Version={{.Version}}
-      - -X github.com/user/goupdate/cmd.BuildTime={{.Date}}
-      - -X github.com/user/goupdate/cmd.GitCommit={{.ShortCommit}}
-      - -X github.com/user/goupdate/cmd.BuildOS={{.Os}}
-      - -X github.com/user/goupdate/cmd.BuildArch={{.Arch}}
+      - -X github.com/ajxudir/goupdate/cmd.Version={{.Version}}
+      - -X github.com/ajxudir/goupdate/cmd.BuildTime={{.Date}}
+      - -X github.com/ajxudir/goupdate/cmd.GitCommit={{.ShortCommit}}
+      - -X github.com/ajxudir/goupdate/cmd.BuildOS={{.Os}}
+      - -X github.com/ajxudir/goupdate/cmd.BuildArch={{.Arch}}
 
 archives:
   - id: default
     formats:
       - tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    # Version-less naming for easier automation (use /releases/latest/download/)
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     files:
       - LICENSE
       - README.md

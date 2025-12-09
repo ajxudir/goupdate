@@ -1,8 +1,8 @@
 package filtering
 
 import (
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/utils"
 )
 
 // FilterPackages filters packages based on the provided options.

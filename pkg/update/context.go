@@ -1,11 +1,11 @@
 package update
 
 import (
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/outdated"
-	"github.com/user/goupdate/pkg/output"
-	"github.com/user/goupdate/pkg/systemtest"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/outdated"
+	"github.com/ajxudir/goupdate/pkg/output"
+	"github.com/ajxudir/goupdate/pkg/systemtest"
 )
 
 // VersionSnapshot stores the version state of a package for validation.

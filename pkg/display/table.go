@@ -1,6 +1,6 @@
 package display
 
-import "github.com/user/goupdate/pkg/output"
+import "github.com/ajxudir/goupdate/pkg/output"
 
 // Alignment specifies text alignment within a column.
 //

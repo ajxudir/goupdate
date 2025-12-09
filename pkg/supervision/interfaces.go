@@ -1,7 +1,7 @@
 package supervision
 
 import (
-	"github.com/user/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/formats"
 )
 
 // Tracker defines the interface for tracking unsupported packages.

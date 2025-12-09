@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/user/goupdate/pkg/warnings"
+	"github.com/ajxudir/goupdate/pkg/warnings"
 )
 
 // getShell returns the user's shell and args to run a command.

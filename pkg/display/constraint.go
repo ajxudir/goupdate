@@ -3,10 +3,10 @@ package display
 import (
 	"fmt"
 
-	"github.com/user/goupdate/pkg/constants"
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/utils"
-	"github.com/user/goupdate/pkg/warnings"
+	"github.com/ajxudir/goupdate/pkg/constants"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/warnings"
 )
 
 // FormatConstraintDisplay formats a package constraint for display.

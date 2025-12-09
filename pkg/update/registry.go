@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/errors"
-	"github.com/user/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/errors"
+	"github.com/ajxudir/goupdate/pkg/formats"
 )
 
 // FormatUpdater defines the interface for updating package versions in manifest files.

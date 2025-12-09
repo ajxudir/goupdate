@@ -63,9 +63,9 @@ VERSION ?= $(shell git describe --tags --always --dirty)
 BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
 
-LDFLAGS := -X github.com/user/goupdate/cmd.Version=$(VERSION) \
-           -X github.com/user/goupdate/cmd.BuildTime=$(BUILD_TIME) \
-           -X github.com/user/goupdate/cmd.GitCommit=$(GIT_COMMIT)
+LDFLAGS := -X github.com/ajxudir/goupdate/cmd.Version=$(VERSION) \
+           -X github.com/ajxudir/goupdate/cmd.BuildTime=$(BUILD_TIME) \
+           -X github.com/ajxudir/goupdate/cmd.GitCommit=$(GIT_COMMIT)
 
 build:
     go build -ldflags="$(LDFLAGS)" -o goupdate .

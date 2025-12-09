@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/user/goupdate/pkg/constants"
-	"github.com/user/goupdate/pkg/display"
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/lock"
-	"github.com/user/goupdate/pkg/outdated"
-	"github.com/user/goupdate/pkg/output"
-	"github.com/user/goupdate/pkg/systemtest"
+	"github.com/ajxudir/goupdate/pkg/constants"
+	"github.com/ajxudir/goupdate/pkg/display"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/lock"
+	"github.com/ajxudir/goupdate/pkg/outdated"
+	"github.com/ajxudir/goupdate/pkg/output"
+	"github.com/ajxudir/goupdate/pkg/systemtest"
 )
 
 // Note: ShouldTrackUnsupported and CollectUpdateErrors are defined in execution.go

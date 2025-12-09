@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/constants"
-	"github.com/user/goupdate/pkg/errors"
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/lock"
-	"github.com/user/goupdate/pkg/verbose"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/constants"
+	"github.com/ajxudir/goupdate/pkg/errors"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/lock"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
 // PackageUpdater is a function type for updating a package to a target version.

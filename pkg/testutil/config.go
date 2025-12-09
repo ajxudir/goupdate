@@ -1,7 +1,7 @@
 package testutil
 
 import (
-	"github.com/user/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/config"
 )
 
 // ConfigBuilder provides a fluent API for building test configurations.

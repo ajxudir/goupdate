@@ -3,8 +3,8 @@ package update
 import (
 	"strings"
 
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/formats"
 )
 
 // NormalizeUpdateGroup returns the configured group identifier for a package update.

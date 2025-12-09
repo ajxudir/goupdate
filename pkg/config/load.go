@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/user/goupdate/pkg/verbose"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 	"gopkg.in/yaml.v3"
 )
 

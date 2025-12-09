@@ -10,8 +10,8 @@ import (
 	"runtime"
 
 	"github.com/spf13/cobra"
-	"github.com/user/goupdate/pkg/errors"
-	"github.com/user/goupdate/pkg/verbose"
+	"github.com/ajxudir/goupdate/pkg/errors"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
 var exitFunc = os.Exit

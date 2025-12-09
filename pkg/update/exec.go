@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/user/goupdate/pkg/cmdexec"
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/errors"
+	"github.com/ajxudir/goupdate/pkg/cmdexec"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/errors"
 )
 
 // ExecuteUpdateFunc is the function signature for executing update commands.

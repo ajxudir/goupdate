@@ -9,11 +9,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/packages"
-	"github.com/user/goupdate/pkg/utils"
-	"github.com/user/goupdate/pkg/warnings"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/packages"
+	"github.com/ajxudir/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/warnings"
 )
 
 // TestApplyInstalledVersionsFromConfig tests the behavior of ApplyInstalledVersions with configuration.

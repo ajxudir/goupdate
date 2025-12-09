@@ -3,8 +3,8 @@ package formats
 import (
 	"fmt"
 
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/utils"
 )
 
 // RawParser parses raw text files using regex patterns (e.g., requirements.txt).

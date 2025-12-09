@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/user/goupdate/pkg/constants"
+	"github.com/ajxudir/goupdate/pkg/constants"
 )
 
 // Version information set at build time via ldflags.
-// Example: go build -ldflags="-X github.com/user/goupdate/cmd.Version=1.0.0"
+// Example: go build -ldflags="-X github.com/ajxudir/goupdate/cmd.Version=1.0.0"
 var (
 	// Version is the semantic version of the build.
 	Version = "dev"

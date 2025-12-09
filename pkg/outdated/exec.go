@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/user/goupdate/pkg/cmdexec"
-	"github.com/user/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/cmdexec"
+	"github.com/ajxudir/goupdate/pkg/config"
 )
 
 // ExecuteOutdatedFunc is the function signature for executing outdated commands with context support.

@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/user/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/utils"
 )
 
 // Column represents a single table column with its header and current width.

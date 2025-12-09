@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/user/goupdate/pkg/constants"
-	"github.com/user/goupdate/pkg/lock"
+	"github.com/ajxudir/goupdate/pkg/constants"
+	"github.com/ajxudir/goupdate/pkg/lock"
 )
 
 // Status constants re-exported for convenience.

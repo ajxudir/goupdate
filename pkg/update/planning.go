@@ -6,14 +6,14 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/user/goupdate/pkg/config"
-	"github.com/user/goupdate/pkg/constants"
-	"github.com/user/goupdate/pkg/errors"
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/lock"
-	"github.com/user/goupdate/pkg/outdated"
-	"github.com/user/goupdate/pkg/systemtest"
-	"github.com/user/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/constants"
+	"github.com/ajxudir/goupdate/pkg/errors"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/lock"
+	"github.com/ajxudir/goupdate/pkg/outdated"
+	"github.com/ajxudir/goupdate/pkg/systemtest"
+	"github.com/ajxudir/goupdate/pkg/utils"
 )
 
 // UpdateResult holds the result of an update operation for a single package.

@@ -3,9 +3,9 @@
 # Works on both Linux and macOS Docker hosts
 #
 # Standalone usage (DockerHub):
-#   docker run -v $(pwd):/workspace goupdate:latest outdated
-#   docker run -v $(pwd):/workspace goupdate:latest update --patch --yes
-#   docker run -v $(pwd):/workspace goupdate:latest scan
+#   docker run -v $(pwd):/workspace ajxudir/goupdate:latest outdated
+#   docker run -v $(pwd):/workspace ajxudir/goupdate:latest update --patch --yes
+#   docker run -v $(pwd):/workspace ajxudir/goupdate:latest scan
 #
 # Build multi-arch:
 #   docker buildx build --platform linux/amd64,linux/arm64 -t goupdate:latest .
@@ -32,7 +32,7 @@ ARG TARGETARCH=amd64
 ARG VERSION=dev
 
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -ldflags="-s -w -X github.com/user/goupdate/cmd.Version=${VERSION}" -o goupdate main.go
+    go build -ldflags="-s -w -X github.com/ajxudir/goupdate/cmd.Version=${VERSION}" -o goupdate main.go
 
 # Final stage - minimal alpine image
 FROM alpine:3.20

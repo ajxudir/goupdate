@@ -10,11 +10,11 @@ GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_OS ?= $(shell go env GOOS)
 BUILD_ARCH ?= $(shell go env GOARCH)
 
-LDFLAGS := -X github.com/user/goupdate/cmd.Version=$(VERSION) \
-           -X github.com/user/goupdate/cmd.BuildTime=$(BUILD_TIME) \
-           -X github.com/user/goupdate/cmd.GitCommit=$(GIT_COMMIT) \
-           -X github.com/user/goupdate/cmd.BuildOS=$(BUILD_OS) \
-           -X github.com/user/goupdate/cmd.BuildArch=$(BUILD_ARCH)
+LDFLAGS := -X github.com/ajxudir/goupdate/cmd.Version=$(VERSION) \
+           -X github.com/ajxudir/goupdate/cmd.BuildTime=$(BUILD_TIME) \
+           -X github.com/ajxudir/goupdate/cmd.GitCommit=$(GIT_COMMIT) \
+           -X github.com/ajxudir/goupdate/cmd.BuildOS=$(BUILD_OS) \
+           -X github.com/ajxudir/goupdate/cmd.BuildArch=$(BUILD_ARCH)
 
 # Initialize and download dependencies
 init:

@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/mod/semver"
 
-	"github.com/user/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/config"
 )
 
 const (

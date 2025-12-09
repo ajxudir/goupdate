@@ -73,12 +73,14 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 ```bash
 # Linux (amd64)
-curl -Lo goupdate https://github.com/ajxudir/goupdate/releases/latest/download/goupdate_linux_amd64
+curl -Lo goupdate.tar.gz https://github.com/ajxudir/goupdate/releases/latest/download/goupdate_linux_amd64.tar.gz
+tar -xzf goupdate.tar.gz
 chmod +x goupdate
 sudo mv goupdate /usr/local/bin/
 
 # macOS (arm64)
-curl -Lo goupdate https://github.com/ajxudir/goupdate/releases/latest/download/goupdate_darwin_arm64
+curl -Lo goupdate.tar.gz https://github.com/ajxudir/goupdate/releases/latest/download/goupdate_darwin_arm64.tar.gz
+tar -xzf goupdate.tar.gz
 chmod +x goupdate
 sudo mv goupdate /usr/local/bin/
 ```
@@ -98,8 +100,8 @@ Run without installing Go or any dependencies:
 
 ```bash
 # Run directly from Docker Hub
-docker run -v $(pwd):/workspace goupdate:latest outdated
-docker run -v $(pwd):/workspace goupdate:latest update --patch --yes
+docker run -v $(pwd):/workspace ajxudir/goupdate:latest outdated
+docker run -v $(pwd):/workspace ajxudir/goupdate:latest update --patch --yes
 
 # Or use docker-compose for local development
 docker compose run --rm goupdate outdated

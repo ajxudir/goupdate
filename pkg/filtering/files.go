@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/user/goupdate/pkg/formats"
-	"github.com/user/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/utils"
 )
 
 // FileFilterPatterns holds include and exclude glob patterns for file filtering.
