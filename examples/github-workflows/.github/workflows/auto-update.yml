@@ -6,6 +6,12 @@
 #   2. Modify the env section below for your project
 #   3. Push to your repository
 #
+# Requirements:
+#   The workflow installs the appropriate package manager tools based on PACKAGE_MANAGER:
+#   - npm/yarn/pnpm: Requires Node.js (NODE_VERSION env var)
+#   - composer: Requires PHP (PHP_VERSION env var)
+#   - mod: Requires Go (GO_VERSION env var)
+#
 # Update Policy:
 #   - Minor/Patch updates: Applied automatically
 #   - Major updates: Alerts only, does not block other updates

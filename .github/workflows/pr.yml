@@ -7,6 +7,12 @@
 #   - Test: Runs 'make test' and reports results
 #   - Lint: Runs golangci-lint for code quality
 #
+# Test Requirements:
+#   - Only Go is required to run tests
+#   - Tests use regex-based lock file parsing (configured in pkg/testdata/**/.goupdate.yml)
+#   - No npm/yarn/pnpm/composer/dotnet CLI tools are needed
+#   - Lock files in testdata directories provide static test fixtures
+#
 # Configuration (modify in env section below):
 #   - GO_VERSION: Go version to use
 
