@@ -73,13 +73,13 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 ```bash
 # Linux (amd64)
-curl -Lo goupdate.tar.gz https://github.com/ajxudir/goupdate/releases/download/v1.0.0/goupdate_1.0.0_linux_amd64.tar.gz
+curl -Lo goupdate.tar.gz https://github.com/ajxudir/goupdate/releases/latest/download/goupdate_linux_amd64.tar.gz
 tar -xzf goupdate.tar.gz
 chmod +x goupdate
 sudo mv goupdate /usr/local/bin/
 
 # macOS (arm64)
-curl -Lo goupdate.tar.gz https://github.com/ajxudir/goupdate/releases/download/v1.0.0/goupdate_1.0.0_darwin_arm64.tar.gz
+curl -Lo goupdate.tar.gz https://github.com/ajxudir/goupdate/releases/latest/download/goupdate_darwin_arm64.tar.gz
 tar -xzf goupdate.tar.gz
 chmod +x goupdate
 sudo mv goupdate /usr/local/bin/
