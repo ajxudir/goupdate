@@ -200,6 +200,28 @@ jobs:
         with:
           exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
 
+      - name: Fail on major-only updates
+        if: steps.goupdate.outputs.has-major-only == 'true' && steps.goupdate.outputs.has-updates == 'false'
+        env:
+          SUMMARY: ${{ steps.goupdate.outputs.summary }}
+          MAJOR_PACKAGES: ${{ steps.goupdate.outputs.major-packages }}
+        run: |
+          echo "::error::Only major updates available - no minor/patch updates to apply automatically"
+          echo ""
+          echo "=== MAJOR UPDATES REQUIRE MANUAL REVIEW ==="
+          echo ""
+          echo "The following packages have ONLY major version updates available:"
+          echo "$MAJOR_PACKAGES" | tr ' ' '\n' | sed '/^$/d' | sed 's/^/  - /'
+          echo ""
+          echo "Summary: $SUMMARY"
+          echo ""
+          echo "To resolve:"
+          echo "  1. Review the changelogs for breaking changes"
+          echo "  2. Update packages manually, or"
+          echo "  3. Add packages to EXCLUDE_PACKAGES to skip them"
+          echo ""
+          exit 1
+
   # ============================================================================
   # Apply updates and create PR
   # ============================================================================
