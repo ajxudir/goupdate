@@ -103,6 +103,10 @@ Run without installing Go or any dependencies:
 docker run -v $(pwd):/workspace ajxudir/goupdate:latest outdated
 docker run -v $(pwd):/workspace ajxudir/goupdate:latest update --patch --yes
 
+# Test with included testdata after cloning
+git clone https://github.com/ajxudir/goupdate && cd goupdate
+docker run -v $(pwd)/pkg/testdata:/workspace ajxudir/goupdate:latest outdated
+
 # Or use docker-compose for local development
 docker compose run --rm goupdate outdated
 docker compose run --rm update-patch
