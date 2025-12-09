@@ -1,0 +1,6 @@
+{
+  "name": "test/lock-error",
+  "require": {
+    "symfony/console": "^6.0"
+  }
+}

@@ -1,0 +1,53 @@
+# Django App - goupdate configuration
+# Demonstrates: groups for Python, excluding dev tools, system tests
+
+extends: [default]
+
+rules:
+  requirements:
+    groups:
+      web:
+        - Django
+        - djangorestframework
+        - gunicorn
+      async:
+        - celery
+        - redis
+      database:
+        - psycopg2-binary
+      testing:
+        - pytest
+        - pytest-django
+
+    # Don't auto-update formatters
+    ignore:
+      - black
+      - isort
+
+    exclude_versions:
+      - "(?i)dev"
+      - "(?i)post"
+
+# System tests for Django projects
+system_tests:
+  run_preflight: true
+  run_mode: after_all
+  stop_on_fail: true
+  tests:
+    # Run Django's system checks
+    - name: django-check
+      commands: python manage.py check
+      timeout_seconds: 60
+
+    # Run pytest with Django plugin
+    - name: unit-tests
+      commands: pytest -v --tb=short
+      timeout_seconds: 300
+      env:
+        DJANGO_SETTINGS_MODULE: "myapp.settings"
+
+    # Database migrations check (dry-run)
+    - name: migrations-check
+      commands: python manage.py migrate --check
+      timeout_seconds: 60
+      continue_on_fail: true  # May fail if migrations needed

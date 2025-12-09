@@ -1,0 +1,12 @@
+{
+  "name": "no-lock-example",
+  "version": "1.0.0",
+  "description": "Edge case: package.json without package-lock.json (LockMissing status)",
+  "dependencies": {
+    "express": "^4.18.0",
+    "lodash": "*"
+  },
+  "devDependencies": {
+    "jest": "~29.0.0"
+  }
+}

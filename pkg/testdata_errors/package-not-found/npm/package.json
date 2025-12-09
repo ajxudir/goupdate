@@ -1,0 +1,9 @@
+{
+  "name": "not-in-lock-example",
+  "version": "1.0.0",
+  "description": "Edge case: package in manifest but not in lock file (NotInLock status)",
+  "dependencies": {
+    "chalk": "^5.0.0",
+    "missing-package": "^1.0.0"
+  }
+}

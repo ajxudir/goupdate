@@ -1,0 +1,62 @@
+{
+    "_meta": {
+        "hash": {
+            "sha256": "abc123"
+        },
+        "pipfile-spec": 6,
+        "requires": {
+            "python_version": "3.11"
+        },
+        "sources": [
+            {
+                "name": "pypi",
+                "url": "https://pypi.org/simple",
+                "verify_ssl": true
+            }
+        ]
+    },
+    "default": {
+        "django": {
+            "hashes": ["sha256:abc"],
+            "markers": "python_version >= '3.10'",
+            "version": "==4.2.8"
+        },
+        "flask": {
+            "hashes": ["sha256:def"],
+            "markers": "python_version >= '3.8'",
+            "version": "==3.0.1"
+        },
+        "requests": {
+            "hashes": ["sha256:ghi"],
+            "markers": "python_version >= '3.7'",
+            "version": "==2.31.0"
+        },
+        "numpy": {
+            "hashes": ["sha256:jkl"],
+            "markers": "python_version >= '3.9'",
+            "version": "==1.26.3"
+        },
+        "sqlalchemy": {
+            "hashes": ["sha256:mno"],
+            "markers": "python_version >= '3.7'",
+            "version": "==2.0.25"
+        }
+    },
+    "develop": {
+        "pytest": {
+            "hashes": ["sha256:pqr"],
+            "markers": "python_version >= '3.8'",
+            "version": "==7.4.4"
+        },
+        "black": {
+            "hashes": ["sha256:stu"],
+            "markers": "python_version >= '3.8'",
+            "version": "==23.12.0"
+        },
+        "mypy": {
+            "hashes": ["sha256:vwx"],
+            "markers": "python_version >= '3.8'",
+            "version": "==1.8.0"
+        }
+    }
+}

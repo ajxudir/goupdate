@@ -1,0 +1,77 @@
+# Docker Compose configuration for goupdate
+# For local development when Go is not installed
+#
+# Build and run:
+#   docker compose build
+#   docker compose run --rm goupdate outdated
+#   docker compose run --rm goupdate update --patch --yes
+#
+# Or use preset services:
+#   docker compose run --rm outdated
+#   docker compose run --rm scan
+#   docker compose run --rm update-patch
+#
+# With custom config (create ./config/goupdate.yaml first):
+#   docker compose run --rm goupdate-config outdated
+
+services:
+  goupdate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: goupdate:latest
+    volumes:
+      # Mount current directory as workspace
+      - .:/workspace:rw
+      # Cache volumes for faster subsequent runs
+      - npm-cache:/home/goupdate/.npm
+      - go-cache:/home/goupdate/go
+      - pip-cache:/home/goupdate/.cache/pip
+    working_dir: /workspace
+    environment:
+      - HOME=/home/goupdate
+      - GOPRIVATE=${GOPRIVATE:-}
+      - NPM_TOKEN=${NPM_TOKEN:-}
+      - COMPOSER_AUTH=${COMPOSER_AUTH:-}
+
+  # Service with custom config mounted (create ./config/goupdate.yaml first)
+  goupdate-config:
+    extends:
+      service: goupdate
+    volumes:
+      - .:/workspace:rw
+      - ./config:/home/goupdate/.config/goupdate:ro
+      - npm-cache:/home/goupdate/.npm
+      - go-cache:/home/goupdate/go
+      - pip-cache:/home/goupdate/.cache/pip
+
+  # Service for running specific commands
+  outdated:
+    extends:
+      service: goupdate
+    command: ["outdated"]
+
+  scan:
+    extends:
+      service: goupdate
+    command: ["scan"]
+
+  update-patch:
+    extends:
+      service: goupdate
+    command: ["update", "--patch", "--yes"]
+
+  update-minor:
+    extends:
+      service: goupdate
+    command: ["update", "--minor", "--yes"]
+
+  update-major:
+    extends:
+      service: goupdate
+    command: ["update", "--major", "--yes"]
+
+volumes:
+  npm-cache:
+  go-cache:
+  pip-cache:

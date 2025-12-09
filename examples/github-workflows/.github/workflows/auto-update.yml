@@ -1,0 +1,278 @@
+# Auto Update Workflow
+# Automated dependency updates via PR
+#
+# Usage:
+#   1. Copy this .github folder to your repository
+#   2. Modify the env section below for your project
+#   3. Push to your repository
+#
+# Update Policy:
+#   - Minor/Patch updates: Applied automatically
+#   - Major updates: Alerts only, does not block other updates
+
+name: Auto Update Dependencies
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # Weekly on Monday
+
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Operation mode'
+        required: true
+        default: 'update'
+        type: choice
+        options:
+          - check-only
+          - update
+      update-type:
+        description: 'Dependency update type'
+        required: false
+        default: 'minor'
+        type: choice
+        options:
+          - minor
+          - patch
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+# ============================================================================
+# CONFIGURATION - Modify for your project
+# ============================================================================
+env:
+  # Goupdate source (change to your org's fork if needed)
+  GOUPDATE_REPO: 'ajxudir/goupdate'
+
+  # Package manager: npm, yarn, pnpm, composer, mod
+  PACKAGE_MANAGER: 'npm'
+
+  # Language version (uncomment the one you need)
+  NODE_VERSION: '20'
+  # PHP_VERSION: '8.2'
+  # GO_VERSION: '1.24'
+
+  # Branch settings
+  UPDATE_BRANCH: 'goupdate/auto-update'
+  TARGET_BRANCH: 'stage-updates'
+
+  # PR settings
+  PR_TITLE: 'chore(deps): Auto update - {type} ({date})'
+
+  # Test command (set to empty to skip)
+  TEST_COMMAND: 'npm test'
+
+  # Packages to exclude (comma-separated)
+  EXCLUDE_PACKAGES: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      run-updates: ${{ steps.config.outputs.run_updates }}
+      update-type: ${{ steps.config.outputs.update_type }}
+    steps:
+      - id: config
+        run: |
+          EVENT="${{ github.event_name }}"
+          MODE="${{ github.event.inputs.mode }}"
+          TYPE="${{ github.event.inputs.update-type }}"
+
+          if [ "$EVENT" = "schedule" ]; then
+            echo "run_updates=true" >> $GITHUB_OUTPUT
+            echo "update_type=minor" >> $GITHUB_OUTPUT
+          elif [ "$MODE" = "check-only" ]; then
+            echo "run_updates=false" >> $GITHUB_OUTPUT
+            echo "update_type=${TYPE:-minor}" >> $GITHUB_OUTPUT
+          else
+            echo "run_updates=true" >> $GITHUB_OUTPUT
+            echo "update_type=${TYPE:-minor}" >> $GITHUB_OUTPUT
+          fi
+
+  check:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      has-updates: ${{ steps.check.outputs.has-updates }}
+      summary: ${{ steps.check.outputs.summary }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Ensure target branch
+        uses: ./.github/actions/_git-branch
+        with:
+          branch: ${{ env.TARGET_BRANCH }}
+          base: main
+          create-if-missing: 'true'
+          push: 'true'
+
+      # Setup for npm/yarn/pnpm
+      - if: contains('npm yarn pnpm', env.PACKAGE_MANAGER)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Setup for composer
+      - if: env.PACKAGE_MANAGER == 'composer'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+
+      # Setup for go mod
+      - if: env.PACKAGE_MANAGER == 'mod'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install goupdate
+        uses: ./.github/actions/_goupdate-install
+        with:
+          goupdate-repo: ${{ env.GOUPDATE_REPO }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for updates
+        id: check
+        uses: ./.github/actions/_goupdate-check
+        with:
+          rule: ${{ env.PACKAGE_MANAGER }}
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+
+  update:
+    needs: [prepare, check]
+    if: needs.prepare.outputs.run-updates == 'true' && needs.check.outputs.has-updates == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Ensure target branch
+        uses: ./.github/actions/_git-branch
+        with:
+          branch: ${{ env.TARGET_BRANCH }}
+          base: main
+          create-if-missing: 'true'
+          push: 'true'
+
+      - name: Create update branch
+        uses: ./.github/actions/_git-branch
+        with:
+          branch: ${{ env.UPDATE_BRANCH }}
+          base: ${{ env.TARGET_BRANCH }}
+          delete-remote: 'true'
+          push: 'false'
+
+      # Setup for npm/yarn/pnpm
+      - if: contains('npm yarn pnpm', env.PACKAGE_MANAGER)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - if: env.PACKAGE_MANAGER == 'npm'
+        run: npm ci
+
+      - if: env.PACKAGE_MANAGER == 'yarn'
+        run: yarn install --frozen-lockfile
+
+      - if: env.PACKAGE_MANAGER == 'pnpm'
+        run: pnpm install --frozen-lockfile
+
+      # Setup for composer
+      - if: env.PACKAGE_MANAGER == 'composer'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+
+      - if: env.PACKAGE_MANAGER == 'composer'
+        run: composer install --no-interaction
+
+      # Setup for go mod
+      - if: env.PACKAGE_MANAGER == 'mod'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install goupdate
+        uses: ./.github/actions/_goupdate-install
+        with:
+          goupdate-repo: ${{ env.GOUPDATE_REPO }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply updates
+        id: update
+        uses: ./.github/actions/_goupdate-update
+        with:
+          rule: ${{ env.PACKAGE_MANAGER }}
+          update-type: ${{ needs.prepare.outputs.update-type }}
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+          system-test-mode: 'none'
+
+      - name: Run tests
+        if: steps.update.outputs.has-changes == 'true' && env.TEST_COMMAND != ''
+        run: ${{ env.TEST_COMMAND }}
+        continue-on-error: true
+
+      - name: Commit and create PR
+        if: steps.update.outputs.has-changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPDATE_TYPE: ${{ needs.prepare.outputs.update-type }}
+          UPDATE_OUTPUT: ${{ steps.update.outputs.update-output }}
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          TYPE=$(echo "$UPDATE_TYPE" | sed 's/\b\(.\)/\u\1/')
+          TITLE=$(echo "${{ env.PR_TITLE }}" | sed "s/{date}/$DATE/g" | sed "s/{type}/$TYPE/g")
+
+          # Determine files to commit based on package manager
+          case "${{ env.PACKAGE_MANAGER }}" in
+            npm)     FILES="package.json package-lock.json" ;;
+            yarn)    FILES="package.json yarn.lock" ;;
+            pnpm)    FILES="package.json pnpm-lock.yaml" ;;
+            composer) FILES="composer.json composer.lock" ;;
+            mod)     FILES="go.mod go.sum" ;;
+          esac
+
+          git add $FILES
+          git commit -m "$TITLE"
+          git push -u origin "${{ env.UPDATE_BRANCH }}"
+
+          # Create PR
+          gh pr create \
+            --title "$TITLE" \
+            --body "## Automated Dependency Update
+
+          This PR was automatically created by the dependency update workflow.
+
+          \`\`\`
+          $UPDATE_OUTPUT
+          \`\`\`" \
+            --base "${{ env.TARGET_BRANCH }}" \
+            --head "${{ env.UPDATE_BRANCH }}"
+
+  summary:
+    needs: [prepare, check, update]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - env:
+          CHECK_SUMMARY: ${{ needs.check.outputs.summary }}
+        run: |
+          echo "## Auto Update Summary" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$CHECK_SUMMARY" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Update check complete: $CHECK_SUMMARY" >> $GITHUB_STEP_SUMMARY
+          fi

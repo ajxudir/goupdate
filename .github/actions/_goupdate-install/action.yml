@@ -1,0 +1,108 @@
+# Goupdate Install Action
+# Modular action for installing the goupdate binary
+# Part of the modular goupdate action suite
+#
+# Behavior:
+#   - In goupdate repo: Builds from source (dogfooding)
+#   - In other repos: Downloads latest release from GitHub
+
+name: 'Goupdate Install'
+description: 'Install goupdate binary (from source or release)'
+
+inputs:
+  goupdate-version:
+    description: 'Version to install (latest, or specific tag). Ignored in goupdate repo.'
+    required: false
+    default: 'latest'
+  goupdate-repo:
+    description: 'GitHub repository to download goupdate from (owner/repo format)'
+    required: false
+    default: 'ajxudir/goupdate'
+  github-token:
+    description: 'GitHub token for API requests (helps with rate limits)'
+    required: false
+    default: ''
+
+outputs:
+  binary-path:
+    description: 'Path to the installed goupdate binary'
+    value: ${{ steps.install.outputs.binary_path }}
+  version:
+    description: 'Installed version of goupdate'
+    value: ${{ steps.install.outputs.version }}
+  source:
+    description: 'How goupdate was installed (built or downloaded)'
+    value: ${{ steps.install.outputs.source }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install goupdate
+      id: install
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        VERSION: ${{ inputs.goupdate-version }}
+        GOUPDATE_REPO: ${{ inputs.goupdate-repo }}
+      run: |
+        # Detect if this is the goupdate repository
+        REPO_NAME="${GITHUB_REPOSITORY##*/}"
+
+        if [[ "$REPO_NAME" == "goupdate" ]] && [[ -f "go.mod" ]]; then
+          echo "Building goupdate from source (dogfooding)..."
+          go build -o goupdate ./main.go
+          # Move to /usr/local/bin so it's in PATH (consistent with download path)
+          sudo mv goupdate /usr/local/bin/goupdate
+          BINARY_PATH="/usr/local/bin/goupdate"
+          echo "source=built" >> "$GITHUB_OUTPUT"
+        else
+          echo "Downloading goupdate from $GOUPDATE_REPO..."
+
+          # Determine version URL
+          if [[ "$VERSION" == "latest" ]]; then
+            RELEASE_URL="https://api.github.com/repos/${GOUPDATE_REPO}/releases/latest"
+          else
+            RELEASE_URL="https://api.github.com/repos/${GOUPDATE_REPO}/releases/tags/${VERSION}"
+          fi
+
+          # Get download URL with authentication if token provided
+          AUTH_HEADER=""
+          if [[ -n "$GITHUB_TOKEN" ]]; then
+            AUTH_HEADER="Authorization: Bearer $GITHUB_TOKEN"
+          fi
+
+          # Detect OS and architecture
+          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          ARCH=$(uname -m)
+          case "$ARCH" in
+            x86_64) ARCH="amd64" ;;
+            aarch64|arm64) ARCH="arm64" ;;
+          esac
+
+          # Download and extract
+          DOWNLOAD_URL=$(curl -sL ${AUTH_HEADER:+-H "$AUTH_HEADER"} "$RELEASE_URL" | \
+            grep "browser_download_url.*${OS}_${ARCH}" | head -1 | cut -d '"' -f 4)
+
+          if [[ -z "$DOWNLOAD_URL" ]]; then
+            echo "::error::Failed to find download URL for ${OS}_${ARCH}"
+            exit 1
+          fi
+
+          curl -sL "$DOWNLOAD_URL" | tar xzf - -C /usr/local/bin goupdate
+          BINARY_PATH="/usr/local/bin/goupdate"
+          echo "source=downloaded" >> "$GITHUB_OUTPUT"
+        fi
+
+        # Verify installation
+        if ! command -v goupdate &> /dev/null && [[ ! -x "$BINARY_PATH" ]]; then
+          echo "::error::goupdate installation failed"
+          exit 1
+        fi
+
+        # Get version (extract just the version line from multiline output)
+        FULL_VERSION=$("$BINARY_PATH" version 2>/dev/null || echo "unknown")
+        INSTALLED_VERSION=$(echo "$FULL_VERSION" | grep -E "Version:" | sed 's/.*Version:[[:space:]]*//' || echo "unknown")
+
+        echo "binary_path=$BINARY_PATH" >> "$GITHUB_OUTPUT"
+        echo "version=$INSTALLED_VERSION" >> "$GITHUB_OUTPUT"
+        echo "Installed goupdate: $INSTALLED_VERSION"

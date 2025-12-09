@@ -1,0 +1,6 @@
+# Invalid version constraints
+django@4.0
+flask
+requests[security]
+-e git+https://github.com/user/repo.git#egg=mypackage
+./local-package

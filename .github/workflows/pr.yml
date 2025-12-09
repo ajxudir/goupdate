@@ -1,0 +1,310 @@
+# PR Workflow
+# Runs on pull requests to ensure code quality before merge
+#
+# REUSABLE: Copy to other Go projects
+#
+# Checks:
+#   - Test: Runs 'make test' and reports results
+#   - Lint: Runs golangci-lint for code quality
+#
+# Configuration (modify in env section below):
+#   - GO_VERSION: Go version to use
+
+name: PR
+
+on:
+  pull_request:
+    branches: [main, stage]
+
+# Cancel in-progress runs for same PR (saves resources)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.24'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: ./.github/actions/_go-setup
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Run tests
+        id: test
+        run: |
+          echo "Running tests..."
+          # Run tests with output to both terminal and file
+          make test 2>&1 | tee test-output.txt
+          {
+            echo "test_output<<GOUPDATE_TEST_EOF_d4b2a6"
+            tail -20 test-output.txt
+            echo "GOUPDATE_TEST_EOF_d4b2a6"
+          } >> $GITHUB_OUTPUT
+          rm -f test-output.txt
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "## 🧪 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.test.outcome }}" = "success" ]; then
+            echo "✅ **All tests passed**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Tests failed**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Check the job logs for detailed error messages." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: ./.github/actions/_go-setup
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Run tests with coverage
+        id: coverage
+        run: |
+          echo "Running tests with coverage..."
+          make coverage-func 2>&1 | tee coverage-output.txt
+
+          # Extract total coverage percentage
+          COVERAGE=$(grep "^total:" coverage-output.txt | awk '{print $NF}' | sed 's/%//')
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+          # Check for functions below 75% coverage (excluding main.go entry point)
+          # Extract function coverage lines and check for < 75%
+          LOW_COVERAGE=$(grep -E "^\S+\.go:[0-9]+:" coverage-output.txt | grep -v "main.go" | while read line; do
+            pct=$(echo "$line" | awk '{print $NF}' | sed 's/%//')
+            if (( $(echo "$pct < 75" | bc -l) )); then
+              echo "$line"
+            fi
+          done || true)
+
+          if [ -n "$LOW_COVERAGE" ]; then
+            echo "❌ Found functions with coverage below 75%:"
+            echo "$LOW_COVERAGE"
+            echo "low_coverage_found=true" >> $GITHUB_OUTPUT
+            echo "low_coverage<<EOF" >> $GITHUB_OUTPUT
+            echo "$LOW_COVERAGE" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "✅ All functions have at least 75% coverage"
+            echo "low_coverage_found=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check minimum total threshold (95%)
+          MIN_COVERAGE=95
+          COVERAGE_PASSED=true
+          if (( $(echo "$COVERAGE < $MIN_COVERAGE" | bc -l) )); then
+            echo "❌ Total coverage ${COVERAGE}% is below minimum threshold ${MIN_COVERAGE}%"
+            COVERAGE_PASSED=false
+          else
+            echo "✅ Total coverage ${COVERAGE}% meets minimum threshold ${MIN_COVERAGE}%"
+          fi
+
+          # Fail if either check fails
+          if [ "$COVERAGE_PASSED" = "false" ] || [ -n "$LOW_COVERAGE" ]; then
+            echo "passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "passed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate coverage summary
+        if: always()
+        run: |
+          echo "## 📊 Coverage Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          COVERAGE="${{ steps.coverage.outputs.coverage }}"
+          LOW_FOUND="${{ steps.coverage.outputs.low_coverage_found }}"
+
+          # Total coverage status
+          if (( $(echo "$COVERAGE >= 95" | bc -l) )); then
+            echo "✅ **Total Coverage: ${COVERAGE}%** (minimum: 95%)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Total Coverage: ${COVERAGE}%** (minimum: 95%)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Low coverage functions status (below 75%)
+          if [ "$LOW_FOUND" = "true" ]; then
+            echo "❌ **Functions with coverage below 75% found:**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.coverage.outputs.low_coverage }}" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All functions must have at least 75% coverage." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **All functions have at least 75% coverage**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ steps.coverage.outputs.passed }}" != "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**To fix:** Run \`make coverage-func\` locally and add tests for low-coverage functions." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: ./.github/actions/_go-setup
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Lint
+        id: lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+      - name: Generate lint summary
+        if: always()
+        run: |
+          echo "## 🔍 Lint Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.lint.outcome }}" = "success" ]; then
+            echo "✅ **No linting issues found**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Linting issues found**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Check the job logs for detailed linting errors." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ============================================================================
+  # Summary (runs after all checks complete)
+  # ============================================================================
+  summary:
+    name: Summary
+    needs: [test, coverage, lint]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Generate PR summary
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+          COVERAGE_RESULT: ${{ needs.coverage.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
+        run: |
+          echo "## 📋 PR Check Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.head_ref }}\` → \`${{ github.base_ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          case "$TEST_RESULT" in
+            success) echo "| Tests | ✅ passed |" >> $GITHUB_STEP_SUMMARY ;;
+            failure) echo "| Tests | ❌ failed |" >> $GITHUB_STEP_SUMMARY ;;
+            skipped) echo "| Tests | ⏭️ skipped |" >> $GITHUB_STEP_SUMMARY ;;
+            *) echo "| Tests | $TEST_RESULT |" >> $GITHUB_STEP_SUMMARY ;;
+          esac
+
+          case "$COVERAGE_RESULT" in
+            success) echo "| Coverage | ✅ ≥95% |" >> $GITHUB_STEP_SUMMARY ;;
+            failure) echo "| Coverage | ❌ <95% |" >> $GITHUB_STEP_SUMMARY ;;
+            skipped) echo "| Coverage | ⏭️ skipped |" >> $GITHUB_STEP_SUMMARY ;;
+            *) echo "| Coverage | $COVERAGE_RESULT |" >> $GITHUB_STEP_SUMMARY ;;
+          esac
+
+          case "$LINT_RESULT" in
+            success) echo "| Lint | ✅ passed |" >> $GITHUB_STEP_SUMMARY ;;
+            failure) echo "| Lint | ❌ failed |" >> $GITHUB_STEP_SUMMARY ;;
+            skipped) echo "| Lint | ⏭️ skipped |" >> $GITHUB_STEP_SUMMARY ;;
+            *) echo "| Lint | $LINT_RESULT |" >> $GITHUB_STEP_SUMMARY ;;
+          esac
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Overall status
+          if [ "$TEST_RESULT" = "success" ] && [ "$COVERAGE_RESULT" = "success" ] && [ "$LINT_RESULT" = "success" ]; then
+            echo "### ✅ Ready to Merge" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All checks passed. This PR is ready for review and merge." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Not Ready to Merge" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "One or more checks failed. Please fix the issues before merging." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            if [ "$TEST_RESULT" = "failure" ]; then
+              echo "**To fix test failures:**" >> $GITHUB_STEP_SUMMARY
+              echo "1. Run \`make test\` locally to reproduce" >> $GITHUB_STEP_SUMMARY
+              echo "2. Fix failing tests" >> $GITHUB_STEP_SUMMARY
+              echo "3. Push your fixes" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            if [ "$COVERAGE_RESULT" = "failure" ]; then
+              echo "**To fix coverage issues:**" >> $GITHUB_STEP_SUMMARY
+              echo "1. Run \`make coverage-func\` locally" >> $GITHUB_STEP_SUMMARY
+              echo "2. Find functions below 75%: \`make coverage-func | awk '\$NF < 75'\`" >> $GITHUB_STEP_SUMMARY
+              echo "3. Add tests so all functions have ≥75% and total reaches 95%" >> $GITHUB_STEP_SUMMARY
+              echo "4. Push your fixes" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            if [ "$LINT_RESULT" = "failure" ]; then
+              echo "**To fix lint issues:**" >> $GITHUB_STEP_SUMMARY
+              echo "1. Run \`golangci-lint run\` locally" >> $GITHUB_STEP_SUMMARY
+              echo "2. Fix reported issues" >> $GITHUB_STEP_SUMMARY
+              echo "3. Push your fixes" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          # Next steps info
+          echo "### 📝 What Happens Next" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.base_ref }}" = "stage" ]; then
+            echo "When merged to \`stage\`:" >> $GITHUB_STEP_SUMMARY
+            echo "- A prerelease (\`_stage-*\`) will be created for testing" >> $GITHUB_STEP_SUMMARY
+            echo "- Auto Update workflow will check for dependency updates weekly" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ github.base_ref }}" = "main" ]; then
+            echo "When merged to \`main\`:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Code is ready for stable release. Create a release using one of these methods:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Option A: Command Line**" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "git tag v1.2.3 && git push origin v1.2.3" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Option B: GitHub UI**" >> $GITHUB_STEP_SUMMARY
+            echo "1. Go to **Releases** → **Create a new release**" >> $GITHUB_STEP_SUMMARY
+            echo "2. Click **Choose a tag** → type version (e.g., \`v1.2.3\`) → **Create new tag**" >> $GITHUB_STEP_SUMMARY
+            echo "3. Set **Target** to \`main\` and check **Set as the latest release**" >> $GITHUB_STEP_SUMMARY
+            echo "4. Click **Publish release**" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,18 @@
+# Test groups configuration
+extends: [default]
+
+rules:
+  npm:
+    groups:
+      react:
+        - react
+        - react-dom
+        - react-router-dom
+      testing:
+        - jest
+        - "@testing-library/react"
+        - vitest
+      build:
+        - vite
+        - webpack
+        - rollup

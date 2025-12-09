@@ -1,0 +1,619 @@
+# Release Workflow
+# Handles both prereleases (stage) and stable releases (main)
+#
+# Triggers:
+#   - Push to stage: Create prerelease with binaries via GoReleaser
+#   - Push tag (v*): Build stable release with GoReleaser
+#   - Manual dispatch: Trigger release manually from Actions tab
+#   - Called by other workflows: Auto-update triggers release after merge
+#
+# NOTE: This workflow does NOT trigger on pull_request events.
+#   PR checks are handled by pr.yml workflow.
+#   When PRs merge via GITHUB_TOKEN (no push event), the auto-update
+#   workflow explicitly calls this workflow via workflow_call.
+#
+# Flow for push to stage (prerelease):
+#   1. Prepare: Generate RC tag (_stage-YYYYMMDD-rcN)
+#   2. Run tests
+#   3. GoReleaser + Docker build (parallel)
+#
+# Flow for tag push (stable):
+#   1. Prepare: Use pushed tag
+#   2. Run tests
+#   3. GoReleaser + Docker build (parallel)
+#
+# Branching Strategy:
+#   - stage: Prereleases created automatically on push/merge
+#   - main: Stable releases triggered by pushing a version tag
+#
+# To promote to stable:
+#   1. Test the prerelease from stage branch
+#   2. Merge stage → main
+#   3. Create and push a tag: git tag v1.2.3 && git push origin v1.2.3
+#
+# Configuration (modify in env section below):
+#   - GO_VERSION: Go version to use
+#   - STAGE_BRANCH: Branch that triggers prereleases
+#   - RC_TAG_PREFIX: Prefix for RC tags (default: _stage)
+#   - DOCKER_IMAGE_NAME: Name for Docker image (username/image format)
+#   - USE_GORELEASER: Set to 'false' to disable GoReleaser
+#   - BUILD_DOCKER: Set to 'false' to disable Docker builds
+#   - TEST_COMMAND: Custom test command
+#
+# Required Secrets:
+#   - DOCKERHUB_USERNAME: Docker Hub username (for Docker builds)
+#   - DOCKERHUB_TOKEN: Docker Hub access token (for Docker builds)
+#
+# Note: If a feature is enabled but required config is missing, the workflow
+# will fail with clear instructions on how to fix it.
+
+name: Release
+
+on:
+  # Push to stage branch creates prerelease, push to main for stable
+  push:
+    branches: [stage, main]
+    tags:
+      - 'v*'  # Semantic version tags trigger stable release (v1.0.0, v2.1.3, etc.)
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+    inputs:
+      release-type:
+        description: 'Release type'
+        required: true
+        default: 'prerelease'
+        type: choice
+        options:
+          - prerelease
+          - stable
+
+  # Allow other workflows to call this (e.g., auto-update after merge)
+  workflow_call:
+    inputs:
+      release-type:
+        description: 'Release type (prerelease or stable)'
+        required: false
+        default: 'prerelease'
+        type: string
+
+# Prevent concurrent releases
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+# ============================================================================
+# CONFIGURATION - Modify for your project
+# ============================================================================
+env:
+  GO_VERSION: '1.24'
+  STAGE_BRANCH: 'stage'
+  RC_TAG_PREFIX: '_stage'
+  # Docker Hub image name (username/image format)
+  DOCKER_IMAGE_NAME: 'goupdate'
+  # Set to 'false' to disable GoReleaser builds
+  USE_GORELEASER: 'true'
+  # Set to 'false' to disable Docker builds entirely
+  BUILD_DOCKER: 'true'
+  # Test command to run before building
+  TEST_COMMAND: 'make test'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # ============================================================================
+  # Prepare - Determine trigger type and generate tag
+  # ============================================================================
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only run for valid triggers:
+    # - Push to stage branch (prerelease)
+    # - Push tag v* (stable release)
+    # - workflow_dispatch or workflow_call (manual/called)
+    # Skip if pushing to main without a tag
+    if: |
+      github.ref_type == 'tag' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'workflow_call' ||
+      (github.event_name == 'push' && github.ref == format('refs/heads/{0}', 'stage'))
+    outputs:
+      is-push: ${{ steps.config.outputs.is_push }}
+      is-tag: ${{ steps.config.outputs.is_tag }}
+      is-prerelease: ${{ steps.config.outputs.is_prerelease }}
+      is-stable: ${{ steps.config.outputs.is_stable }}
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.config.outputs.version }}
+      goreleaser-enabled: ${{ steps.validate.outputs.goreleaser_enabled }}
+      docker-enabled: ${{ steps.validate.outputs.docker_enabled }}
+
+    steps:
+      - name: Checkout (for tag generation)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure stage branch exists
+        if: github.ref_type != 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STAGE_BRANCH: ${{ env.STAGE_BRANCH }}
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if stage branch exists on remote
+          if ! git ls-remote --heads origin "$STAGE_BRANCH" | grep -q "$STAGE_BRANCH"; then
+            echo "Branch '$STAGE_BRANCH' does not exist. Creating from main..."
+            git checkout -b "$STAGE_BRANCH"
+            git push -u origin "$STAGE_BRANCH"
+            echo "✅ Created branch '$STAGE_BRANCH' from main"
+          else
+            echo "✅ Branch '$STAGE_BRANCH' already exists"
+          fi
+
+      - name: Verify tag is on main branch
+        if: github.ref_type == 'tag'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          # For stable releases, verify the tag is on main branch
+          echo "Verifying tag '$TAG' is on main branch..."
+
+          # Get the commit the tag points to
+          TAG_COMMIT=$(git rev-list -n 1 "$TAG")
+          echo "Tag commit: $TAG_COMMIT"
+
+          # Check if this commit is reachable from main
+          if git merge-base --is-ancestor "$TAG_COMMIT" origin/main; then
+            echo "✅ Tag '$TAG' is on main branch"
+          else
+            echo "❌ Tag '$TAG' is NOT on main branch"
+            echo "Stable releases must be tagged on main branch."
+            echo "Please ensure your tag is on main before pushing."
+            exit 1
+          fi
+
+      - name: Determine trigger type
+        id: config
+        env:
+          REF: ${{ github.ref }}
+          REF_TYPE: ${{ github.ref_type }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_RELEASE_TYPE: ${{ inputs.release-type }}
+        run: |
+          echo "Ref: $REF"
+          echo "Ref type: $REF_TYPE"
+          echo "Event: $EVENT_NAME"
+
+          if [ "$REF_TYPE" = "tag" ]; then
+            # Tag push (v*) - stable release
+            TAG_NAME="${REF#refs/tags/}"
+            VERSION="${TAG_NAME#v}"
+
+            echo "is_push=false" >> $GITHUB_OUTPUT
+            echo "is_tag=true" >> $GITHUB_OUTPUT
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "is_stable=true" >> $GITHUB_OUTPUT
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "🚀 Release type: STABLE (tag: $TAG_NAME)"
+
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ] || [ "$EVENT_NAME" = "workflow_call" ]; then
+            # Manual or called trigger
+            if [ "$INPUT_RELEASE_TYPE" = "stable" ]; then
+              echo "is_push=false" >> $GITHUB_OUTPUT
+              echo "is_tag=false" >> $GITHUB_OUTPUT
+              echo "is_prerelease=false" >> $GITHUB_OUTPUT
+              echo "is_stable=true" >> $GITHUB_OUTPUT
+              echo "version=" >> $GITHUB_OUTPUT
+              echo "🚀 Release type: STABLE (manual trigger)"
+            else
+              # Default to prerelease for workflow_call (from auto-update)
+              echo "is_push=true" >> $GITHUB_OUTPUT
+              echo "is_tag=false" >> $GITHUB_OUTPUT
+              echo "is_prerelease=true" >> $GITHUB_OUTPUT
+              echo "is_stable=false" >> $GITHUB_OUTPUT
+              echo "version=" >> $GITHUB_OUTPUT
+              echo "📦 Release type: PRERELEASE (triggered by $EVENT_NAME)"
+            fi
+
+          else
+            # Push to stage branch - prerelease
+            echo "is_push=true" >> $GITHUB_OUTPUT
+            echo "is_tag=false" >> $GITHUB_OUTPUT
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "is_stable=false" >> $GITHUB_OUTPUT
+            echo "version=" >> $GITHUB_OUTPUT
+            echo "📦 Release type: PRERELEASE (push to stage branch)"
+          fi
+
+      - name: Generate tag
+        id: tag
+        env:
+          REF: ${{ github.ref }}
+          REF_TYPE: ${{ github.ref_type }}
+          PREFIX: ${{ env.RC_TAG_PREFIX }}
+        run: |
+          if [ "$REF_TYPE" = "tag" ]; then
+            # Use the pushed tag directly
+            TAG_NAME="${REF#refs/tags/}"
+            echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+            echo "Using pushed tag: $TAG_NAME"
+          else
+            # Generate RC tag for push to stage
+            TODAY=$(date -u +%Y%m%d)
+
+            echo "Checking existing tags for today..."
+            EXISTING=$(git tag -l "${PREFIX}-${TODAY}-rc*" | sort -V | tail -1)
+
+            if [ -z "$EXISTING" ]; then
+              SEQ=1
+            else
+              CURRENT_SEQ=$(echo "$EXISTING" | sed "s/.*-rc//" | cut -d- -f1)
+              SEQ=$((CURRENT_SEQ + 1))
+            fi
+
+            TAG="${PREFIX}-${TODAY}-rc${SEQ}"
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            echo "Generated prerelease tag: $TAG"
+          fi
+
+      - name: Validate configuration
+        id: validate
+        env:
+          USE_GORELEASER: ${{ env.USE_GORELEASER }}
+          BUILD_DOCKER: ${{ env.BUILD_DOCKER }}
+        run: |
+          # Check GoReleaser
+          if [ "$USE_GORELEASER" = "true" ]; then
+            echo "goreleaser_enabled=true" >> $GITHUB_OUTPUT
+            echo "✅ GoReleaser: ENABLED"
+          else
+            echo "goreleaser_enabled=false" >> $GITHUB_OUTPUT
+            echo "⏭️  GoReleaser: DISABLED"
+          fi
+
+          # Check Docker
+          if [ "$BUILD_DOCKER" = "true" ]; then
+            echo "docker_enabled=true" >> $GITHUB_OUTPUT
+            echo "✅ Docker: ENABLED (will validate secrets in job)"
+          else
+            echo "docker_enabled=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Docker: DISABLED"
+          fi
+
+  # ============================================================================
+  # Run tests
+  # ============================================================================
+  test:
+    name: Test
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      # Pass through prepare outputs for downstream jobs
+      is-push: ${{ needs.prepare.outputs.is-push }}
+      is-tag: ${{ needs.prepare.outputs.is-tag }}
+      is-prerelease: ${{ needs.prepare.outputs.is-prerelease }}
+      is-stable: ${{ needs.prepare.outputs.is-stable }}
+      tag: ${{ needs.prepare.outputs.tag }}
+      version: ${{ needs.prepare.outputs.version }}
+      goreleaser-enabled: ${{ needs.prepare.outputs.goreleaser-enabled }}
+      docker-enabled: ${{ needs.prepare.outputs.docker-enabled }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # For stage push: checkout branch (tag doesn't exist yet)
+          # For tag push: checkout the tag directly
+          ref: ${{ needs.prepare.outputs.is-push == 'true' && env.STAGE_BRANCH || needs.prepare.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: ./.github/actions/_go-setup
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Run tests
+        run: ${{ env.TEST_COMMAND }}
+
+  # ============================================================================
+  # Build with GoReleaser (handles both prereleases and stable releases)
+  # ============================================================================
+  goreleaser:
+    name: GoReleaser
+    needs: test
+    if: needs.test.outputs.goreleaser-enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      release-url: ${{ steps.release.outputs.release-url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.test.outputs.is-push == 'true' && env.STAGE_BRANCH || needs.test.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Build and release
+        id: release
+        uses: ./.github/actions/_goreleaser
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ needs.test.outputs.tag }}
+          tag-prefix: ${{ env.RC_TAG_PREFIX }}
+          prerelease: ${{ needs.test.outputs.is-prerelease }}
+          # Set as latest for stable releases
+          latest: ${{ needs.test.outputs.is-stable }}
+          # Skip semver validation for prereleases (RC tags aren't semver compliant)
+          skip-validate: ${{ needs.test.outputs.is-prerelease }}
+
+  # ============================================================================
+  # Build Docker image (runs in parallel with goreleaser)
+  # ============================================================================
+  docker:
+    name: Docker
+    needs: test
+    if: needs.test.outputs.docker-enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check Docker secrets
+        env:
+          HAS_USERNAME: ${{ secrets.DOCKERHUB_USERNAME != '' }}
+          HAS_TOKEN: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+        run: |
+          MISSING=""
+          if [ "$HAS_USERNAME" != "true" ]; then
+            MISSING="${MISSING}DOCKERHUB_USERNAME "
+          fi
+          if [ "$HAS_TOKEN" != "true" ]; then
+            MISSING="${MISSING}DOCKERHUB_TOKEN "
+          fi
+
+          if [ -n "$MISSING" ]; then
+            echo "## ❌ Docker Configuration Error" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Docker builds are **enabled** (\`BUILD_DOCKER: 'true'\`) but required secrets are missing:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "Missing: $MISSING" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### How to Fix" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Option 1: Add the missing secrets**" >> $GITHUB_STEP_SUMMARY
+            echo "1. Go to **Settings** → **Secrets and variables** → **Actions**" >> $GITHUB_STEP_SUMMARY
+            echo "2. Add the following repository secrets:" >> $GITHUB_STEP_SUMMARY
+            echo "   - \`DOCKERHUB_USERNAME\`: Your Docker Hub username" >> $GITHUB_STEP_SUMMARY
+            echo "   - \`DOCKERHUB_TOKEN\`: Your Docker Hub access token" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Option 2: Disable Docker builds**" >> $GITHUB_STEP_SUMMARY
+            echo "1. Edit \`.github/workflows/release.yml\`" >> $GITHUB_STEP_SUMMARY
+            echo "2. Change \`BUILD_DOCKER: 'true'\` to \`BUILD_DOCKER: 'false'\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "::error::Docker secrets missing: $MISSING. Either add the secrets or set BUILD_DOCKER: 'false' in the workflow."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.test.outputs.is-push == 'true' && env.STAGE_BRANCH || needs.test.outputs.tag }}
+
+      - name: Prepare Docker tags (prerelease)
+        if: needs.test.outputs.is-prerelease == 'true'
+        id: tags-prerelease
+        env:
+          TAG: ${{ needs.test.outputs.tag }}
+        run: |
+          {
+            echo "tags<<GOUPDATE_DOCKER_TAGS_EOF_e9c5b2"
+            echo "$TAG"
+            echo "rc-latest"
+            echo "GOUPDATE_DOCKER_TAGS_EOF_e9c5b2"
+          } >> $GITHUB_OUTPUT
+
+      - name: Prepare Docker tags (stable)
+        if: needs.test.outputs.is-stable == 'true'
+        id: tags-stable
+        env:
+          VERSION: ${{ needs.test.outputs.version }}
+          TAG: ${{ needs.test.outputs.tag }}
+        run: |
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+
+          {
+            echo "tags<<GOUPDATE_DOCKER_TAGS_EOF_e9c5b2"
+            echo "$TAG"
+            echo "$VERSION"
+            echo "$MAJOR.$MINOR"
+            echo "$MAJOR"
+            echo "latest"
+            echo "GOUPDATE_DOCKER_TAGS_EOF_e9c5b2"
+          } >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker
+        uses: ./.github/actions/_dockerhub
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          image-name: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}
+          tags: ${{ needs.test.outputs.is-prerelease == 'true' && steps.tags-prerelease.outputs.tags || steps.tags-stable.outputs.tags }}
+          build-args: |
+            VERSION=${{ needs.test.outputs.tag }}
+
+  # ============================================================================
+  # Summary
+  # ============================================================================
+  summary:
+    name: Summary
+    needs: [prepare, test, goreleaser, docker]
+    # Only run summary if prepare ran (skip when triggered from invalid branch like main without tag)
+    if: always() && needs.prepare.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Generate summary
+        env:
+          IS_PUSH: ${{ needs.prepare.outputs.is-push }}
+          IS_PRERELEASE: ${{ needs.prepare.outputs.is-prerelease }}
+          IS_STABLE: ${{ needs.prepare.outputs.is-stable }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          GORELEASER_ENABLED: ${{ needs.prepare.outputs.goreleaser-enabled }}
+          DOCKER_ENABLED: ${{ needs.prepare.outputs.docker-enabled }}
+          TEST_RESULT: ${{ needs.test.result }}
+          GORELEASER_RESULT: ${{ needs.goreleaser.result }}
+          GORELEASER_URL: ${{ needs.goreleaser.outputs.release-url }}
+          DOCKER_RESULT: ${{ needs.docker.result }}
+          USE_GORELEASER: ${{ env.USE_GORELEASER }}
+          BUILD_DOCKER: ${{ env.BUILD_DOCKER }}
+        run: |
+          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$IS_PUSH" = "true" ]; then
+            echo "### 📦 Prerelease: \`$TAG\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This is a **staging release candidate** created from push to stage." >> $GITHUB_STEP_SUMMARY
+          elif [ "$IS_PRERELEASE" = "true" ]; then
+            echo "### 📦 Prerelease: \`$TAG\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This is a **staging release candidate**." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### 🚀 Stable Release: \`$TAG\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This is a **production release**." >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Job Status Table
+          echo "### Build Status" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status | Notes |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|-------|" >> $GITHUB_STEP_SUMMARY
+
+          # Test status
+          case "$TEST_RESULT" in
+            success) echo "| Tests | ✅ success | All tests passed |" >> $GITHUB_STEP_SUMMARY ;;
+            failure) echo "| Tests | ❌ failure | Check logs for errors |" >> $GITHUB_STEP_SUMMARY ;;
+            *) echo "| Tests | $TEST_RESULT | |" >> $GITHUB_STEP_SUMMARY ;;
+          esac
+
+          # GoReleaser status
+          if [ "$GORELEASER_ENABLED" = "true" ]; then
+            case "$GORELEASER_RESULT" in
+              success) echo "| GoReleaser | ✅ success | Binaries uploaded to release |" >> $GITHUB_STEP_SUMMARY ;;
+              failure) echo "| GoReleaser | ❌ failure | Check logs for errors |" >> $GITHUB_STEP_SUMMARY ;;
+              skipped) echo "| GoReleaser | ⏭️ skipped | Tests did not pass |" >> $GITHUB_STEP_SUMMARY ;;
+              *) echo "| GoReleaser | $GORELEASER_RESULT | |" >> $GITHUB_STEP_SUMMARY ;;
+            esac
+          else
+            echo "| GoReleaser | ⏭️ disabled | USE_GORELEASER is not 'true' |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Docker status
+          if [ "$DOCKER_ENABLED" = "true" ]; then
+            case "$DOCKER_RESULT" in
+              success) echo "| Docker | ✅ success | Image pushed to Docker Hub |" >> $GITHUB_STEP_SUMMARY ;;
+              failure) echo "| Docker | ❌ failure | Check logs for errors |" >> $GITHUB_STEP_SUMMARY ;;
+              skipped) echo "| Docker | ⏭️ skipped | |" >> $GITHUB_STEP_SUMMARY ;;
+              *) echo "| Docker | $DOCKER_RESULT | |" >> $GITHUB_STEP_SUMMARY ;;
+            esac
+          else
+            echo "| Docker | ⏭️ disabled | BUILD_DOCKER is not 'true' |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Links section
+          if [ "$TEST_RESULT" = "success" ]; then
+            echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+            if [ -n "$GORELEASER_URL" ]; then
+              echo "- [GitHub Release]($GORELEASER_URL)" >> $GITHUB_STEP_SUMMARY
+            elif [ -n "$TAG" ]; then
+              echo "- [GitHub Release](https://github.com/${{ github.repository }}/releases/tag/$TAG)" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [ "$DOCKER_ENABLED" = "true" ] && [ "$DOCKER_RESULT" = "success" ]; then
+              echo "- [Docker Hub](https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }})" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Docker tags info
+          if [ "$DOCKER_ENABLED" = "true" ] && [ "$DOCKER_RESULT" = "success" ]; then
+            echo "### 🐳 Docker Tags" >> $GITHUB_STEP_SUMMARY
+            if [ "$IS_PRERELEASE" = "true" ]; then
+              echo "- \`$TAG\`" >> $GITHUB_STEP_SUMMARY
+              echo "- \`rc-latest\`" >> $GITHUB_STEP_SUMMARY
+            else
+              MAJOR=$(echo $VERSION | cut -d. -f1)
+              MINOR=$(echo $VERSION | cut -d. -f2)
+              echo "- \`$TAG\`" >> $GITHUB_STEP_SUMMARY
+              echo "- \`$VERSION\`" >> $GITHUB_STEP_SUMMARY
+              echo "- \`$MAJOR.$MINOR\`" >> $GITHUB_STEP_SUMMARY
+              echo "- \`$MAJOR\`" >> $GITHUB_STEP_SUMMARY
+              echo "- \`latest\`" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Configuration help for disabled features
+          if [ "$USE_GORELEASER" != "true" ] || [ "$BUILD_DOCKER" != "true" ]; then
+            echo "### ⚙️ Enable Disabled Features" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            if [ "$USE_GORELEASER" != "true" ]; then
+              echo "**To enable GoReleaser:**" >> $GITHUB_STEP_SUMMARY
+              echo "1. Edit \`.github/workflows/release.yml\`" >> $GITHUB_STEP_SUMMARY
+              echo "2. Set \`USE_GORELEASER: 'true'\` in the env section" >> $GITHUB_STEP_SUMMARY
+              echo "3. Ensure \`.goreleaser.yml\` exists in your repository" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            if [ "$BUILD_DOCKER" != "true" ]; then
+              echo "**To enable Docker builds:**" >> $GITHUB_STEP_SUMMARY
+              echo "1. Edit \`.github/workflows/release.yml\`" >> $GITHUB_STEP_SUMMARY
+              echo "2. Set \`BUILD_DOCKER: 'true'\` in the env section" >> $GITHUB_STEP_SUMMARY
+              echo "3. Add repository secrets:" >> $GITHUB_STEP_SUMMARY
+              echo "   - \`DOCKERHUB_USERNAME\`: Your Docker Hub username" >> $GITHUB_STEP_SUMMARY
+              echo "   - \`DOCKERHUB_TOKEN\`: Your Docker Hub access token" >> $GITHUB_STEP_SUMMARY
+              echo "4. Ensure \`Dockerfile\` exists in your repository" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          # Next steps
+          if [ "$IS_PRERELEASE" = "true" ] && [ "$TEST_RESULT" = "success" ]; then
+            echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "1. Test this prerelease thoroughly" >> $GITHUB_STEP_SUMMARY
+            echo "2. When ready, merge \`stage\` → \`main\`" >> $GITHUB_STEP_SUMMARY
+            echo "3. Create a stable release using one of these methods:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Option A: Command Line**" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "git tag v1.2.3 && git push origin v1.2.3" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Option B: GitHub UI**" >> $GITHUB_STEP_SUMMARY
+            echo "1. Go to **Releases** → **Create a new release**" >> $GITHUB_STEP_SUMMARY
+            echo "2. Click **Choose a tag** → type your version (e.g., \`v1.2.3\`) → **Create new tag**" >> $GITHUB_STEP_SUMMARY
+            echo "3. Set **Target** to \`main\`" >> $GITHUB_STEP_SUMMARY
+            echo "4. Check **Set as the latest release** (not prerelease)" >> $GITHUB_STEP_SUMMARY
+            echo "5. Click **Publish release**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "GoReleaser will automatically build binaries and update your release." >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,6 @@
+{
+  "name": "test-config-error",
+  "dependencies": {
+    "react": "^18.0.0"
+  }
+}

@@ -1,0 +1,63 @@
+# React App - goupdate configuration
+# Demonstrates: groups, incremental updates, ignoring types, system tests
+
+extends: [default]
+
+rules:
+  npm:
+    groups:
+      framework:
+        - react
+        - react-dom
+        - react-router-dom
+      state:
+        - "@tanstack/react-query"
+        - zustand
+      dev:
+        - typescript
+        - vite
+        - vitest
+
+    # Update React incrementally (nearest version instead of latest)
+    incremental:
+      - react
+      - react-dom
+
+    # Skip type packages
+    ignore:
+      - "@types/*"
+
+    # Note: Pre-release filtering inherits from default config
+    # Default patterns exclude: alpha, beta, rc, canary, dev, snapshot, nightly, preview
+
+# System tests validate app health before and after updates
+system_tests:
+  run_preflight: true
+  run_mode: after_all
+  stop_on_fail: true
+  tests:
+    # Quick type check and lint
+    - name: type-check
+      commands: npm run type-check
+      timeout_seconds: 60
+      continue_on_fail: true  # Lint issues don't block updates
+
+    # Unit tests with Vitest
+    - name: unit-tests
+      commands: npm test -- --run
+      timeout_seconds: 120
+
+    # Build verification
+    - name: build
+      commands: npm run build
+      timeout_seconds: 300
+
+    # End-to-end tests (example with Playwright)
+    # - name: e2e-tests
+    #   commands: |
+    #     npm run preview &
+    #     sleep 3
+    #     npx playwright test
+    #   timeout_seconds: 600
+    #   env:
+    #     CI: "true"

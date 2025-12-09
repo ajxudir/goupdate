@@ -1,0 +1,6 @@
+{
+  "name": "test-unknown-extends",
+  "dependencies": {
+    "lodash": "^4.17.0"
+  }
+}

@@ -1,0 +1,247 @@
+# Default goupdate configuration
+# This file uses the new multiline commands format with env support
+# and config-based parsing. See docs/configuration.md for full schema.
+
+# Global version exclusion patterns (pre-release versions)
+# Each pattern matches a specific pre-release indicator
+exclude_versions:
+  - "(?i)[._-]alpha"
+  - "(?i)[._-]beta"
+  - "(?i)[._-]rc"
+  - "(?i)[._-]canary"
+  - "(?i)[._-]dev"
+  - "(?i)[._-]snapshot"
+  - "(?i)[._-]nightly"
+  - "(?i)[._-]preview"
+  - "(?i)[._-]next"
+
+rules:
+  # NPM/Node.js packages in package.json
+  # Uses npm ls for maximum compatibility across package-lock.json versions (v1, v2, v3)
+  npm: &js_rule
+    manager: js
+    include: ["**/package.json"]
+    exclude: ["**/node_modules/**", "**/vendor/**"]
+    format: json
+    fields:
+      dependencies: prod
+      devDependencies: dev
+    outdated:
+      commands: |
+        npm view {{package}} versions --json
+      format: json
+      timeout_seconds: 30
+    update:
+      commands: |
+        npm install --package-lock-only --ignore-scripts
+      timeout_seconds: 300
+    lock_files:
+      - files: ["**/package-lock.json"]
+        commands: |
+          npm ls --json --package-lock-only 2>/dev/null || exit 0
+        timeout_seconds: 60
+
+  # pnpm packages (extends npm rule)
+  # Uses pnpm ls for maximum compatibility across pnpm-lock.yaml versions
+  pnpm:
+    <<: *js_rule
+    update:
+      commands: |
+        pnpm install --lockfile-only
+      timeout_seconds: 300
+    lock_files:
+      - files: ["**/pnpm-lock.yaml"]
+        commands: |
+          pnpm ls --json --depth=0 2>/dev/null || exit 0
+        timeout_seconds: 60
+
+  # Yarn packages (extends npm rule)
+  # Uses yarn list for maximum compatibility across yarn versions (classic and berry)
+  yarn:
+    <<: *js_rule
+    update:
+      commands: |
+        yarn install --mode update-lockfile 2>/dev/null || yarn install
+      timeout_seconds: 300
+    lock_files:
+      - files: ["**/yarn.lock"]
+        commands: |
+          yarn list --json --depth=0 2>/dev/null || exit 0
+        timeout_seconds: 60
+
+  # Composer/PHP packages
+  composer:
+    manager: php
+    include: ["**/composer.json"]
+    exclude: ["**/vendor/**"]
+    format: json
+    fields:
+      require: prod
+      require-dev: dev
+    ignore: ["php", "ext-*"]
+    outdated:
+      commands: |
+        composer show {{package}} --all --format=json
+      format: json
+      extraction:
+        json_key: "versions"
+      timeout_seconds: 30
+    update:
+      # composer install updates lock file based on composer.json after version is changed
+      commands: |
+        composer install --no-interaction --no-scripts
+      timeout_seconds: 300
+    lock_files:
+      - files: ["**/composer.lock"]
+        format: json
+        extraction:
+          pattern: '(?s)"name":\s*"(?P<n>[^"]+)"\s*,\s*"version":\s*"(?P<version>[^"]+)"'
+
+  # Python requirements.txt
+  requirements:
+    manager: python
+    include: ["**/requirements*.txt"]
+    exclude: ["**/venv/**", "**/.venv/**"]
+    format: raw
+    fields:
+      packages: prod
+    extraction:
+      # Pattern fixes:
+      # 1. Package name must start with letter/digit (not hyphen) to exclude pip directives (-r, -e, etc.)
+      # 2. Optional extras in brackets like [django,celery] are matched but not captured
+      pattern: '(?m)^(?P<n>[a-zA-Z0-9][\w\-\.]*)(?:\[[^\]]+\])?(?:[ \t]*(?P<constraint>[><=~!]+)[ \t]*(?P<version>[\w\.\-\+]+)|[ \t]+(?P<version_alt>[\w\.\-\+]+))?'
+    outdated:
+      commands: |
+        curl -s "https://pypi.org/pypi/{{package}}/json"
+      format: json
+      extraction:
+        json_key: "releases"
+      timeout_seconds: 30
+    update:
+      # No lock command - requirements.txt is the manifest, no separate lock file
+      # The version is updated directly in requirements.txt
+      timeout_seconds: 60
+    # requirements.txt is self-pinning: declared versions ARE the installed versions
+    self_pinning: true
+
+  # Python Pipfile
+  pipfile:
+    manager: python
+    include: ["**/Pipfile"]
+    exclude: ["**/venv/**", "**/.venv/**"]
+    format: raw
+    fields:
+      packages: prod
+      dev-packages: dev
+    extraction:
+      pattern: '(?m)^(?P<n>[\w\-\.]+)\s*=\s*"(?P<constraint>[><=~!]+)?\s*(?P<version>[\w\.\-\+\*]+)?'
+    outdated:
+      commands: |
+        curl -s "https://pypi.org/pypi/{{package}}/json"
+      format: json
+      extraction:
+        json_key: "releases"
+      timeout_seconds: 30
+    update:
+      commands: |
+        pipenv lock
+      timeout_seconds: 300
+    lock_files:
+      - files: ["**/Pipfile.lock"]
+        format: json
+        extraction:
+          pattern: '(?s)"(?P<n>[\w\-]+)":\s*\{[^}]*"version":\s*"==(?P<version>[^"]+)"'
+
+  # Go modules
+  mod:
+    manager: golang
+    include: ["**/go.mod"]
+    format: raw
+    fields:
+      require: prod
+    extraction:
+      pattern: '(?m)^\s*(?P<n>[\w\.\-\/]+)\s+(?P<version>v[\w\.\-\+]+)'
+    outdated:
+      commands: |
+        go list -m -json -versions {{package}}
+      format: json
+      extraction:
+        json_key: "Versions"
+      timeout_seconds: 30
+    update:
+      # go mod tidy updates go.sum based on go.mod after version is changed
+      commands: |
+        go mod tidy
+      timeout_seconds: 120
+    lock_files:
+      - files: ["**/go.sum"]
+        format: raw
+        extraction:
+          pattern: '(?m)^(?P<n>\S+)\s+(?P<version>v[^\s]+)'
+
+  # .NET MSBuild projects (csproj, vbproj, fsproj)
+  msbuild:
+    manager: dotnet
+    include: ["**/*.csproj", "**/*.vbproj", "**/*.fsproj"]
+    format: xml
+    fields:
+      ItemGroup/PackageReference: prod
+    extraction:
+      # Dev dependency detection: packages with PrivateAssets="all" or <PrivateAssets>all</PrivateAssets>
+      dev_element: "PrivateAssets"
+      dev_element_value: "all"
+    outdated:
+      commands: |
+        dotnet package search {{package}} --exact-match
+      format: raw
+      extraction:
+        # Parse dotnet package search table output: | PackageName | Version | ... |
+        pattern: '(?m)^\|\s*[^|]+\|\s*(?P<version>\d[\w\.\-]*)\s*\|'
+      timeout_seconds: 30
+    update:
+      # dotnet restore updates lock file based on csproj after version is changed
+      commands: |
+        dotnet restore
+      timeout_seconds: 300
+    lock_files:
+      - files: ["**/packages.lock.json"]
+        format: json
+        extraction:
+          pattern: '"(?P<n>[\w\.-/]+)"\s*:\s*\{\s*"resolved"\s*:\s*"(?P<version>[^"]+)"'
+
+  # NuGet packages.config (legacy .NET)
+  nuget:
+    manager: dotnet
+    include: ["**/packages.config"]
+    format: xml
+    fields:
+      packages: prod
+    extraction:
+      path: "package"
+      name_attr: "id"
+      version_attr: "version"
+      # Dev dependency detection: packages with developmentDependency="true"
+      dev_attr: "developmentDependency"
+      dev_value: "true"
+    outdated:
+      commands: |
+        dotnet package search {{package}} --exact-match
+      format: raw
+      extraction:
+        # Parse dotnet package search table output: | PackageName | Version | ... |
+        pattern: '(?m)^\|\s*[^|]+\|\s*(?P<version>\d[\w\.\-]*)\s*\|'
+      timeout_seconds: 30
+    update:
+      commands: |
+        dotnet restore
+      timeout_seconds: 300
+    lock_files:
+      - files: ["**/packages.lock.json"]
+        format: json
+        extraction:
+          pattern: '"(?P<n>[\w\.-/]+)"\s*:\s*\{\s*"resolved"\s*:\s*"(?P<version>[^"]+)"'
+
+# Global latest mapping defaults
+latest_mapping:
+  default:
+    latest: "*"

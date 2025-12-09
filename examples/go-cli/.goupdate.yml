@@ -1,0 +1,13 @@
+# Go CLI - goupdate configuration
+# Demonstrates: groups for Go modules
+
+extends: [default]
+
+rules:
+  mod:
+    groups:
+      cli:
+        - github.com/spf13/cobra
+        - github.com/spf13/viper
+      logging:
+        - go.uber.org/zap

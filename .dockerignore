@@ -1,0 +1,30 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+goupdate
+*.exe
+coverage.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test artifacts
+*.test
+testdata/
+
+# Documentation (not needed in image)
+docs/
+*.md
+!README.md
+
+# Examples (not needed in image)
+examples/
+
+# Config files (mounted at runtime)
+config/

@@ -1,0 +1,13 @@
+# Test override: Use regex extraction instead of npm commands for offline testing
+# The default config uses `npm ls --json` for maximum compatibility, but tests
+# need to work without npm installed. This override uses regex parsing.
+extends: ["default"]
+
+rules:
+  npm:
+    lock_files:
+      - files: ["**/package-lock.json"]
+        format: json
+        extraction:
+          # Parse package-lock.json v3 format: "node_modules/pkg": {"version": "x.y.z"}
+          pattern: '"node_modules/(?P<n>[^"]+)":\s*\{[^}]*"version":\s*"(?P<version>[^"]+)"'

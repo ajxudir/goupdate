@@ -1,0 +1,9 @@
+{
+  "name": "test-lock-missing-package",
+  "version": "1.0.0",
+  "description": "Test case where package is in package.json but missing from lock file",
+  "dependencies": {
+    "lodash": "^4.17.0",
+    "missing-package": "^1.0.0"
+  }
+}

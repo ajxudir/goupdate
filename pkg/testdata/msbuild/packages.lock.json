@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net8.0": {
+      "Microsoft.Extensions.Hosting": {
+        "resolved": "8.0.0",
+        "contentHash": "abc123",
+        "type": "Direct"
+      },
+      "Microsoft.Extensions.Http": {
+        "resolved": "8.0.0",
+        "contentHash": "def456",
+        "type": "Direct"
+      },
+      "Microsoft.EntityFrameworkCore": {
+        "resolved": "8.0.2",
+        "contentHash": "ghi789",
+        "type": "Direct"
+      },
+      "Microsoft.EntityFrameworkCore.SqlServer": {
+        "resolved": "8.0.2",
+        "contentHash": "jkl012",
+        "type": "Direct"
+      },
+      "Swashbuckle.AspNetCore": {
+        "resolved": "6.5.0",
+        "contentHash": "mno345",
+        "type": "Direct"
+      },
+      "MediatR": {
+        "resolved": "12.2.0",
+        "contentHash": "pqr678",
+        "type": "Direct"
+      },
+      "Mapster": {
+        "resolved": "7.4.0",
+        "contentHash": "stu901",
+        "type": "Direct"
+      },
+      "Serilog.AspNetCore": {
+        "resolved": "8.0.1",
+        "contentHash": "vwx234",
+        "type": "Direct"
+      },
+      "FluentValidation.AspNetCore": {
+        "resolved": "11.3.0",
+        "contentHash": "yza567",
+        "type": "Direct"
+      },
+      "Polly.Extensions.Http": {
+        "resolved": "3.0.0",
+        "contentHash": "bcd890",
+        "type": "Direct"
+      },
+      "StackExchange.Redis": {
+        "resolved": "2.7.20",
+        "contentHash": "efg123",
+        "type": "Direct"
+      }
+    }
+  }
+}

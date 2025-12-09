@@ -1,0 +1,16 @@
+# Test incremental packages configuration
+extends: [default]
+
+rules:
+  npm:
+    # These packages should update one major version at a time
+    incremental:
+      - react
+      - react-dom
+      - typescript
+      - eslint
+
+  mod:
+    incremental:
+      - github.com/gin-gonic/gin
+      - go.uber.org/zap

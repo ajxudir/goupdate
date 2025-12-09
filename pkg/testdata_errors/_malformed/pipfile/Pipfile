@@ -1,0 +1,11 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages
+django = ">=4.0"
+flask = "~=3.0.0"
+
+[dev-packages]
+pytest = ">=7.0.0"

@@ -1,0 +1,16 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+# Edge case: Pipfile without Pipfile.lock (LockMissing status)
+
+[packages]
+django = ">=4.0"
+celery = "*"
+
+[dev-packages]
+pytest = ">=7.0"
+
+[requires]
+python_version = "3.11"

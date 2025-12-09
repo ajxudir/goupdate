@@ -1,0 +1,16 @@
+# Test config with multiple lock file patterns
+rules:
+  multi-lock:
+    files: ["manifest.json"]
+    format: json
+    extraction:
+      fields: [dependencies]
+    lock_files:
+      - files: ["lock-a.json"]
+        format: json
+        extraction:
+          pattern: '"(?P<name>[^"]+)":\s*\{\s*"version":\s*"(?P<version>[^"]+)"'
+      - files: ["lock-b.txt"]
+        format: raw
+        extraction:
+          pattern: '(?P<name>[\w./@-]+)\s+(?P<version>v?[\d.]+)'

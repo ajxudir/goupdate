@@ -1,0 +1,17 @@
+goupdate
+*.exe
+coverage.out
+coverage.html
+.DS_Store
+node_modules/
+package-lock.json
+# Project's own .goupdate.yml is tracked for self-documentation
+# All other .goupdate.yml files (nested) are ignored to protect user configs
+**/.goupdate.yml
+!/.goupdate.yml
+!testdata/**/.goupdate.yml
+!**/testdata/**/.goupdate.yml
+!**/_testdata/**/.goupdate.yml
+!examples/**/.goupdate.yml
+dist/
+cover.out

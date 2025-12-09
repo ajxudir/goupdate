@@ -1,0 +1,24 @@
+# Laravel App - goupdate configuration
+# Demonstrates: groups for PHP/Composer
+
+extends: [default]
+
+rules:
+  composer:
+    groups:
+      framework:
+        - laravel/framework
+        - laravel/sanctum
+      plugins:
+        - spatie/laravel-permission
+        - predis/predis
+      dev:
+        - phpunit/phpunit
+        - laravel/pint
+        - nunomaduro/larastan
+
+    # Skip prereleases
+    exclude_versions:
+      - "(?i)alpha"
+      - "(?i)beta"
+      - "(?i)RC"

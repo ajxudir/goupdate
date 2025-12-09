@@ -1,0 +1,8 @@
+# Test config with a rule that has no lock_files configured
+rules:
+  nolock-rule:
+    files: ["manifest.json"]
+    format: json
+    extraction:
+      fields: [dependencies]
+    # No lock_files - triggers NotConfigured status

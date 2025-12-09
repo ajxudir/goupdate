@@ -1,0 +1,13 @@
+# Test config pointing to a lock file that causes extraction failure
+rules:
+  broken-lock:
+    files: ["manifest.json"]
+    format: json
+    extraction:
+      fields: [dependencies]
+    lock_files:
+      - files: ["broken.lock"]
+        format: raw
+        extraction:
+          # Invalid regex pattern to cause parse error
+          pattern: '(?P<name>[^)(?P<version>[^)'

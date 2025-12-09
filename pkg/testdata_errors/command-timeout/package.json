@@ -1,0 +1,8 @@
+{
+  "name": "command-timeout-test",
+  "version": "1.0.0",
+  "description": "Test case: command that takes too long and should timeout",
+  "dependencies": {
+    "lodash": "^4.17.21"
+  }
+}

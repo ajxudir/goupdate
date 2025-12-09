@@ -1,0 +1,11 @@
+{
+  "name": "invalid-versions",
+  "version": "1.0.0",
+  "dependencies": {
+    "lodash": "not-a-version",
+    "express": "latest",
+    "axios": "file:../local-axios",
+    "moment": "git://github.com/moment/moment.git",
+    "uuid": ""
+  }
+}

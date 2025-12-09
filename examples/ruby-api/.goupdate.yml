@@ -1,0 +1,66 @@
+# Ruby API - Custom config for Bundler (not in defaults)
+# Demonstrates: Adding support for an unsupported package manager
+#
+# This example shows how to add full goupdate support for Ruby/Bundler
+# without waiting for upstream changes. Define your own rules!
+
+rules:
+  bundler:
+    manager: ruby
+    format: raw
+    include:
+      - "**/Gemfile"
+    exclude:
+      - "**/vendor/**"
+
+    # Extract gem name and version from Gemfile syntax: gem 'name', '~> version'
+    extraction:
+      pattern: "(?m)^\\s*gem\\s+['\"](?P<n>[^'\"]+)['\"](?:,\\s*['\"](?P<constraint>[~>=<]+)?\\s*(?P<version>[\\d.]+)['\"])?"
+
+    # Map all gems as prod dependencies (Gemfile doesn't separate by sections for simple parsing)
+    fields:
+      dependencies: prod
+
+    # Ruby's ~> is the pessimistic operator (similar to npm's ~)
+    constraint_mapping:
+      "~>": "~"
+
+    groups:
+      framework:
+        - rails
+        - puma
+      database:
+        - pg
+        - redis
+      background:
+        - sidekiq
+      testing:
+        - rspec-rails
+        - factory_bot_rails
+
+    ignore:
+      - rubocop
+      - rubocop-rails
+
+    exclude_versions:
+      - "(?i)pre"
+      - "(?i)alpha"
+      - "(?i)beta"
+
+    # Custom command to fetch available versions from RubyGems API
+    # Uses grep instead of jq for portability (jq may not be pre-installed)
+    outdated:
+      commands: |
+        curl -s "https://rubygems.org/api/v1/versions/{{package}}.json" |
+        grep -oE '"number":"[0-9]+\.[0-9]+(\.[0-9]+)*"' |
+        grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)*'
+      format: raw
+      extraction:
+        pattern: "(?P<version>[\\d.]+)"
+      timeout_seconds: 30
+
+    # Custom command to update lock file
+    update:
+      commands: |
+        bundle update {{package}} --conservative
+      timeout_seconds: 120

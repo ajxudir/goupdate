@@ -1,0 +1,12 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+django = {git = "https://github.com/django/django.git"}
+flask = {path = "../local-flask"}
+requests = {version = "*", extras = ["security"]}
+
+[dev-packages]
+pytest = "*"

@@ -1,0 +1,77 @@
+# GoReleaser configuration for goupdate
+# Documentation: https://goreleaser.com/customization/
+
+version: 2
+
+project_name: goupdate
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+
+builds:
+  - id: goupdate
+    main: ./main.go
+    binary: goupdate
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    goarm:
+      - "7"
+    ignore:
+      # arm (32-bit) is only supported on linux
+      - goos: darwin
+        goarch: arm
+    ldflags:
+      - -s -w
+      - -X github.com/user/goupdate/cmd.Version={{.Version}}
+      - -X github.com/user/goupdate/cmd.BuildTime={{.Date}}
+      - -X github.com/user/goupdate/cmd.GitCommit={{.ShortCommit}}
+      - -X github.com/user/goupdate/cmd.BuildOS={{.Os}}
+      - -X github.com/user/goupdate/cmd.BuildArch={{.Arch}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: ajxudir
+    name: goupdate
+  draft: false
+  prerelease: auto
+  # IMPORTANT: Default to NOT marking as latest
+  # This prevents prereleases from being marked as latest
+  # Stable releases override this via GORELEASER_MAKE_LATEST=true env var
+  make_latest: false
+  # Title defaults to tag name when not specified

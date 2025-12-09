@@ -1,0 +1,8 @@
+{
+  "name": "test/invalid-versions",
+  "require": {
+    "symfony/console": "dev-master",
+    "guzzlehttp/guzzle": "not-a-version",
+    "monolog/monolog": ""
+  }
+}

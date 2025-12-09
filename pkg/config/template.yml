@@ -1,0 +1,242 @@
+# goupdate configuration
+# Full schema reference with examples
+# See: https://github.com/ajxudir/goupdate for documentation
+
+# Extend other config files (resolved relative to this file)
+# The 'default' preset includes rules for npm, pnpm, yarn, composer, pip, go, and dotnet
+extends:
+  - default                    # Built-in defaults (recommended)
+  # - ./base-config.yml        # Custom shared config (optional)
+
+# Working directory for relative paths (default: current directory)
+# working_dir: ./packages
+
+# Global version exclusion patterns (regex)
+# Each pattern is tested independently - if any matches, version is excluded
+exclude_versions:
+  - "(?i)[._-]alpha"
+  - "(?i)[._-]beta"
+  - "(?i)[._-]rc"
+  - "(?i)[._-]canary"
+  - "(?i)[._-]dev"
+  - "(?i)[._-]snapshot"
+  - "(?i)[._-]nightly"
+  - "(?i)[._-]preview"
+  - "(?i)[._-]next"
+
+# Package manager rules - override or extend built-in rules
+rules:
+  # Example: Disable a built-in rule
+  # msbuild:
+  #   enabled: false                           # Disable this rule (inherits from default but won't run)
+
+  # Example: Custom NPM configuration
+  # npm:
+  #   enabled: true                            # Enable/disable this rule (default: true)
+  #   manager: js                              # Package manager type
+  #   include: ["**/package.json"]             # Files to scan (glob patterns)
+  #   exclude: ["**/node_modules/**"]          # Files to ignore
+  #   format: json                             # File format: json, yaml, raw, xml
+  #   fields:                                  # Fields mapping to dependency types
+  #     dependencies: prod
+  #     devDependencies: dev
+  #   ignore: ["internal-*"]                   # Package name patterns to skip
+  #
+  #   # Version checking configuration
+  #   outdated:
+  #     commands: |                            # Multiline commands (supports pipes)
+  #       npm view {{package}} versions --json
+  #     format: json                           # Output format: json, yaml, raw
+  #     extraction:                            # Custom extraction from command output
+  #       json_key: versions                   # For JSON: dot-path to version array
+  #       # yaml_key: releases                 # For YAML: dot-path to version array
+  #       # pattern: 'v(?P<version>\d+\.\d+)'  # For raw: regex with named group
+  #     timeout_seconds: 30                    # Command timeout (default: 30)
+  #     exclude_version_patterns:              # Rule-level version exclusions
+  #       - "(?i)alpha"
+  #
+  #   # Update configuration
+  #   update:
+  #     commands: |                            # Commands to update lock files
+  #       npm install --package-lock-only --ignore-scripts
+  #     timeout_seconds: 300                   # Command timeout (default: 300)
+  #
+  #   # Lock file parsing for installed version detection
+  #   # Use EITHER file-based (format + extraction) OR command-based (commands)
+  #   lock_files:
+  #     # Command-based: runs command and parses JSON output
+  #     - files: ["**/package-lock.json"]       # For detection/rule conflict resolution
+  #       commands: |
+  #         npm ls --json --package-lock-only 2>/dev/null || exit 0
+  #       timeout_seconds: 60
+  #     # File-based alternative: uses regex on lock file content
+  #     # - files: ["**/package-lock.json"]
+  #     #   format: json
+  #     #   extraction:
+  #     #     pattern: '"node_modules/(?P<n>[^"]+)":\s*\{[^}]*"version":\s*"(?P<version>[^"]+)"'
+  #
+  #   # Per-package overrides - configure behavior for specific packages
+  #   package_overrides:
+  #     lodash:
+  #       ignore: true                         # Skip this package entirely
+  #     react:
+  #       constraint: "^"                      # Force constraint type
+  #       outdated:
+  #         commands: |                        # Custom outdated command for this package
+  #           npm view {{package}} dist-tags --json
+  #
+  #   # Named groups for atomic updates (packages in same group update together)
+  #   groups:
+  #     react-ecosystem: [react, react-dom, react-router]
+  #     testing: [jest, @testing-library/react]
+  #
+  #   # Version constraint mapping
+  #   constraint_mapping:
+  #     "~=": "~"                              # Map ~= to ~
+  #     "==": "="
+  #
+  #   # Latest version indicators
+  #   latest_mapping:
+  #     default:
+  #       latest: "*"                          # "latest" means any version
+  #     packages:
+  #       typescript:
+  #         next: "^"                          # "next" for typescript means ^
+  #
+  #   # Per-rule incremental packages (alternative to package_overrides)
+  #   incremental:
+  #     - webpack                              # Can also use regex: "webpack.*"
+
+  # Example: Python requirements.txt (uses PyPI JSON API for cross-platform support)
+  # requirements:
+  #   manager: python
+  #   include: ["**/requirements*.txt"]
+  #   exclude: ["**/venv/**", "**/.venv/**"]
+  #   format: raw
+  #   fields:
+  #     packages: prod
+  #   extraction:
+  #     pattern: '^(?P<n>[\w\-\.]+)(?:[ \t]*(?P<constraint>[><=~!]+)[ \t]*(?P<version>[\w\.\-\+]+)|[ \t]+(?P<version_alt>[\w\.\-\+]+))?'
+  #   outdated:
+  #     commands: |
+  #       curl -s "https://pypi.org/pypi/{{package}}/json"
+  #     format: json
+  #     extraction:
+  #       json_key: "releases"                    # PyPI returns versions as object keys
+  #     timeout_seconds: 30
+  #   # Note: requirements.txt has no lock file - version is updated directly in manifest
+
+  # Example: Go modules
+  # mod:
+  #   manager: golang
+  #   include: ["**/go.mod"]
+  #   format: raw
+  #   fields:
+  #     require: prod
+  #   extraction:
+  #     pattern: '(?m)^\s*(?P<n>[\w\.\-\/]+)\s+(?P<version>v[\w\.\-\+]+)'
+  #   outdated:
+  #     commands: |
+  #       go list -m -json -versions {{package}}
+  #     format: json
+  #     extraction:
+  #       json_key: "Versions"
+  #     timeout_seconds: 30
+  #   update:
+  #     commands: |
+  #       go mod tidy                          # Updates go.sum based on go.mod changes
+  #     timeout_seconds: 120
+  #   lock_files:
+  #     - files: ["**/go.sum"]
+  #       format: raw
+  #       extraction:
+  #         pattern: '(?m)^(?P<n>\S+)\s+(?P<version>v[^\s]+)'
+
+  # Example: .NET MSBuild projects (uses NuGet API for cross-platform support)
+  # msbuild:
+  #   manager: dotnet
+  #   include: ["**/*.csproj", "**/*.vbproj", "**/*.fsproj"]
+  #   format: xml
+  #   fields:
+  #     ItemGroup/PackageReference: prod
+  #   outdated:
+  #     commands: |
+  #       curl -s "https://api.nuget.org/v3-flatcontainer/{{package}}/index.json"
+  #     format: json
+  #     extraction:
+  #       json_key: "versions"                    # NuGet API returns versions array
+  #     timeout_seconds: 30
+  #   update:
+  #     commands: |
+  #       dotnet restore                        # Updates lock file based on csproj changes
+  #     timeout_seconds: 300
+
+  # Example: Composer/PHP
+  # composer:
+  #   manager: php
+  #   include: ["**/composer.json"]
+  #   exclude: ["**/vendor/**"]
+  #   format: json
+  #   fields:
+  #     require: prod
+  #     require-dev: dev
+  #   ignore: ["php", "ext-*"]                 # Ignore PHP runtime requirements
+  #   outdated:
+  #     commands: |
+  #       composer show {{package}} --all --format=json
+  #     format: json
+  #     extraction:
+  #       json_key: "versions"
+  #     timeout_seconds: 30
+  #   update:
+  #     commands: |
+  #       composer install --no-interaction --no-scripts  # Updates lock based on composer.json
+  #     timeout_seconds: 300
+
+# Placeholder substitutions available in commands:
+# {{package}}    - Package name
+# {{version}}    - Target version being checked/updated
+# {{constraint}} - Version constraint (^, ~, >=, etc.)
+
+# Format options for outdated.format:
+# - json: Parse JSON output, use extraction.json_key for nested paths
+# - yaml: Parse YAML output, use extraction.yaml_key for nested paths
+# - raw: Use extraction.pattern regex with named groups (use grep/awk/jq to preprocess)
+
+# Security settings - can only be configured from root config file
+# security:
+#   # Max config file size (default: 10MB = 10485760 bytes)
+#   max_config_file_size: 10485760
+#
+#   # Max regex pattern length to prevent ReDoS attacks (default: 1000)
+#   max_regex_complexity: 1000
+#
+#   # Allow complex regex patterns that might be vulnerable to ReDoS
+#   # WARNING: Only enable if you trust all regex patterns in your config
+#   allow_complex_regex: false
+#
+#   # Allow ".." in extends paths (default: false for security)
+#   allow_path_traversal: false
+#
+#   # Allow absolute paths in extends (default: false)
+#   allow_absolute_paths: false
+
+# Versioning configuration for non-standard version formats
+# versioning:
+#   # Format: semver (default), numeric, ordered/list, regex
+#   format: semver
+#
+#   # Custom regex for version extraction (used with format: regex)
+#   # regex: "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
+#
+#   # Sort order for version lists: desc (newest first), asc (oldest first)
+#   sort: desc
+#
+# Supported version formats:
+#   Standard:     1.2.3, v1.2.3, 1.2.3-alpha, 1.2.3+build
+#   Pre-release:  1.0.0-alpha, 1.0.0-beta.1, 1.0.0-rc03
+#   4+ segments:  1.0.0.0, 1.0.0.1, 10.0.0.0.1
+#   CalVer:       2024.01.15, 2024.1.15
+#   Prefixed:     next-14.0.3, release-2024.01.15, alpine-3.18.4
+#   Date-based:   20240115, 2024060100 (Moodle-style)
+#   Build nums:   150, 200 (use format: numeric)

@@ -1,0 +1,57 @@
+# goupdate configuration for the goupdate project itself
+# Only targets the root go.mod, excludes test fixtures and examples
+
+extends: [default]
+
+# System tests validate updates work correctly
+# Using after_each mode for maximum safety - tests run after each package update
+# This immediately identifies which package breaks tests and auto-rollbacks
+system_tests:
+  run_preflight: true
+  run_mode: after_each
+  stop_on_fail: true
+  tests:
+    - name: test
+      commands: make test
+      timeout_seconds: 300
+
+    - name: build
+      commands: make build
+      timeout_seconds: 120
+
+rules:
+  # Only enable Go modules rule - disable all others
+  # This prevents scanning testdata/examples for npm, composer, etc.
+  npm:
+    enabled: false
+  pnpm:
+    enabled: false
+  yarn:
+    enabled: false
+  composer:
+    enabled: false
+  requirements:
+    enabled: false
+  pipfile:
+    enabled: false
+  msbuild:
+    enabled: false
+  nuget:
+    enabled: false
+
+  mod:
+    # Only include the root go.mod
+    include:
+      - "go.mod"
+
+    # Exclude all test fixtures and examples
+    exclude:
+      - "pkg/testdata/**"
+      - "pkg/_testdata/**"
+      - "examples/**"
+
+    # Skip unstable versions (regex patterns)
+    exclude_versions:
+      - "(?i)alpha"
+      - "(?i)beta"
+      - "(?i)rc"

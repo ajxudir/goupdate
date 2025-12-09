@@ -1,0 +1,8 @@
+{
+  "name": "invalid-command-test",
+  "version": "1.0.0",
+  "description": "Test case: outdated command references non-existent binary",
+  "dependencies": {
+    "lodash": "^4.17.21"
+  }
+}

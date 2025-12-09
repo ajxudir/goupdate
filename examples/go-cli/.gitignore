@@ -1,0 +1,6 @@
+myapp
+*.exe
+*.test
+*.out
+vendor/
+.env
