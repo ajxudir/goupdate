@@ -1,0 +1,83 @@
+# Frontend App - goupdate configuration
+# Example: pnpm-based Vue.js frontend with grouped dependencies
+#
+# Based on matematikk-mooc/frontend project structure
+
+extends: [default]
+
+rules:
+  pnpm:
+    # Group related packages for coordinated updates
+    groups:
+      # Vue ecosystem - update together
+      vue:
+        - vue
+        - vuex
+        - vue-router
+        - "@vue/reactivity"
+        - "@vueuse/core"
+
+      # Build tooling
+      build:
+        - webpack
+        - webpack-cli
+        - webpack-dev-server
+        - vue-loader
+        - sass
+        - sass-loader
+
+      # Testing tools
+      testing:
+        - vitest
+        - "@vitest/coverage-v8"
+        - playwright
+
+      # Linting
+      lint:
+        - eslint
+        - eslint-plugin-vue
+        - prettier
+
+      # TypeScript
+      typescript:
+        - typescript
+        - "@types/node"
+
+    # Update Vue incrementally for stability
+    incremental:
+      - vue
+      - vuex
+
+    # Skip type packages (often auto-updated by IDE tools)
+    ignore:
+      - "@types/*"
+
+    # Skip pre-release versions
+    exclude_versions:
+      - "(?i)alpha"
+      - "(?i)beta"
+      - "(?i)rc"
+      - "(?i)canary"
+      - "(?i)preview"
+
+# System tests validate app health before and after updates
+system_tests:
+  run_preflight: true
+  run_mode: after_all
+  stop_on_fail: true
+  tests:
+    # Lint check (non-blocking)
+    - name: lint
+      commands: pnpm run lint
+      timeout_seconds: 60
+      continue_on_fail: true
+
+    # Build verification
+    - name: build
+      commands: pnpm run build
+      timeout_seconds: 300
+
+    # Unit tests
+    - name: test
+      commands: pnpm run test
+      timeout_seconds: 120

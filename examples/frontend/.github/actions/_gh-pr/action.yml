@@ -1,0 +1,90 @@
+# GitHub Pull Request Action
+# Creates GitHub pull requests
+
+name: 'GitHub Pull Request'
+description: 'Create GitHub pull requests'
+
+inputs:
+  github-token:
+    description: 'GitHub token for creating PR'
+    required: true
+  title:
+    description: 'PR title'
+    required: true
+  body:
+    description: 'PR body content'
+    required: false
+    default: ''
+  base:
+    description: 'Base branch to merge into'
+    required: false
+    default: 'main'
+  head:
+    description: 'Head branch with changes (default: current branch)'
+    required: false
+    default: ''
+  draft:
+    description: 'Create as draft PR'
+    required: false
+    default: 'false'
+
+outputs:
+  pr-number:
+    description: 'Created PR number'
+    value: ${{ steps.pr.outputs.number }}
+  pr-url:
+    description: 'URL of the created PR'
+    value: ${{ steps.pr.outputs.url }}
+  pr-operation:
+    description: 'Whether PR was created or already existed'
+    value: ${{ steps.pr.outputs.operation }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Create or find PR
+      id: pr
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        TITLE: ${{ inputs.title }}
+        BODY: ${{ inputs.body }}
+        BASE: ${{ inputs.base }}
+        HEAD_INPUT: ${{ inputs.head }}
+        IS_DRAFT: ${{ inputs.draft }}
+      run: |
+        # Determine head branch
+        HEAD="${HEAD_INPUT:-$(git rev-parse --abbrev-ref HEAD)}"
+
+        # Push head branch
+        git push -u origin "$HEAD" 2>/dev/null || true
+
+        # Check for existing PR
+        EXISTING=$(gh pr list --head "$HEAD" --base "$BASE" --json number,url -q '.[0]' 2>/dev/null || echo "")
+        if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
+          echo "number=$(echo "$EXISTING" | jq -r '.number')" >> $GITHUB_OUTPUT
+          echo "url=$(echo "$EXISTING" | jq -r '.url')" >> $GITHUB_OUTPUT
+          echo "operation=existing" >> $GITHUB_OUTPUT
+          echo "Found existing PR: $(echo "$EXISTING" | jq -r '.url')"
+          exit 0
+        fi
+
+        # Verify base branch exists
+        if ! git ls-remote --heads origin "$BASE" | grep -qE "refs/heads/${BASE}$"; then
+          echo "::error::Base branch '$BASE' does not exist"
+          exit 1
+        fi
+
+        # Build create args
+        ARGS=(--title "$TITLE" --base "$BASE" --head "$HEAD")
+        [ -n "$BODY" ] && ARGS+=(--body "$BODY") || ARGS+=(--body "")
+        [ "$IS_DRAFT" = "true" ] && ARGS+=(--draft)
+
+        # Create PR
+        PR_URL=$(gh pr create "${ARGS[@]}" 2>&1) || { echo "::error::Failed to create PR: $PR_URL"; exit 1; }
+        PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+
+        echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+        echo "url=$PR_URL" >> $GITHUB_OUTPUT
+        echo "operation=created" >> $GITHUB_OUTPUT
+        echo "Created PR #$PR_NUMBER: $PR_URL"
