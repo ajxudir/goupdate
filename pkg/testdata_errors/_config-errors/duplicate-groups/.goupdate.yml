@@ -1,0 +1,10 @@
+# Test case: duplicate group members should error
+extends: ["default"]
+
+rules:
+  npm:
+    groups:
+      frontend:
+        packages: ["react", "vue"]
+      ui:
+        packages: ["react", "express"]

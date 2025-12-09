@@ -5,12 +5,15 @@ coverage.html
 .DS_Store
 node_modules/
 package-lock.json
+!**/testdata/**/package-lock.json
+!**/testdata_errors/**/package-lock.json
 # Project's own .goupdate.yml is tracked for self-documentation
 # All other .goupdate.yml files (nested) are ignored to protect user configs
 **/.goupdate.yml
 !/.goupdate.yml
 !testdata/**/.goupdate.yml
 !**/testdata/**/.goupdate.yml
+!**/testdata_errors/**/.goupdate.yml
 !**/_testdata/**/.goupdate.yml
 !examples/**/.goupdate.yml
 dist/
