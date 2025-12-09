@@ -1,0 +1,11 @@
+# Test override: Use regex extraction instead of npm commands for offline testing
+extends: ["default"]
+
+rules:
+  npm:
+    lock_files:
+      - files: ["**/package-lock.json"]
+        format: json
+        extraction:
+          # Parse package-lock.json v3 format: "node_modules/pkg": {"version": "x.y.z"}
+          pattern: '"node_modules/(?P<n>[^"]+)":\s*\{[^}]*"version":\s*"(?P<version>[^"]+)"'
