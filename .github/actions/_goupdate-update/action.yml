@@ -88,20 +88,22 @@ runs:
         fi
 
         # Run update with continue-on-fail to see all errors
+        # Stream output live while capturing to file for later parsing
+        # This ensures developers see progress in real-time
+        OUTPUT_FILE=$(mktemp)
         STDERR_FILE=$(mktemp)
         set +e
-        OUTPUT=$(goupdate update -r mod $UPDATE_FLAG $EXCLUDE_FLAG $TEST_FLAG $VERBOSE_FLAG --continue-on-fail -y 2>"$STDERR_FILE")
-        EXIT_CODE=$?
+        goupdate update -r mod $UPDATE_FLAG $EXCLUDE_FLAG $TEST_FLAG $VERBOSE_FLAG --continue-on-fail -y 2>"$STDERR_FILE" | tee "$OUTPUT_FILE"
+        EXIT_CODE=${PIPESTATUS[0]}
         set -e
+        OUTPUT=$(cat "$OUTPUT_FILE")
+        rm -f "$OUTPUT_FILE"
 
         # Show any stderr
         if [[ -s "$STDERR_FILE" ]]; then
           cat "$STDERR_FILE" >&2
         fi
         rm -f "$STDERR_FILE"
-
-        # Show output
-        echo "$OUTPUT"
 
         # If command failed and verbose was not enabled, re-run with verbose for debugging
         if [[ "$EXIT_CODE" -ne 0 && "$VERBOSE" != "true" ]]; then

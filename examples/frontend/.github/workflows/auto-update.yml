@@ -244,8 +244,10 @@ jobs:
           TYPE_FLAG="--minor"
           [ "$TYPE" = "patch" ] && TYPE_FLAG="--patch"
 
-          OUTPUT=$(goupdate update -r "$RULES" $TYPE_FLAG $EXCLUDE_FLAG --continue-on-fail -y 2>&1)
-          echo "$OUTPUT"
+          # Stream output live while also capturing to file
+          # This ensures developers see progress in real-time
+          goupdate update -r "$RULES" $TYPE_FLAG $EXCLUDE_FLAG --continue-on-fail -y 2>&1 | tee /tmp/update-output.txt
+          OUTPUT=$(cat /tmp/update-output.txt)
 
           # Store for PR body
           {
