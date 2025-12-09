@@ -1,6 +1,7 @@
 package display
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/ajxudir/goupdate/pkg/constants"
@@ -103,7 +104,9 @@ func HasAvailableUpdates(major, minor, patch string) bool {
 // FormatAvailableVersions formats available versions for display after an update.
 //
 // Returns a formatted string showing which versions are still available
-// after updating to the target version.
+// after updating to the target version. Only shows versions that are higher
+// than the target to avoid noise (e.g., won't show "patch: 7.26.10" when
+// target is already "7.28.5").
 //
 // Parameters:
 //   - target: The version that was updated to
@@ -112,7 +115,7 @@ func HasAvailableUpdates(major, minor, patch string) bool {
 //   - patch: Available patch version
 //
 // Returns:
-//   - string: Formatted string like "(major: 2.0.0, minor: 1.5.0 available)" or empty if none
+//   - string: Formatted string like "(major: 2.0.0 available)" or empty if none
 //
 // Example:
 //
@@ -124,9 +127,10 @@ func FormatAvailableVersions(target, major, minor, patch string) string {
 	minor = strings.TrimSpace(minor)
 	patch = strings.TrimSpace(patch)
 
-	hasMajor := major != "" && major != constants.PlaceholderNA && major != target
-	hasMinor := minor != "" && minor != constants.PlaceholderNA && minor != target
-	hasPatch := patch != "" && patch != constants.PlaceholderNA && patch != target
+	// Only show versions that are valid AND higher than the target
+	hasMajor := isValidAndHigher(major, target)
+	hasMinor := isValidAndHigher(minor, target)
+	hasPatch := isValidAndHigher(patch, target)
 
 	if !hasMajor && !hasMinor && !hasPatch {
 		return ""
@@ -144,6 +148,65 @@ func FormatAvailableVersions(target, major, minor, patch string) string {
 	}
 
 	return "(" + strings.Join(parts, ", ") + " available)"
+}
+
+// isValidAndHigher checks if a version is valid (non-empty, non-placeholder)
+// and higher than the target version.
+func isValidAndHigher(version, target string) bool {
+	if version == "" || version == constants.PlaceholderNA {
+		return false
+	}
+	if version == target {
+		return false
+	}
+	// Compare versions - only show if available version is higher than target
+	return compareVersions(version, target) > 0
+}
+
+// compareVersions compares two version strings.
+// Returns: positive if v1 > v2, negative if v1 < v2, zero if equal.
+// Uses simple numeric comparison of version parts.
+func compareVersions(v1, v2 string) int {
+	// Strip leading 'v' if present
+	v1 = strings.TrimPrefix(strings.TrimSpace(v1), "v")
+	v2 = strings.TrimPrefix(strings.TrimSpace(v2), "v")
+
+	parts1 := strings.Split(v1, ".")
+	parts2 := strings.Split(v2, ".")
+
+	// Compare each part
+	maxLen := len(parts1)
+	if len(parts2) > maxLen {
+		maxLen = len(parts2)
+	}
+
+	for i := 0; i < maxLen; i++ {
+		var n1, n2 int
+		if i < len(parts1) {
+			n1, _ = strconv.Atoi(extractNumeric(parts1[i]))
+		}
+		if i < len(parts2) {
+			n2, _ = strconv.Atoi(extractNumeric(parts2[i]))
+		}
+		if n1 != n2 {
+			return n1 - n2
+		}
+	}
+	return 0
+}
+
+// extractNumeric extracts the leading numeric portion of a string.
+// E.g., "10-rc1" -> "10", "5" -> "5"
+func extractNumeric(s string) string {
+	var result strings.Builder
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			result.WriteRune(r)
+		} else {
+			break
+		}
+	}
+	return result.String()
 }
 
 // FormatAvailableVersionsUpToDate formats available versions for packages that are up to date.

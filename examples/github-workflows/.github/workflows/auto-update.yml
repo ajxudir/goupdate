@@ -49,12 +49,12 @@ env:
   GO_VERSION: '1.24'
   DOTNET_VERSION: '8.0'
 
-  # Branches
-  UPDATE_BRANCH: 'goupdate/auto-update'
+  # Branches - {type} will be replaced with minor/patch
+  UPDATE_BRANCH: 'goupdate/{type}'
   TARGET_BRANCH: 'stage-updates'
 
   # PR
-  PR_TITLE: 'chore(deps): Auto update - {type} ({date})'
+  PR_TITLE: 'GoUpdate: Auto update - {type} ({date})'
   TEST_COMMAND: ''
   EXCLUDE_PACKAGES: ''
 
@@ -275,9 +275,10 @@ jobs:
             $TEST_COMMAND || true
           fi
 
-          # Setup branches
+          # Setup branches - substitute {type} in branch name
+          BRANCH=$(echo "$UPDATE_BRANCH" | sed "s/{type}/$TYPE/g")
           git fetch origin "$TARGET_BRANCH" 2>/dev/null || git branch "$TARGET_BRANCH" && git push -u origin "$TARGET_BRANCH"
-          git checkout -B "$UPDATE_BRANCH" origin/"$TARGET_BRANCH" 2>/dev/null || git checkout -B "$UPDATE_BRANCH"
+          git checkout -B "$BRANCH" origin/"$TARGET_BRANCH" 2>/dev/null || git checkout -B "$BRANCH"
 
           # Commit
           DATE=$(date -u +%Y-%m-%d)
@@ -286,7 +287,7 @@ jobs:
 
           git add -A
           git commit -m "$TITLE"
-          git push -u origin "$UPDATE_BRANCH" --force
+          git push -u origin "$BRANCH" --force
 
           # Build PR body
           BODY="## Dependency Updates
@@ -302,5 +303,5 @@ jobs:
           fi
 
           # Create PR
-          gh pr create --title "$TITLE" --body "$BODY" --base "$TARGET_BRANCH" --head "$UPDATE_BRANCH" 2>/dev/null || \
+          gh pr create --title "$TITLE" --body "$BODY" --base "$TARGET_BRANCH" --head "$BRANCH" 2>/dev/null || \
           gh pr edit --title "$TITLE" --body "$BODY"

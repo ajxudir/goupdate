@@ -241,7 +241,7 @@ func BuildUpdateTableFromPackages(packages []formats.Package, selection outdated
 
 // PrintUpdatePreview prints a detailed preview showing packages that will be updated.
 func PrintUpdatePreview(plans []*PlannedUpdate, table *output.Table, selection outdated.UpdateSelectionFlags) {
-	var willUpdate, hasMoreUpdates []*PlannedUpdate
+	var willUpdate, hasMoreUpdates, hasMajorOnly []*PlannedUpdate
 
 	for _, plan := range plans {
 		res := plan.Res
@@ -255,10 +255,20 @@ func PrintUpdatePreview(plans []*PlannedUpdate, table *output.Table, selection o
 		}
 		targetVersion := strings.TrimSpace(res.Target)
 
+		hasMajor := res.Major != "" && res.Major != constants.PlaceholderNA
+
 		if targetVersion != "" && targetVersion != currentVersion {
 			willUpdate = append(willUpdate, plan)
+			// Track if this package also has major updates available
+			if hasMajor && res.Major != targetVersion {
+				hasMajorOnly = append(hasMajorOnly, plan)
+			}
 		} else if display.HasAvailableUpdates(res.Major, res.Minor, res.Patch) {
 			hasMoreUpdates = append(hasMoreUpdates, plan)
+			// Track major-only packages
+			if hasMajor && res.Minor == constants.PlaceholderNA && res.Patch == constants.PlaceholderNA {
+				hasMajorOnly = append(hasMajorOnly, plan)
+			}
 		}
 	}
 
@@ -298,6 +308,12 @@ func PrintUpdatePreview(plans []*PlannedUpdate, table *output.Table, selection o
 
 	counts := ComputeSummaryFromPlans(plans)
 	PrintUpdateSummaryLines(counts, SummaryModePreview)
+
+	// Show major updates warning at the end for visibility
+	if counts.HasMajor > 0 {
+		fmt.Println()
+		fmt.Printf("⚠️  %d package(s) have MAJOR updates available (not auto-applied)\n", counts.HasMajor)
+	}
 }
 
 // FormatSummaryStrings formats the summary counts into display strings for cmd layer.
