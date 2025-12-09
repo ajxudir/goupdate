@@ -129,6 +129,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # Enable corepack for pnpm/yarn
+      - if: env.PACKAGE_MANAGER == 'pnpm' || env.PACKAGE_MANAGER == 'yarn'
+        run: corepack enable
+
       # Setup for composer
       - if: env.PACKAGE_MANAGER == 'composer'
         uses: shivammathur/setup-php@v2
@@ -186,6 +190,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+
+      # Enable corepack for pnpm/yarn
+      - if: env.PACKAGE_MANAGER == 'pnpm' || env.PACKAGE_MANAGER == 'yarn'
+        run: corepack enable
 
       - if: env.PACKAGE_MANAGER == 'npm'
         run: npm ci

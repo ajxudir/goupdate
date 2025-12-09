@@ -9,8 +9,10 @@
 #   3. Push to your repository
 #
 # Requirements:
-#   - Node.js (version specified in NODE_VERSION)
-#   - pnpm (auto-enabled via corepack)
+#   The workflow installs the appropriate package manager tools based on PACKAGE_MANAGER:
+#   - npm/yarn/pnpm: Requires Node.js (NODE_VERSION env var)
+#   - composer: Requires PHP (PHP_VERSION env var)
+#   - mod: Requires Go (GO_VERSION env var)
 #
 # Update Policy:
 #   - Minor/Patch updates: Applied automatically
@@ -55,8 +57,10 @@ env:
   # Package manager: npm, yarn, pnpm, composer, mod
   PACKAGE_MANAGER: 'pnpm'
 
-  # Node.js version
+  # Language version (uncomment the one you need)
   NODE_VERSION: '20'
+  # PHP_VERSION: '8.2'
+  # GO_VERSION: '1.24'
 
   # Branch settings
   UPDATE_BRANCH: 'goupdate/auto-update'
@@ -131,6 +135,18 @@ jobs:
       - if: env.PACKAGE_MANAGER == 'pnpm' || env.PACKAGE_MANAGER == 'yarn'
         run: corepack enable
 
+      # Setup for composer
+      - if: env.PACKAGE_MANAGER == 'composer'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+
+      # Setup for go mod
+      - if: env.PACKAGE_MANAGER == 'mod'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
       - name: Install goupdate
         uses: ./.github/actions/_goupdate-install
         with:
@@ -190,6 +206,21 @@ jobs:
 
       - if: env.PACKAGE_MANAGER == 'pnpm'
         run: pnpm install --frozen-lockfile
+
+      # Setup for composer
+      - if: env.PACKAGE_MANAGER == 'composer'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+
+      - if: env.PACKAGE_MANAGER == 'composer'
+        run: composer install --no-interaction
+
+      # Setup for go mod
+      - if: env.PACKAGE_MANAGER == 'mod'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Install goupdate
         uses: ./.github/actions/_goupdate-install
