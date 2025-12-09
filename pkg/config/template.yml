@@ -17,6 +17,7 @@ exclude_versions:
   - "(?i)[._-]alpha"
   - "(?i)[._-]beta"
   - "(?i)[._-]rc"
+  - "(?i)[._-]pre"
   - "(?i)[._-]canary"
   - "(?i)[._-]dev"
   - "(?i)[._-]snapshot"
