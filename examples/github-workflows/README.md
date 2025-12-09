@@ -155,6 +155,16 @@ TEST_COMMAND: 'dotnet test && npm test'
 
 If a package has both major and patch available, the patch is applied and major is reported.
 
+### Major-Only Updates
+
+When **only** major updates are available (no minor/patch updates across all package managers), the workflow **fails** intentionally. This triggers a GitHub email notification so you can:
+
+1. Review changelogs for breaking changes
+2. Update packages manually after testing
+3. Add packages to `ignore` in `.goupdate.yml` to skip them
+
+This ensures major version bumps always get human review.
+
 ## Manual Trigger
 
 Go to Actions → Auto Update Dependencies → Run workflow:

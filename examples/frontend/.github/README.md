@@ -93,6 +93,10 @@ TEST_COMMAND: 'composer test && pnpm test'
 - **Patch/Minor**: Applied automatically
 - **Major**: Alerts only, does not block other updates
 
+### Major-Only Updates
+
+When **only** major updates are available (no minor/patch updates), the workflow **fails** intentionally. This triggers a GitHub email notification so you can review and handle them manually.
+
 ## Manual Trigger
 
 Go to Actions → Auto Update Dependencies → Run workflow:
