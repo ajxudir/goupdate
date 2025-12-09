@@ -99,17 +99,8 @@ make build && sudo make install
 Run without installing Go or any dependencies:
 
 ```bash
-# Run directly from Docker Hub
-docker run -v $(pwd):/workspace ajxudir/goupdate:latest outdated
-docker run -v $(pwd):/workspace ajxudir/goupdate:latest update --patch --yes
-
-# Test with included testdata after cloning
 git clone https://github.com/ajxudir/goupdate && cd goupdate
 docker run -v $(pwd)/pkg/testdata:/workspace ajxudir/goupdate:latest outdated
-
-# Or use docker-compose for local development
-docker compose run --rm goupdate outdated
-docker compose run --rm update-patch
 ```
 
 See [Dockerfile](Dockerfile) and [docker-compose.yml](docker-compose.yml) for configuration options.

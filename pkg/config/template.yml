@@ -160,8 +160,9 @@ rules:
   #   fields:
   #     ItemGroup/PackageReference: prod
   #   outdated:
+  #     # NuGet API requires lowercase package names
   #     commands: |
-  #       curl -s "https://api.nuget.org/v3-flatcontainer/{{package}}/index.json"
+  #       curl -s "https://api.nuget.org/v3-flatcontainer/$(echo '{{package}}' | tr '[:upper:]' '[:lower:]')/index.json"
   #     format: json
   #     extraction:
   #       json_key: "versions"                    # NuGet API returns versions array
