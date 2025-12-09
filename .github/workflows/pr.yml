@@ -9,9 +9,12 @@
 #
 # Test Requirements:
 #   - Only Go is required to run tests
-#   - Tests use regex-based lock file parsing (configured in pkg/testdata/**/.goupdate.yml)
-#   - No npm/yarn/pnpm/composer/dotnet CLI tools are needed
+#   - No npm/yarn/pnpm/composer/go/dotnet CLI tools are needed because:
+#     1. Lock file parsing uses regex extraction (configured in pkg/testdata/**/.goupdate.yml)
+#     2. Version fetching (outdated command) uses mocked functions, not real HTTP/CLI calls
+#     3. Package updates use mocked functions, not real package manager commands
 #   - Lock files in testdata directories provide static test fixtures
+#   - Tests only use basic shell commands (echo, pwd, grep) available on all Linux systems
 #
 # Configuration (modify in env section below):
 #   - GO_VERSION: Go version to use
