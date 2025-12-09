@@ -59,3 +59,13 @@ rules:
       - "(?i)rc"
       - "(?i)canary"
       - "(?i)preview"
+
+# System test to verify no compile errors after updates
+system_tests:
+  run_preflight: true
+  run_mode: after_all
+  stop_on_fail: true
+  tests:
+    - name: build
+      commands: pnpm run build
+      timeout_seconds: 300
