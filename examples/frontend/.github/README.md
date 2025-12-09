@@ -20,20 +20,35 @@ Enable only the package managers your project uses. This example defaults to pnp
 ```yaml
 env:
   # Package Managers - Enable the ones your project uses
+
+  # Node.js package managers
   ENABLE_NPM: 'false'
   ENABLE_YARN: 'false'
-  ENABLE_PNPM: 'true'      # Frontend uses pnpm
+  ENABLE_PNPM: 'true'       # Frontend uses pnpm
+
+  # PHP package manager
   ENABLE_COMPOSER: 'false'
+
+  # Python package managers
+  ENABLE_PIP: 'false'         # requirements.txt
+  ENABLE_PIPENV: 'false'      # Pipfile
+
+  # Go package manager
   ENABLE_GO: 'false'
+
+  # .NET package manager
+  ENABLE_NUGET: 'false'
 ```
 
 ### Language Versions
 
 ```yaml
 env:
-  NODE_VERSION: '20'      # For npm, yarn, pnpm
-  PHP_VERSION: '8.2'      # For composer
-  GO_VERSION: '1.24'      # For go mod
+  NODE_VERSION: '20'        # For npm, yarn, pnpm
+  PHP_VERSION: '8.2'        # For composer
+  PYTHON_VERSION: '3.12'    # For pip, pipenv
+  GO_VERSION: '1.24'        # For go mod
+  DOTNET_VERSION: '8.0'     # For nuget
 ```
 
 ## Example Configurations
@@ -68,7 +83,10 @@ TEST_COMMAND: 'composer test && pnpm test'
 | `ENABLE_YARN` | yarn | Node.js | package.json, yarn.lock |
 | `ENABLE_PNPM` | pnpm | Node.js | package.json, pnpm-lock.yaml |
 | `ENABLE_COMPOSER` | composer | PHP | composer.json, composer.lock |
+| `ENABLE_PIP` | pip | Python | requirements.txt |
+| `ENABLE_PIPENV` | pipenv | Python | Pipfile, Pipfile.lock |
 | `ENABLE_GO` | go mod | Go | go.mod, go.sum |
+| `ENABLE_NUGET` | nuget | .NET | *.csproj, packages.config |
 
 ## Update Policy
 

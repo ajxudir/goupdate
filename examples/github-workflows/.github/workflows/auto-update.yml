@@ -6,15 +6,17 @@
 #   2. Modify the env section below for your project
 #   3. Push to your repository
 #
-# Requirements:
-#   The workflow installs tools based on enabled package managers:
-#   - npm/yarn/pnpm: Requires Node.js (NODE_VERSION env var)
-#   - composer: Requires PHP (PHP_VERSION env var)
-#   - mod: Requires Go (GO_VERSION env var)
+# Supported Package Managers:
+#   - Node.js: npm, yarn, pnpm
+#   - PHP: composer
+#   - Python: requirements (pip), pipfile (pipenv)
+#   - Go: mod
+#   - .NET: nuget
 #
 # Multiple Package Managers:
-#   Enable multiple package managers for projects like Laravel (composer + npm)
-#   or full-stack apps. Only the tools you enable will be installed.
+#   Enable multiple package managers for projects like Laravel (composer + npm),
+#   Django (requirements + npm), or full-stack apps.
+#   Only the tools you enable will be installed.
 #
 # Update Policy:
 #   - Minor/Patch updates: Applied automatically
@@ -58,20 +60,34 @@ env:
 
   # -------------------------------------------------------------------------
   # Package Managers - Enable the ones your project uses
-  # Set to 'true' to enable, 'false' or remove to disable
+  # Set to 'true' to enable, 'false' to disable
   # -------------------------------------------------------------------------
+  # Node.js package managers
   ENABLE_NPM: 'true'
   ENABLE_YARN: 'false'
   ENABLE_PNPM: 'false'
+
+  # PHP package manager
   ENABLE_COMPOSER: 'false'
+
+  # Python package managers
+  ENABLE_PIP: 'false'         # requirements.txt
+  ENABLE_PIPENV: 'false'      # Pipfile
+
+  # Go package manager
   ENABLE_GO: 'false'
+
+  # .NET package manager
+  ENABLE_NUGET: 'false'
 
   # -------------------------------------------------------------------------
   # Language Versions - Configure versions for enabled package managers
   # -------------------------------------------------------------------------
-  NODE_VERSION: '20'      # For npm, yarn, pnpm
-  PHP_VERSION: '8.2'      # For composer
-  GO_VERSION: '1.24'      # For go mod
+  NODE_VERSION: '20'        # For npm, yarn, pnpm
+  PHP_VERSION: '8.2'        # For composer
+  PYTHON_VERSION: '3.12'    # For pip, pipenv
+  GO_VERSION: '1.24'        # For go mod
+  DOTNET_VERSION: '8.0'     # For nuget
 
   # -------------------------------------------------------------------------
   # Branch Settings
@@ -105,10 +121,11 @@ jobs:
     outputs:
       run-updates: ${{ steps.config.outputs.run_updates }}
       update-type: ${{ steps.config.outputs.update_type }}
-      # Package manager flags for downstream jobs
       use-node: ${{ steps.detect.outputs.use_node }}
       use-php: ${{ steps.detect.outputs.use_php }}
+      use-python: ${{ steps.detect.outputs.use_python }}
       use-go: ${{ steps.detect.outputs.use_go }}
+      use-dotnet: ${{ steps.detect.outputs.use_dotnet }}
       package-managers: ${{ steps.detect.outputs.package_managers }}
     steps:
       - id: config
@@ -134,14 +151,19 @@ jobs:
           ENABLE_YARN: ${{ env.ENABLE_YARN }}
           ENABLE_PNPM: ${{ env.ENABLE_PNPM }}
           ENABLE_COMPOSER: ${{ env.ENABLE_COMPOSER }}
+          ENABLE_PIP: ${{ env.ENABLE_PIP }}
+          ENABLE_PIPENV: ${{ env.ENABLE_PIPENV }}
           ENABLE_GO: ${{ env.ENABLE_GO }}
+          ENABLE_NUGET: ${{ env.ENABLE_NUGET }}
         run: |
-          # Detect which language runtimes are needed
           USE_NODE="false"
           USE_PHP="false"
+          USE_PYTHON="false"
           USE_GO="false"
+          USE_DOTNET="false"
           MANAGERS=""
 
+          # Node.js package managers
           if [ "$ENABLE_NPM" = "true" ]; then
             USE_NODE="true"
             MANAGERS="${MANAGERS}npm,"
@@ -154,32 +176,50 @@ jobs:
             USE_NODE="true"
             MANAGERS="${MANAGERS}pnpm,"
           fi
+
+          # PHP
           if [ "$ENABLE_COMPOSER" = "true" ]; then
             USE_PHP="true"
             MANAGERS="${MANAGERS}composer,"
           fi
+
+          # Python
+          if [ "$ENABLE_PIP" = "true" ]; then
+            USE_PYTHON="true"
+            MANAGERS="${MANAGERS}requirements,"
+          fi
+          if [ "$ENABLE_PIPENV" = "true" ]; then
+            USE_PYTHON="true"
+            MANAGERS="${MANAGERS}pipfile,"
+          fi
+
+          # Go
           if [ "$ENABLE_GO" = "true" ]; then
             USE_GO="true"
             MANAGERS="${MANAGERS}mod,"
           fi
 
-          # Remove trailing comma
+          # .NET
+          if [ "$ENABLE_NUGET" = "true" ]; then
+            USE_DOTNET="true"
+            MANAGERS="${MANAGERS}nuget,"
+          fi
+
           MANAGERS="${MANAGERS%,}"
 
           echo "use_node=$USE_NODE" >> $GITHUB_OUTPUT
           echo "use_php=$USE_PHP" >> $GITHUB_OUTPUT
+          echo "use_python=$USE_PYTHON" >> $GITHUB_OUTPUT
           echo "use_go=$USE_GO" >> $GITHUB_OUTPUT
+          echo "use_dotnet=$USE_DOTNET" >> $GITHUB_OUTPUT
           echo "package_managers=$MANAGERS" >> $GITHUB_OUTPUT
 
-          echo "Detected package managers: $MANAGERS"
-          echo "Node.js needed: $USE_NODE"
-          echo "PHP needed: $USE_PHP"
-          echo "Go needed: $USE_GO"
+          echo "Package managers: $MANAGERS"
 
   check:
     needs: prepare
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     outputs:
       has-updates: ${{ steps.aggregate.outputs.has_updates }}
       summary: ${{ steps.aggregate.outputs.summary }}
@@ -198,7 +238,7 @@ jobs:
           push: 'true'
 
       # -----------------------------------------------------------------------
-      # Setup Node.js (for npm, yarn, pnpm)
+      # Setup Node.js (npm, yarn, pnpm)
       # -----------------------------------------------------------------------
       - name: Setup Node.js
         if: needs.prepare.outputs.use-node == 'true'
@@ -211,7 +251,7 @@ jobs:
         run: corepack enable
 
       # -----------------------------------------------------------------------
-      # Setup PHP (for composer)
+      # Setup PHP (composer)
       # -----------------------------------------------------------------------
       - name: Setup PHP
         if: needs.prepare.outputs.use-php == 'true'
@@ -220,13 +260,35 @@ jobs:
           php-version: ${{ env.PHP_VERSION }}
 
       # -----------------------------------------------------------------------
-      # Setup Go (for go mod)
+      # Setup Python (pip, pipenv)
+      # -----------------------------------------------------------------------
+      - name: Setup Python
+        if: needs.prepare.outputs.use-python == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pipenv
+        if: env.ENABLE_PIPENV == 'true'
+        run: pip install pipenv
+
+      # -----------------------------------------------------------------------
+      # Setup Go (mod)
       # -----------------------------------------------------------------------
       - name: Setup Go
         if: needs.prepare.outputs.use-go == 'true'
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+
+      # -----------------------------------------------------------------------
+      # Setup .NET (nuget)
+      # -----------------------------------------------------------------------
+      - name: Setup .NET
+        if: needs.prepare.outputs.use-dotnet == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       # -----------------------------------------------------------------------
       # Install goupdate
@@ -272,12 +334,36 @@ jobs:
           rule: composer
           exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
 
+      - name: Check pip updates
+        id: check-pip
+        if: env.ENABLE_PIP == 'true'
+        uses: ./.github/actions/_goupdate-check
+        with:
+          rule: requirements
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+
+      - name: Check pipenv updates
+        id: check-pipenv
+        if: env.ENABLE_PIPENV == 'true'
+        uses: ./.github/actions/_goupdate-check
+        with:
+          rule: pipfile
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+
       - name: Check go mod updates
         id: check-mod
         if: env.ENABLE_GO == 'true'
         uses: ./.github/actions/_goupdate-check
         with:
           rule: mod
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+
+      - name: Check nuget updates
+        id: check-nuget
+        if: env.ENABLE_NUGET == 'true'
+        uses: ./.github/actions/_goupdate-check
+        with:
+          rule: nuget
           exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
 
       - name: Aggregate results
@@ -287,36 +373,30 @@ jobs:
           YARN_UPDATES: ${{ steps.check-yarn.outputs.has-updates }}
           PNPM_UPDATES: ${{ steps.check-pnpm.outputs.has-updates }}
           COMPOSER_UPDATES: ${{ steps.check-composer.outputs.has-updates }}
+          PIP_UPDATES: ${{ steps.check-pip.outputs.has-updates }}
+          PIPENV_UPDATES: ${{ steps.check-pipenv.outputs.has-updates }}
           MOD_UPDATES: ${{ steps.check-mod.outputs.has-updates }}
+          NUGET_UPDATES: ${{ steps.check-nuget.outputs.has-updates }}
           NPM_SUMMARY: ${{ steps.check-npm.outputs.summary }}
           YARN_SUMMARY: ${{ steps.check-yarn.outputs.summary }}
           PNPM_SUMMARY: ${{ steps.check-pnpm.outputs.summary }}
           COMPOSER_SUMMARY: ${{ steps.check-composer.outputs.summary }}
+          PIP_SUMMARY: ${{ steps.check-pip.outputs.summary }}
+          PIPENV_SUMMARY: ${{ steps.check-pipenv.outputs.summary }}
           MOD_SUMMARY: ${{ steps.check-mod.outputs.summary }}
+          NUGET_SUMMARY: ${{ steps.check-nuget.outputs.summary }}
         run: |
           HAS_UPDATES="false"
           SUMMARY=""
 
-          if [ "$NPM_UPDATES" = "true" ]; then
-            HAS_UPDATES="true"
-            SUMMARY="${SUMMARY}npm: ${NPM_SUMMARY}; "
-          fi
-          if [ "$YARN_UPDATES" = "true" ]; then
-            HAS_UPDATES="true"
-            SUMMARY="${SUMMARY}yarn: ${YARN_SUMMARY}; "
-          fi
-          if [ "$PNPM_UPDATES" = "true" ]; then
-            HAS_UPDATES="true"
-            SUMMARY="${SUMMARY}pnpm: ${PNPM_SUMMARY}; "
-          fi
-          if [ "$COMPOSER_UPDATES" = "true" ]; then
-            HAS_UPDATES="true"
-            SUMMARY="${SUMMARY}composer: ${COMPOSER_SUMMARY}; "
-          fi
-          if [ "$MOD_UPDATES" = "true" ]; then
-            HAS_UPDATES="true"
-            SUMMARY="${SUMMARY}mod: ${MOD_SUMMARY}; "
-          fi
+          for pm in NPM YARN PNPM COMPOSER PIP PIPENV MOD NUGET; do
+            updates_var="${pm}_UPDATES"
+            summary_var="${pm}_SUMMARY"
+            if [ "${!updates_var}" = "true" ]; then
+              HAS_UPDATES="true"
+              SUMMARY="${SUMMARY}${pm,,}: ${!summary_var}; "
+            fi
+          done
 
           echo "has_updates=$HAS_UPDATES" >> $GITHUB_OUTPUT
           echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
@@ -349,7 +429,7 @@ jobs:
           push: 'false'
 
       # -----------------------------------------------------------------------
-      # Setup Node.js (for npm, yarn, pnpm)
+      # Setup Node.js (npm, yarn, pnpm)
       # -----------------------------------------------------------------------
       - name: Setup Node.js
         if: needs.prepare.outputs.use-node == 'true'
@@ -374,7 +454,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # -----------------------------------------------------------------------
-      # Setup PHP (for composer)
+      # Setup PHP (composer)
       # -----------------------------------------------------------------------
       - name: Setup PHP
         if: needs.prepare.outputs.use-php == 'true'
@@ -387,13 +467,45 @@ jobs:
         run: composer install --no-interaction
 
       # -----------------------------------------------------------------------
-      # Setup Go (for go mod)
+      # Setup Python (pip, pipenv)
+      # -----------------------------------------------------------------------
+      - name: Setup Python
+        if: needs.prepare.outputs.use-python == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pip dependencies
+        if: env.ENABLE_PIP == 'true'
+        run: pip install -r requirements.txt
+
+      - name: Install pipenv
+        if: env.ENABLE_PIPENV == 'true'
+        run: |
+          pip install pipenv
+          pipenv install
+
+      # -----------------------------------------------------------------------
+      # Setup Go (mod)
       # -----------------------------------------------------------------------
       - name: Setup Go
         if: needs.prepare.outputs.use-go == 'true'
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+
+      # -----------------------------------------------------------------------
+      # Setup .NET (nuget)
+      # -----------------------------------------------------------------------
+      - name: Setup .NET
+        if: needs.prepare.outputs.use-dotnet == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore .NET dependencies
+        if: env.ENABLE_NUGET == 'true'
+        run: dotnet restore
 
       # -----------------------------------------------------------------------
       # Install goupdate
@@ -447,12 +559,42 @@ jobs:
           exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
           system-test-mode: 'none'
 
+      - name: Update pip packages
+        id: update-pip
+        if: env.ENABLE_PIP == 'true'
+        uses: ./.github/actions/_goupdate-update
+        with:
+          rule: requirements
+          update-type: ${{ needs.prepare.outputs.update-type }}
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+          system-test-mode: 'none'
+
+      - name: Update pipenv packages
+        id: update-pipenv
+        if: env.ENABLE_PIPENV == 'true'
+        uses: ./.github/actions/_goupdate-update
+        with:
+          rule: pipfile
+          update-type: ${{ needs.prepare.outputs.update-type }}
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+          system-test-mode: 'none'
+
       - name: Update go modules
         id: update-mod
         if: env.ENABLE_GO == 'true'
         uses: ./.github/actions/_goupdate-update
         with:
           rule: mod
+          update-type: ${{ needs.prepare.outputs.update-type }}
+          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+          system-test-mode: 'none'
+
+      - name: Update nuget packages
+        id: update-nuget
+        if: env.ENABLE_NUGET == 'true'
+        uses: ./.github/actions/_goupdate-update
+        with:
+          rule: nuget
           update-type: ${{ needs.prepare.outputs.update-type }}
           exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
           system-test-mode: 'none'
@@ -483,70 +625,37 @@ jobs:
           YARN_OUTPUT: ${{ steps.update-yarn.outputs.update-output }}
           PNPM_OUTPUT: ${{ steps.update-pnpm.outputs.update-output }}
           COMPOSER_OUTPUT: ${{ steps.update-composer.outputs.update-output }}
+          PIP_OUTPUT: ${{ steps.update-pip.outputs.update-output }}
+          PIPENV_OUTPUT: ${{ steps.update-pipenv.outputs.update-output }}
           MOD_OUTPUT: ${{ steps.update-mod.outputs.update-output }}
+          NUGET_OUTPUT: ${{ steps.update-nuget.outputs.update-output }}
         run: |
           DATE=$(date -u +%Y-%m-%d)
           TYPE=$(echo "$UPDATE_TYPE" | sed 's/\b\(.\)/\u\1/')
           TITLE=$(echo "${{ env.PR_TITLE }}" | sed "s/{date}/$DATE/g" | sed "s/{type}/$TYPE/g")
 
-          # Add all possible dependency files
           git add -A
-
           git commit -m "$TITLE"
           git push -u origin "${{ env.UPDATE_BRANCH }}"
 
-          # Build PR body with all outputs
+          # Build PR body
           BODY="## Automated Dependency Update
 
           This PR was automatically created by the dependency update workflow.
           "
 
-          if [ -n "$NPM_OUTPUT" ]; then
-            BODY="${BODY}
-          ### npm
+          for output_name in NPM YARN PNPM COMPOSER PIP PIPENV MOD NUGET; do
+            output_var="${output_name}_OUTPUT"
+            if [ -n "${!output_var}" ]; then
+              BODY="${BODY}
+          ### ${output_name,,}
           \`\`\`
-          $NPM_OUTPUT
-          \`\`\`
-          "
-          fi
-
-          if [ -n "$YARN_OUTPUT" ]; then
-            BODY="${BODY}
-          ### yarn
-          \`\`\`
-          $YARN_OUTPUT
+          ${!output_var}
           \`\`\`
           "
-          fi
+            fi
+          done
 
-          if [ -n "$PNPM_OUTPUT" ]; then
-            BODY="${BODY}
-          ### pnpm
-          \`\`\`
-          $PNPM_OUTPUT
-          \`\`\`
-          "
-          fi
-
-          if [ -n "$COMPOSER_OUTPUT" ]; then
-            BODY="${BODY}
-          ### composer
-          \`\`\`
-          $COMPOSER_OUTPUT
-          \`\`\`
-          "
-          fi
-
-          if [ -n "$MOD_OUTPUT" ]; then
-            BODY="${BODY}
-          ### go mod
-          \`\`\`
-          $MOD_OUTPUT
-          \`\`\`
-          "
-          fi
-
-          # Create PR
           gh pr create \
             --title "$TITLE" \
             --body "$BODY" \

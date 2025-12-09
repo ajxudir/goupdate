@@ -18,11 +18,24 @@ Enable only the package managers your project uses. Only the required tools will
 env:
   # Package Managers - Enable the ones your project uses
   # Set to 'true' to enable, 'false' to disable
+
+  # Node.js package managers
   ENABLE_NPM: 'true'
   ENABLE_YARN: 'false'
   ENABLE_PNPM: 'false'
+
+  # PHP package manager
   ENABLE_COMPOSER: 'false'
+
+  # Python package managers
+  ENABLE_PIP: 'false'         # requirements.txt
+  ENABLE_PIPENV: 'false'      # Pipfile
+
+  # Go package manager
   ENABLE_GO: 'false'
+
+  # .NET package manager
+  ENABLE_NUGET: 'false'
 ```
 
 ### Language Versions
@@ -31,9 +44,11 @@ Configure versions for the enabled package managers:
 
 ```yaml
 env:
-  NODE_VERSION: '20'      # For npm, yarn, pnpm
-  PHP_VERSION: '8.2'      # For composer
-  GO_VERSION: '1.24'      # For go mod
+  NODE_VERSION: '20'        # For npm, yarn, pnpm
+  PHP_VERSION: '8.2'        # For composer
+  PYTHON_VERSION: '3.12'    # For pip, pipenv
+  GO_VERSION: '1.24'        # For go mod
+  DOTNET_VERSION: '8.0'     # For nuget
 ```
 
 ### Other Settings
@@ -88,6 +103,38 @@ GO_VERSION: '1.24'
 TEST_COMMAND: 'go test ./... && pnpm test'
 ```
 
+### Django (Python + npm)
+```yaml
+ENABLE_NPM: 'true'
+ENABLE_PIP: 'true'
+NODE_VERSION: '20'
+PYTHON_VERSION: '3.12'
+TEST_COMMAND: 'python manage.py test && npm test'
+```
+
+### Flask with Pipenv
+```yaml
+ENABLE_PIPENV: 'true'
+PYTHON_VERSION: '3.12'
+TEST_COMMAND: 'pipenv run pytest'
+```
+
+### .NET Web API
+```yaml
+ENABLE_NUGET: 'true'
+DOTNET_VERSION: '8.0'
+TEST_COMMAND: 'dotnet test'
+```
+
+### Blazor (.NET + npm)
+```yaml
+ENABLE_NPM: 'true'
+ENABLE_NUGET: 'true'
+NODE_VERSION: '20'
+DOTNET_VERSION: '8.0'
+TEST_COMMAND: 'dotnet test && npm test'
+```
+
 ## Supported Package Managers
 
 | Flag | Manager | Language | Files |
@@ -96,7 +143,10 @@ TEST_COMMAND: 'go test ./... && pnpm test'
 | `ENABLE_YARN` | yarn | Node.js | package.json, yarn.lock |
 | `ENABLE_PNPM` | pnpm | Node.js | package.json, pnpm-lock.yaml |
 | `ENABLE_COMPOSER` | composer | PHP | composer.json, composer.lock |
+| `ENABLE_PIP` | pip | Python | requirements.txt |
+| `ENABLE_PIPENV` | pipenv | Python | Pipfile, Pipfile.lock |
 | `ENABLE_GO` | go mod | Go | go.mod, go.sum |
+| `ENABLE_NUGET` | nuget | .NET | *.csproj, packages.config |
 
 ## Update Policy
 
