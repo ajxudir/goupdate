@@ -213,7 +213,9 @@ func runOutdated(cmd *cobra.Command, args []string) error {
 
 		result := outdatedResult{pkg: p, group: p.Group, err: err, major: constants.PlaceholderNA, minor: constants.PlaceholderNA, patch: constants.PlaceholderNA, latestMissing: isLatestMissing(p, &ruleCfg)}
 		if err == nil {
-			displayFiltered := outdated.FilterVersionsByConstraint(p, versions, outdated.UpdateSelectionFlags{})
+			// For display, show ALL available versions (including major) without constraint filtering
+			// This ensures users see major updates even when their package uses ^ or ~ constraints
+			displayFiltered := outdated.FilterVersionsByConstraint(p, versions, outdated.UpdateSelectionFlags{Major: true})
 			targetFiltered := outdated.FilterVersionsByConstraint(p, versions, selection)
 			result.available = targetFiltered
 

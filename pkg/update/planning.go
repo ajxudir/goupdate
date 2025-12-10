@@ -350,11 +350,12 @@ func planVersionUpdate(
 		versioning = ruleCfg.Outdated.Versioning
 	}
 
-	// Filter versions by package's original constraint (not by scope) to get all available within constraint
-	allWithinConstraint := outdated.FilterVersionsByConstraint(p, versions, outdated.UpdateSelectionFlags{})
+	// Get ALL available versions (including major) without constraint filtering
+	// This ensures users see major updates even when their package uses ^ or ~ constraints
+	allAvailable := outdated.FilterVersionsByConstraint(p, versions, outdated.UpdateSelectionFlags{Major: true})
 
-	// Summarize all versions within constraint (for remaining updates summary)
-	major, minor, patch, summarizeErr := outdated.SummarizeAvailableVersions(outdated.CurrentVersionForOutdated(p), allWithinConstraint, versioning, incremental)
+	// Summarize all available versions (for display - shows what updates exist)
+	major, minor, patch, summarizeErr := outdated.SummarizeAvailableVersions(outdated.CurrentVersionForOutdated(p), allAvailable, versioning, incremental)
 	if summarizeErr != nil {
 		res.Status = constants.StatusSummarizeError
 		res.Err = summarizeErr
@@ -379,7 +380,7 @@ func planVersionUpdate(
 		Res:                  res,
 		Original:             originalVersion,
 		GroupKey:             groupKey,
-		VersionsInConstraint: allWithinConstraint,
+		VersionsInConstraint: allAvailable,
 		Versioning:           versioning,
 		Incremental:          incremental,
 	}
