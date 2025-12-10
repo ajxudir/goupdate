@@ -136,15 +136,16 @@ func FormatAvailableVersions(target, major, minor, patch string) string {
 		return ""
 	}
 
+	// Order: patch → minor → major (minor is most common, so comes first for alignment)
 	var parts []string
-	if hasMajor {
-		parts = append(parts, "major: "+major)
+	if hasPatch {
+		parts = append(parts, "patch: "+patch)
 	}
 	if hasMinor {
 		parts = append(parts, "minor: "+minor)
 	}
-	if hasPatch {
-		parts = append(parts, "patch: "+patch)
+	if hasMajor {
+		parts = append(parts, "major: "+major)
 	}
 
 	return "(" + strings.Join(parts, ", ") + " available)"
@@ -239,15 +240,16 @@ func FormatAvailableVersionsUpToDate(major, minor, patch string) string {
 		return ""
 	}
 
+	// Order: patch → minor → major (minor is most common, so comes first for alignment)
 	var parts []string
-	if hasMajor {
-		parts = append(parts, "major: "+major)
+	if hasPatch {
+		parts = append(parts, "patch: "+patch)
 	}
 	if hasMinor {
 		parts = append(parts, "minor: "+minor)
 	}
-	if hasPatch {
-		parts = append(parts, "patch: "+patch)
+	if hasMajor {
+		parts = append(parts, "major: "+major)
 	}
 
 	return "(" + strings.Join(parts, ", ") + " available)"
