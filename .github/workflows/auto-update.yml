@@ -1,4 +1,4 @@
-# Auto Update Workflow
+# GoUpdate - Auto Update Workflow
 # Automated dependency updates via PR to staging branch
 #
 # Triggers:
@@ -13,25 +13,17 @@
 #      (release workflow triggers automatically on push to stage)
 #   5. If AUTO_MERGE_UPDATES is false: leave PR for manual review
 #
-# Reusable actions (copy to other Go projects):
-#   - _go-setup: Go environment with caching
-#   - _go-test: Run Go tests
-#   - _goupdate-install: Install goupdate binary
-#   - _goupdate-check: Check for dependency updates
-#   - _goupdate-update: Apply dependency updates
-#   - _gh-pr: Create PRs with auto-merge
-#
 # Configuration (modify in env section below):
-#   - GO_VERSION: Go version to use
+#   - ENABLE_* flags: Enable/disable package managers
+#   - *_VERSION: Runtime versions
 #   - UPDATE_BRANCH_NAME: Branch name for dependency updates
 #   - UPDATE_TARGET_BRANCH: Branch to merge updates into (stage)
 #   - AUTO_MERGE_UPDATES: Enable auto-merge for update PRs
-#   - DELETE_BRANCH_ON_MERGE: Delete update branch after merge
 #   - PR_TITLE: PR title template (use {date} and {type} placeholders)
 #   - COMMIT_MESSAGE: Commit message template
 #   - EXCLUDE_PACKAGES: Packages to skip updating
 
-name: Auto Update
+name: GoUpdate - Auto Update
 
 on:
   # Weekly check on Monday at 00:00 UTC
@@ -67,11 +59,32 @@ concurrency:
 # CONFIGURATION - Modify for your project
 # ============================================================================
 env:
+  GOUPDATE_REPO: 'ajxudir/goupdate'
+
+  # Package Managers (set to 'true' to enable)
+  ENABLE_NPM: 'false'
+  ENABLE_YARN: 'false'
+  ENABLE_PNPM: 'false'
+  ENABLE_COMPOSER: 'false'
+  ENABLE_PIP: 'false'
+  ENABLE_PIPENV: 'false'
+  ENABLE_GO: 'true'
+  ENABLE_NUGET: 'false'
+
+  # Runtime Versions
+  NODE_VERSION: '20'
+  PHP_VERSION: '8.2'
+  PYTHON_VERSION: '3.12'
   GO_VERSION: '1.24'
+  DOTNET_VERSION: '8.0'
+
+  # Branches
   UPDATE_BRANCH_NAME: 'goupdate/auto-update-minor'
   UPDATE_TARGET_BRANCH: 'stage'
+
+  # Auto-merge
   AUTO_MERGE_UPDATES: 'true'
-  DELETE_BRANCH_ON_MERGE: 'true'
+
   # PR title template - use {date} for current date, {type} for update type (minor/patch/all)
   PR_TITLE: 'GoUpdate: Auto update - {type} ({date})'
   # Commit message template - supports {date} and {type} placeholders
@@ -105,8 +118,13 @@ jobs:
           HAS_APP_PRIVATE_KEY: ${{ secrets.GOUPDATE_APP_PRIVATE_KEY != '' }}
         run: |
           if [ "$HAS_APP_ID" != "true" ] || [ "$HAS_APP_PRIVATE_KEY" != "true" ]; then
-            echo "::error::GitHub App credentials required. Add GOUPDATE_APP_ID and GOUPDATE_APP_PRIVATE_KEY secrets."
-            echo "See: https://github.com/${{ github.repository }}#github-app-setup-required-for-auto-update"
+            echo "::error::GoUpdate: GitHub App credentials required"
+            echo ""
+            echo "To enable auto-merge, configure these repository secrets:"
+            echo "  - GOUPDATE_APP_ID"
+            echo "  - GOUPDATE_APP_PRIVATE_KEY"
+            echo ""
+            echo "See: https://github.com/${{ github.repository }}#github-app-setup"
             exit 1
           fi
 
@@ -200,25 +218,33 @@ jobs:
         with:
           exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
 
+      - name: Generate job summary
+        env:
+          SUMMARY: ${{ steps.goupdate.outputs.summary }}
+        run: |
+          echo "## GoUpdate - Check Updates" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Update check complete: $SUMMARY" >> $GITHUB_STEP_SUMMARY
+
       - name: Fail on major-only updates
         if: steps.goupdate.outputs.has-major-only == 'true' && steps.goupdate.outputs.has-updates == 'false'
         env:
           SUMMARY: ${{ steps.goupdate.outputs.summary }}
           MAJOR_PACKAGES: ${{ steps.goupdate.outputs.major-packages }}
         run: |
-          echo "::error::Only major updates available - no minor/patch updates to apply automatically"
+          echo "::error::GoUpdate: Only major updates available"
           echo ""
-          echo "=== MAJOR UPDATES REQUIRE MANUAL REVIEW ==="
+          echo "════════════════════════════════════════════════════════════════"
+          echo "⚠️  MAJOR UPDATES REQUIRE MANUAL REVIEW"
+          echo "════════════════════════════════════════════════════════════════"
           echo ""
-          echo "The following packages have ONLY major version updates available:"
+          echo "The following packages have only major version updates:"
           echo "$MAJOR_PACKAGES" | tr ' ' '\n' | sed '/^$/d' | sed 's/^/  - /'
           echo ""
-          echo "Summary: $SUMMARY"
-          echo ""
-          echo "To resolve:"
-          echo "  1. Review the changelogs for breaking changes"
+          echo "Major updates may contain breaking changes. To resolve:"
+          echo "  1. Review changelogs for breaking changes"
           echo "  2. Update packages manually, or"
-          echo "  3. Add packages to EXCLUDE_PACKAGES to skip them"
+          echo "  3. Add to EXCLUDE_PACKAGES to skip"
           echo ""
           exit 1
 
@@ -304,11 +330,11 @@ jobs:
       - name: Commit and push changes
         if: steps.goupdate.outputs.has-changes == 'true'
         env:
-          UPDATED_PKGS: ${{ steps.goupdate.outputs.updated-packages }}
+          UPDATE_OUTPUT: ${{ steps.goupdate.outputs.update-output }}
           COMMIT_MSG: ${{ steps.messages.outputs.commit_msg }}
         run: |
-          # Convert space-separated package list to bullet points
-          FORMATTED_PKGS=$(echo "$UPDATED_PKGS" | tr ' ' '\n' | sed '/^$/d' | sed 's/^/- /')
+          # Extract package versions from update output (format: "package v1.0.0 → v2.0.0")
+          FORMATTED_PKGS=$(echo "$UPDATE_OUTPUT" | grep -E "^\s+\S+\s+v[0-9]" | sed 's/^[[:space:]]*/- /' | head -20)
 
           git add go.mod go.sum
           git commit -m "$(cat <<EOF
@@ -336,16 +362,14 @@ jobs:
         run: |
           {
             echo "body<<PR_BODY_EOF_7e3c1a"
-            echo "## Automated Dependency Update"
-            echo ""
-            echo "This PR was automatically created by the dependency update workflow."
+            echo "## GoUpdate - Automated Dependency Update"
             echo ""
             echo '```'
             echo "$UPDATE_OUTPUT"
             echo '```'
             echo ""
             echo "---"
-            echo "*Created by [GoUpdate](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})*"
+            echo "*Created by GoUpdate*"
             echo "PR_BODY_EOF_7e3c1a"
           } >> $GITHUB_OUTPUT
 
@@ -364,6 +388,27 @@ jobs:
           auto-merge: 'false'
           merge-method: 'squash'
           delete-branch: 'false'
+
+      - name: Generate job summary
+        if: steps.goupdate.outputs.has-changes == 'true'
+        env:
+          PR_URL: ${{ steps.pr.outputs.pr-url }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr-number }}
+          UPDATE_BRANCH: ${{ env.UPDATE_BRANCH_NAME }}
+          TARGET_BRANCH: ${{ env.UPDATE_TARGET_BRANCH }}
+          UPDATE_OUTPUT: ${{ steps.goupdate.outputs.update-output }}
+        run: |
+          {
+            echo "## GoUpdate - Apply Updates"
+            echo ""
+            echo "### PR Created"
+            echo "- **PR:** [#$PR_NUMBER]($PR_URL)"
+            echo "- **Branch:** \`$UPDATE_BRANCH\` → \`$TARGET_BRANCH\`"
+            echo ""
+            echo '```'
+            echo "$UPDATE_OUTPUT"
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
 
   # ============================================================================
   # Wait for PR checks and merge
@@ -547,6 +592,24 @@ jobs:
           echo "checks_passed=false" >> $GITHUB_OUTPUT
           exit 1
 
+      - name: Generate job summary
+        if: always()
+        env:
+          PR_URL: ${{ needs.apply-updates.outputs.pr-url }}
+          PR_NUMBER: ${{ needs.apply-updates.outputs.pr-number }}
+          MERGED: ${{ steps.wait-merge.outputs.merged }}
+        run: |
+          {
+            echo "## GoUpdate - Merge PR"
+            echo ""
+            echo "- **PR:** [#$PR_NUMBER]($PR_URL)"
+            if [ "$MERGED" = "true" ]; then
+              echo "- **Status:** ✅ Merged"
+            else
+              echo "- **Status:** ❌ Not merged"
+            fi
+          } >> $GITHUB_STEP_SUMMARY
+
   # ============================================================================
   # Summary
   # ============================================================================
@@ -574,7 +637,7 @@ jobs:
           PR_MERGED: ${{ needs.merge-pr.outputs.merged }}
           AUTO_MERGE_ENABLED: ${{ needs.prepare.outputs.auto-merge-updates }}
         run: |
-          echo "## 🔄 Auto Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## GoUpdate - Auto Update Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Trigger:** $EVENT" >> $GITHUB_STEP_SUMMARY
           if [ -n "$MODE" ]; then
@@ -584,14 +647,14 @@ jobs:
 
           # PR info if created
           if [ -n "$PR_URL" ]; then
-            echo "### 📋 Pull Request" >> $GITHUB_STEP_SUMMARY
-            echo "**PR:** [#$PR_NUMBER]($PR_URL)" >> $GITHUB_STEP_SUMMARY
+            echo "### Pull Request" >> $GITHUB_STEP_SUMMARY
+            echo "- **PR:** [#$PR_NUMBER]($PR_URL)" >> $GITHUB_STEP_SUMMARY
             if [ "$AUTO_MERGE_ENABLED" = "true" ]; then
               if [ "$PR_MERGED" = "true" ]; then
-                echo "**Status:** ✅ Merged (release workflow triggers automatically)" >> $GITHUB_STEP_SUMMARY
+                echo "- **Status:** ✅ Merged (release workflow triggers automatically)" >> $GITHUB_STEP_SUMMARY
               fi
             else
-              echo "**Status:** 📝 Awaiting manual review" >> $GITHUB_STEP_SUMMARY
+              echo "- **Status:** Awaiting manual review" >> $GITHUB_STEP_SUMMARY
             fi
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
@@ -608,15 +671,15 @@ jobs:
           if [ "$APPLY_RESULT" = "success" ] && [ -n "$UPDATE_OUTPUT" ]; then
             echo "### Apply Updates" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
             echo "$UPDATE_OUTPUT" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
           fi
 
           # What happens next - show only when PR was merged
           if [ "$PR_MERGED" = "true" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### 📝 What Happens Next" >> $GITHUB_STEP_SUMMARY
+            echo "### What Happens Next" >> $GITHUB_STEP_SUMMARY
             echo "The PR was merged to \`stage\`. A prerelease will be created for testing." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "When ready for stable release:" >> $GITHUB_STEP_SUMMARY
