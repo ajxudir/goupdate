@@ -6,18 +6,19 @@
 #   - Manual dispatch: check-only or update mode
 #
 # Flow:
-#   1. Check for dependency updates
-#   2. Apply updates and run tests
-#   3. Create PR to target branch
-#   4. If AUTO_MERGE_UPDATES is true: wait for checks, merge PR
-#   5. If AUTO_MERGE_UPDATES is false: leave PR for manual review
+#   1. Scan repository for package managers
+#   2. Check for dependency updates
+#   3. Apply updates and run tests
+#   4. Create PR to target branch
+#   5. If AUTO_MERGE_UPDATES is true: wait for checks, merge PR
+#   6. If AUTO_MERGE_UPDATES is false: leave PR for manual review
 #
 # Configuration (modify in env section below):
-#   - ENABLE_* flags: Enable/disable package managers
-#   - *_VERSION: Runtime versions
-#   - UPDATE_BRANCH_NAME: Branch name for dependency updates
+#   - DEFAULT_BRANCH: Repository default branch (main/master)
+#   - BRANCH_PREFIX: Prefix for update branches (goupdate)
 #   - UPDATE_TARGET_BRANCH: Branch to merge updates into
 #   - AUTO_MERGE_UPDATES: Enable auto-merge for update PRs
+#   - *_VERSION: Runtime versions
 #   - PR_TITLE: PR title template (use {date} and {type} placeholders)
 #   - COMMIT_MESSAGE: Commit message template
 #   - EXCLUDE_PACKAGES: Packages to skip updating
@@ -56,29 +57,20 @@ concurrency:
 env:
   GOUPDATE_REPO: 'ajxudir/goupdate'
 
-  # Package Managers (set to 'true' to enable)
-  ENABLE_NPM: 'true'
-  ENABLE_YARN: 'false'
-  ENABLE_PNPM: 'false'
-  ENABLE_COMPOSER: 'true'
-  ENABLE_PIP: 'false'
-  ENABLE_PIPENV: 'false'
-  ENABLE_GO: 'true'
-  ENABLE_NUGET: 'false'
+  # Branches
+  DEFAULT_BRANCH: 'main'
+  BRANCH_PREFIX: 'goupdate'
+  UPDATE_TARGET_BRANCH: 'stage-updates'
 
-  # Runtime Versions
+  # Auto-merge
+  AUTO_MERGE_UPDATES: 'true'
+
+  # Runtime Versions (used when package managers are detected)
   NODE_VERSION: '20'
   PHP_VERSION: '8.2'
   PYTHON_VERSION: '3.12'
   GO_VERSION: '1.24'
   DOTNET_VERSION: '8.0'
-
-  # Branches
-  UPDATE_BRANCH_NAME: 'goupdate/auto-update-minor'
-  UPDATE_TARGET_BRANCH: 'stage-updates'
-
-  # Auto-merge
-  AUTO_MERGE_UPDATES: 'true'
 
   # PR title template - use {date} for current date, {type} for update type (minor/patch/all)
   PR_TITLE: 'GoUpdate: Auto update - {type} ({date})'
@@ -93,24 +85,25 @@ permissions:
 
 jobs:
   # ============================================================================
-  # Prepare - Determine what actions to take based on trigger
+  # Prepare - Scan repository and determine what actions to take
   # ============================================================================
   prepare:
     name: Prepare
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 5
     outputs:
       run-dependency-check: ${{ steps.config.outputs.run_dependency_check }}
       run-updates: ${{ steps.config.outputs.run_updates }}
       check-only: ${{ steps.config.outputs.check_only }}
       update-type: ${{ steps.config.outputs.update_type }}
       auto-merge-updates: ${{ steps.config.outputs.auto_merge_updates }}
-      rules: ${{ steps.config.outputs.rules }}
-      use-node: ${{ steps.config.outputs.use_node }}
-      use-php: ${{ steps.config.outputs.use_php }}
-      use-python: ${{ steps.config.outputs.use_python }}
-      use-go: ${{ steps.config.outputs.use_go }}
-      use-dotnet: ${{ steps.config.outputs.use_dotnet }}
+      update-branch-name: ${{ steps.config.outputs.update_branch_name }}
+      rules: ${{ steps.scan.outputs.rules }}
+      use-node: ${{ steps.scan.outputs.use_node }}
+      use-php: ${{ steps.scan.outputs.use_php }}
+      use-python: ${{ steps.scan.outputs.use_python }}
+      use-go: ${{ steps.scan.outputs.use_go }}
+      use-dotnet: ${{ steps.scan.outputs.use_dotnet }}
 
     steps:
       - name: Validate GitHub App credentials
@@ -129,47 +122,71 @@ jobs:
             exit 1
           fi
 
-      - name: Determine actions
-        id: config
-        env:
-          AUTO_MERGE: ${{ env.AUTO_MERGE_UPDATES }}
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEFAULT_BRANCH }}
+
+      - name: Install goupdate
+        uses: ./.github/actions/_goupdate-install
+        with:
+          goupdate-repo: ${{ env.GOUPDATE_REPO }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan for package managers
+        id: scan
         run: |
-          EVENT="${{ github.event_name }}"
-          MODE="${{ github.event.inputs.mode }}"
-          UPDATE_TYPE="${{ github.event.inputs.update-type }}"
+          echo "Scanning repository for package managers..."
+          SCAN_OUTPUT=$(goupdate scan --json 2>/dev/null || echo '{"rules":[]}')
+          echo "Scan output: $SCAN_OUTPUT"
 
-          echo "Event: $EVENT, Mode: $MODE, Update-Type: $UPDATE_TYPE, Auto-Merge: $AUTO_MERGE"
-
-          # Build rules list from ENABLE_* flags
-          RULES=""
-          [ "$ENABLE_NPM" = "true" ] && RULES="${RULES}npm,"
-          [ "$ENABLE_YARN" = "true" ] && RULES="${RULES}yarn,"
-          [ "$ENABLE_PNPM" = "true" ] && RULES="${RULES}pnpm,"
-          [ "$ENABLE_COMPOSER" = "true" ] && RULES="${RULES}composer,"
-          [ "$ENABLE_PIP" = "true" ] && RULES="${RULES}requirements,"
-          [ "$ENABLE_PIPENV" = "true" ] && RULES="${RULES}pipfile,"
-          [ "$ENABLE_GO" = "true" ] && RULES="${RULES}mod,"
-          [ "$ENABLE_NUGET" = "true" ] && RULES="${RULES}nuget,"
-          RULES="${RULES%,}"
+          # Extract rules as comma-separated list
+          RULES=$(echo "$SCAN_OUTPUT" | jq -r '.rules // [] | map(.name) | join(",")')
+          echo "Detected rules: $RULES"
           echo "rules=$RULES" >> $GITHUB_OUTPUT
 
-          # Detect needed runtimes
+          # Determine required runtimes based on detected rules
           USE_NODE="false"
           USE_PHP="false"
           USE_PYTHON="false"
           USE_GO="false"
           USE_DOTNET="false"
-          [[ "$ENABLE_NPM" = "true" || "$ENABLE_YARN" = "true" || "$ENABLE_PNPM" = "true" ]] && USE_NODE="true"
-          [ "$ENABLE_COMPOSER" = "true" ] && USE_PHP="true"
-          [[ "$ENABLE_PIP" = "true" || "$ENABLE_PIPENV" = "true" ]] && USE_PYTHON="true"
-          [ "$ENABLE_GO" = "true" ] && USE_GO="true"
-          [ "$ENABLE_NUGET" = "true" ] && USE_DOTNET="true"
+
+          if echo "$RULES" | grep -qE "(npm|yarn|pnpm)"; then
+            USE_NODE="true"
+          fi
+          if echo "$RULES" | grep -q "composer"; then
+            USE_PHP="true"
+          fi
+          if echo "$RULES" | grep -qE "(requirements|pipfile)"; then
+            USE_PYTHON="true"
+          fi
+          if echo "$RULES" | grep -q "mod"; then
+            USE_GO="true"
+          fi
+          if echo "$RULES" | grep -q "nuget"; then
+            USE_DOTNET="true"
+          fi
 
           echo "use_node=$USE_NODE" >> $GITHUB_OUTPUT
           echo "use_php=$USE_PHP" >> $GITHUB_OUTPUT
           echo "use_python=$USE_PYTHON" >> $GITHUB_OUTPUT
           echo "use_go=$USE_GO" >> $GITHUB_OUTPUT
           echo "use_dotnet=$USE_DOTNET" >> $GITHUB_OUTPUT
+
+          echo "Runtime detection: node=$USE_NODE, php=$USE_PHP, python=$USE_PYTHON, go=$USE_GO, dotnet=$USE_DOTNET"
+
+      - name: Determine actions
+        id: config
+        env:
+          AUTO_MERGE: ${{ env.AUTO_MERGE_UPDATES }}
+          BRANCH_PREFIX: ${{ env.BRANCH_PREFIX }}
+        run: |
+          EVENT="${{ github.event_name }}"
+          MODE="${{ github.event.inputs.mode }}"
+          UPDATE_TYPE="${{ github.event.inputs.update-type }}"
+
+          echo "Event: $EVENT, Mode: $MODE, Update-Type: $UPDATE_TYPE, Auto-Merge: $AUTO_MERGE"
 
           # Pass through auto-merge setting
           echo "auto_merge_updates=$AUTO_MERGE" >> $GITHUB_OUTPUT
@@ -180,32 +197,27 @@ jobs:
               echo "run_updates=true" >> $GITHUB_OUTPUT
               echo "check_only=false" >> $GITHUB_OUTPUT
               echo "update_type=minor" >> $GITHUB_OUTPUT
+              echo "update_branch_name=${BRANCH_PREFIX}/auto-update-minor" >> $GITHUB_OUTPUT
               ;;
             workflow_dispatch)
+              UTYPE="${UPDATE_TYPE:-minor}"
+              echo "update_branch_name=${BRANCH_PREFIX}/auto-update-${UTYPE}" >> $GITHUB_OUTPUT
               case "$MODE" in
                 check-only)
                   echo "run_dependency_check=true" >> $GITHUB_OUTPUT
                   echo "run_updates=false" >> $GITHUB_OUTPUT
                   echo "check_only=true" >> $GITHUB_OUTPUT
-                  echo "update_type=${UPDATE_TYPE:-minor}" >> $GITHUB_OUTPUT
+                  echo "update_type=$UTYPE" >> $GITHUB_OUTPUT
                   ;;
-                update)
+                update|*)
                   echo "run_dependency_check=true" >> $GITHUB_OUTPUT
                   echo "run_updates=true" >> $GITHUB_OUTPUT
                   echo "check_only=false" >> $GITHUB_OUTPUT
-                  echo "update_type=${UPDATE_TYPE:-minor}" >> $GITHUB_OUTPUT
-                  ;;
-                *)
-                  echo "run_dependency_check=true" >> $GITHUB_OUTPUT
-                  echo "run_updates=true" >> $GITHUB_OUTPUT
-                  echo "check_only=false" >> $GITHUB_OUTPUT
-                  echo "update_type=${UPDATE_TYPE:-minor}" >> $GITHUB_OUTPUT
+                  echo "update_type=$UTYPE" >> $GITHUB_OUTPUT
                   ;;
               esac
               ;;
           esac
-
-          echo "Rules: $RULES"
 
   # ============================================================================
   # Check for dependency updates
@@ -226,26 +238,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.DEFAULT_BRANCH }}
           fetch-depth: 0
 
       - name: Ensure target branch exists
         uses: ./.github/actions/_git-branch
         with:
           branch: ${{ env.UPDATE_TARGET_BRANCH }}
-          base: ${{ github.event.repository.default_branch }}
+          base: ${{ env.DEFAULT_BRANCH }}
           create-if-missing: 'true'
           push: 'true'
 
-      # Setup runtimes
+      # Setup runtimes based on scan results
       - name: Setup Node.js
         if: needs.prepare.outputs.use-node == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Enable corepack
-        if: env.ENABLE_YARN == 'true' || env.ENABLE_PNPM == 'true'
-        run: corepack enable
 
       - name: Setup PHP
         if: needs.prepare.outputs.use-php == 'true'
@@ -270,22 +279,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      # Install dependencies
-      - if: env.ENABLE_NPM == 'true'
-        run: npm ci
-      - if: env.ENABLE_YARN == 'true'
-        run: yarn install --frozen-lockfile
-      - if: env.ENABLE_PNPM == 'true'
-        run: pnpm install --frozen-lockfile
-      - if: env.ENABLE_COMPOSER == 'true'
-        run: composer install --no-interaction
-      - if: env.ENABLE_PIP == 'true'
-        run: pip install -r requirements.txt
-      - if: env.ENABLE_PIPENV == 'true'
-        run: pip install pipenv && pipenv install
-      - if: env.ENABLE_NUGET == 'true'
-        run: dotnet restore
 
       - name: Install goupdate
         uses: ./.github/actions/_goupdate-install
@@ -349,26 +342,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.DEFAULT_BRANCH }}
           fetch-depth: 0
 
       - name: Ensure target branch exists
         uses: ./.github/actions/_git-branch
         with:
           branch: ${{ env.UPDATE_TARGET_BRANCH }}
-          base: ${{ github.event.repository.default_branch }}
+          base: ${{ env.DEFAULT_BRANCH }}
           create-if-missing: 'true'
           push: 'true'
 
-      # Setup runtimes
+      # Setup runtimes based on scan results
       - name: Setup Node.js
         if: needs.prepare.outputs.use-node == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Enable corepack
-        if: env.ENABLE_YARN == 'true' || env.ENABLE_PNPM == 'true'
-        run: corepack enable
 
       - name: Setup PHP
         if: needs.prepare.outputs.use-php == 'true'
@@ -394,26 +384,10 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      # Install dependencies
-      - if: env.ENABLE_NPM == 'true'
-        run: npm ci
-      - if: env.ENABLE_YARN == 'true'
-        run: yarn install --frozen-lockfile
-      - if: env.ENABLE_PNPM == 'true'
-        run: pnpm install --frozen-lockfile
-      - if: env.ENABLE_COMPOSER == 'true'
-        run: composer install --no-interaction
-      - if: env.ENABLE_PIP == 'true'
-        run: pip install -r requirements.txt
-      - if: env.ENABLE_PIPENV == 'true'
-        run: pip install pipenv && pipenv install
-      - if: env.ENABLE_NUGET == 'true'
-        run: dotnet restore
-
       - name: Create update branch
         uses: ./.github/actions/_git-branch
         with:
-          branch: ${{ env.UPDATE_BRANCH_NAME }}
+          branch: ${{ needs.prepare.outputs.update-branch-name }}
           base: ${{ env.UPDATE_TARGET_BRANCH }}
           delete-remote: 'true'
           push: 'false'
@@ -457,6 +431,7 @@ jobs:
         env:
           UPDATE_OUTPUT: ${{ steps.goupdate.outputs.update-output }}
           COMMIT_MSG: ${{ steps.messages.outputs.commit_msg }}
+          UPDATE_BRANCH: ${{ needs.prepare.outputs.update-branch-name }}
         run: |
           # Extract package versions from update output (format: "package v1.0.0 → v2.0.0")
           FORMATTED_PKGS=$(echo "$UPDATE_OUTPUT" | grep -E "^\s+\S+\s+v?[0-9]" | sed 's/^[[:space:]]*/- /' | head -20)
@@ -469,7 +444,7 @@ jobs:
           $FORMATTED_PKGS
           EOF
           )"
-          git push -u origin "${{ env.UPDATE_BRANCH_NAME }}"
+          git push -u origin "$UPDATE_BRANCH"
 
       - name: Generate GitHub App token
         id: app-token
@@ -507,7 +482,7 @@ jobs:
           title: ${{ steps.messages.outputs.pr_title }}
           body: ${{ steps.pr-body.outputs.body }}
           base: ${{ env.UPDATE_TARGET_BRANCH }}
-          head: ${{ env.UPDATE_BRANCH_NAME }}
+          head: ${{ needs.prepare.outputs.update-branch-name }}
           auto-merge: 'false'
           merge-method: 'squash'
           delete-branch: 'false'
@@ -517,7 +492,7 @@ jobs:
         env:
           PR_URL: ${{ steps.pr.outputs.pr-url }}
           PR_NUMBER: ${{ steps.pr.outputs.pr-number }}
-          UPDATE_BRANCH: ${{ env.UPDATE_BRANCH_NAME }}
+          UPDATE_BRANCH: ${{ needs.prepare.outputs.update-branch-name }}
           TARGET_BRANCH: ${{ env.UPDATE_TARGET_BRANCH }}
           UPDATE_OUTPUT: ${{ steps.goupdate.outputs.update-output }}
         run: |
@@ -735,11 +710,4 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
             echo "$UPDATE_OUTPUT" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # What happens next - show only when PR was merged
-          if [ "$PR_MERGED" = "true" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### What Happens Next" >> $GITHUB_STEP_SUMMARY
-            echo "The PR was merged to \`$TARGET_BRANCH\`." >> $GITHUB_STEP_SUMMARY
           fi
