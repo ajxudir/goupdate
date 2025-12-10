@@ -74,6 +74,26 @@ func TestSafeFromVersion(t *testing.T) {
 		result := SafeFromVersion(res)
 		assert.Equal(t, "2.0.0", result)
 	})
+
+	t.Run("uses original version if original installed is N/A but original version set", func(t *testing.T) {
+		res := UpdateResult{
+			OriginalInstalled: constants.PlaceholderNA,
+			OriginalVersion:   "1.5.0",
+			Pkg:               formats.Package{Version: "2.0.0"},
+		}
+		result := SafeFromVersion(res)
+		assert.Equal(t, "1.5.0", result)
+	})
+
+	t.Run("uses original version if original installed is empty but original version set", func(t *testing.T) {
+		res := UpdateResult{
+			OriginalInstalled: "",
+			OriginalVersion:   "1.5.0",
+			Pkg:               formats.Package{Version: "2.0.0"},
+		}
+		result := SafeFromVersion(res)
+		assert.Equal(t, "1.5.0", result)
+	})
 }
 
 func TestDetermineScopeDescription(t *testing.T) {

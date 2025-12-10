@@ -44,10 +44,14 @@ func FormatConstraintDisplay(p formats.Package, selection outdated.UpdateSelecti
 	return display.FormatConstraintDisplayWithFlags(p, selection.Major, selection.Minor, selection.Patch)
 }
 
-// SafeFromVersion returns the original installed version (for "from" display in update summaries).
+// SafeFromVersion returns the original version (for "from" display in update summaries).
+// Checks in order: OriginalInstalled (lock file), OriginalVersion (declared), then current Pkg.Version.
 func SafeFromVersion(res UpdateResult) string {
 	if res.OriginalInstalled != "" && res.OriginalInstalled != constants.PlaceholderNA {
 		return res.OriginalInstalled
+	}
+	if res.OriginalVersion != "" && res.OriginalVersion != constants.PlaceholderNA {
+		return res.OriginalVersion
 	}
 	return display.SafeDeclaredValue(res.Pkg.Version)
 }

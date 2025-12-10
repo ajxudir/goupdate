@@ -1,6 +1,6 @@
 # GoUpdate GitHub Actions Example
 
-Drop-in GitHub Actions workflow for automated dependency updates.
+Drop-in GitHub Actions workflow for automated dependency updates across multiple package managers.
 
 ## Quick Start
 
@@ -10,24 +10,57 @@ Drop-in GitHub Actions workflow for automated dependency updates.
 
 ## Configuration
 
-Edit the environment variables in the workflow:
+### Enable Package Managers
+
+Enable only the package managers your project uses. Only the required tools will be installed.
 
 ```yaml
 env:
-  # Goupdate source (change to your org's fork if needed)
-  GOUPDATE_REPO: 'ajxudir/goupdate'
+  # Package Managers - Enable the ones your project uses
+  # Set to 'true' to enable, 'false' to disable
 
-  # Package manager: npm, yarn, pnpm, composer, mod
-  PACKAGE_MANAGER: 'npm'
+  # Node.js package managers
+  ENABLE_NPM: 'true'
+  ENABLE_YARN: 'false'
+  ENABLE_PNPM: 'false'
 
-  # Language version (uncomment the one you need)
-  NODE_VERSION: '20'
-  # PHP_VERSION: '8.2'
-  # GO_VERSION: '1.24'
+  # PHP package manager
+  ENABLE_COMPOSER: 'false'
 
+  # Python package managers
+  ENABLE_PIP: 'false'         # requirements.txt
+  ENABLE_PIPENV: 'false'      # Pipfile
+
+  # Go package manager
+  ENABLE_GO: 'false'
+
+  # .NET package manager
+  ENABLE_NUGET: 'false'
+```
+
+### Language Versions
+
+Configure versions for the enabled package managers:
+
+```yaml
+env:
+  NODE_VERSION: '20'        # For npm, yarn, pnpm
+  PHP_VERSION: '8.2'        # For composer
+  PYTHON_VERSION: '3.12'    # For pip, pipenv
+  GO_VERSION: '1.24'        # For go mod
+  DOTNET_VERSION: '8.0'     # For nuget
+```
+
+### Other Settings
+
+```yaml
+env:
   # Branch settings
   UPDATE_BRANCH: 'goupdate/auto-update'
   TARGET_BRANCH: 'stage-updates'
+
+  # PR title template ({date} and {type} are replaced)
+  PR_TITLE: 'chore(deps): Auto update - {type} ({date})'
 
   # Test command (set to empty to skip)
   TEST_COMMAND: 'npm test'
@@ -36,15 +69,84 @@ env:
   EXCLUDE_PACKAGES: ''
 ```
 
+## Example Configurations
+
+### Node.js (npm)
+```yaml
+ENABLE_NPM: 'true'
+NODE_VERSION: '20'
+TEST_COMMAND: 'npm test'
+```
+
+### Node.js (pnpm)
+```yaml
+ENABLE_PNPM: 'true'
+NODE_VERSION: '20'
+TEST_COMMAND: 'pnpm test'
+```
+
+### Laravel (PHP + npm)
+```yaml
+ENABLE_NPM: 'true'
+ENABLE_COMPOSER: 'true'
+NODE_VERSION: '20'
+PHP_VERSION: '8.2'
+TEST_COMMAND: 'composer test && npm test'
+```
+
+### Full-stack (Go + pnpm)
+```yaml
+ENABLE_PNPM: 'true'
+ENABLE_GO: 'true'
+NODE_VERSION: '20'
+GO_VERSION: '1.24'
+TEST_COMMAND: 'go test ./... && pnpm test'
+```
+
+### Django (Python + npm)
+```yaml
+ENABLE_NPM: 'true'
+ENABLE_PIP: 'true'
+NODE_VERSION: '20'
+PYTHON_VERSION: '3.12'
+TEST_COMMAND: 'python manage.py test && npm test'
+```
+
+### Flask with Pipenv
+```yaml
+ENABLE_PIPENV: 'true'
+PYTHON_VERSION: '3.12'
+TEST_COMMAND: 'pipenv run pytest'
+```
+
+### .NET Web API
+```yaml
+ENABLE_NUGET: 'true'
+DOTNET_VERSION: '8.0'
+TEST_COMMAND: 'dotnet test'
+```
+
+### Blazor (.NET + npm)
+```yaml
+ENABLE_NPM: 'true'
+ENABLE_NUGET: 'true'
+NODE_VERSION: '20'
+DOTNET_VERSION: '8.0'
+TEST_COMMAND: 'dotnet test && npm test'
+```
+
 ## Supported Package Managers
 
-| Manager | Files |
-|---------|-------|
-| `npm` | package.json, package-lock.json |
-| `yarn` | package.json, yarn.lock |
-| `pnpm` | package.json, pnpm-lock.yaml |
-| `composer` | composer.json, composer.lock |
-| `mod` | go.mod, go.sum |
+| Flag | Manager | Language | Files |
+|------|---------|----------|-------|
+| `ENABLE_NPM` | npm | Node.js | package.json, package-lock.json |
+| `ENABLE_YARN` | yarn | Node.js | package.json, yarn.lock |
+| `ENABLE_PNPM` | pnpm | Node.js | package.json, pnpm-lock.yaml |
+| `ENABLE_COMPOSER` | composer | PHP | composer.json, composer.lock |
+| `ENABLE_PIP` | pip | Python | requirements.txt |
+| `ENABLE_PIPENV` | pipenv | Python | Pipfile, Pipfile.lock |
+| `ENABLE_GO` | go mod | Go | go.mod, go.sum |
+| `ENABLE_NUGET` | nuget | .NET | *.csproj, packages.config |
 
 ## Update Policy
 
@@ -52,6 +154,16 @@ env:
 - **Major**: Alerts only, does not block other updates
 
 If a package has both major and patch available, the patch is applied and major is reported.
+
+### Major-Only Updates
+
+When **only** major updates are available (no minor/patch updates across all package managers), the workflow **fails** intentionally. This triggers a GitHub email notification so you can:
+
+1. Review changelogs for breaking changes
+2. Update packages manually after testing
+3. Add packages to `ignore` in `.goupdate.yml` to skip them
+
+This ensures major version bumps always get human review.
 
 ## Manual Trigger
 
@@ -64,10 +176,11 @@ Go to Actions → Auto Update Dependencies → Run workflow:
 ```
 .github/
 ├── actions/
-│   ├── _goupdate-install/   # Download goupdate
+│   ├── _goupdate-install/   # Download goupdate binary
 │   ├── _goupdate-check/     # Check for updates
 │   ├── _goupdate-update/    # Apply updates
-│   └── _gh-pr/              # Create PRs
+│   ├── _gh-pr/              # Create pull requests
+│   └── _git-branch/         # Branch management
 └── workflows/
     └── auto-update.yml      # Main workflow
 ```

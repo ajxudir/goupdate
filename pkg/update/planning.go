@@ -28,6 +28,7 @@ type UpdateResult struct {
 	Minor             string             // Latest minor version available
 	Patch             string             // Latest patch version available
 	OriginalInstalled string             // Original installed version before update (for summary display)
+	OriginalVersion   string             // Original declared version before update (for summary display)
 	SystemTestResult  *systemtest.Result // System test results for this package (if run)
 }
 
@@ -154,13 +155,14 @@ func BuildGroupedPlans(
 		}
 
 		p := plan.Pkg
+		originalVersion := p.Version
 		res := UpdateResult{
 			Pkg:               p,
 			Status:            constants.StatusUpToDate,
 			Group:             p.Group,
 			OriginalInstalled: p.InstalledVersion,
+			OriginalVersion:   originalVersion,
 		}
-		originalVersion := p.Version
 
 		updateCfg, cfgErr := plan.Cfg, plan.Err
 		if cfgErr != nil {
@@ -215,6 +217,7 @@ func handleConfigError(p formats.Package, cfgErr error, updateCtx *UpdateContext
 		Status:            constants.StatusUpToDate,
 		Group:             p.Group,
 		OriginalInstalled: p.InstalledVersion,
+		OriginalVersion:   originalVersion,
 	}
 
 	if errors.IsUnsupported(cfgErr) {
@@ -256,6 +259,7 @@ func handleFloatingConstraint(p formats.Package, updateCfg *config.UpdateCfg, up
 		Status:            lock.InstallStatusFloating,
 		Group:             groupDisplay,
 		OriginalInstalled: p.InstalledVersion,
+		OriginalVersion:   originalVersion,
 	}
 	if updateCtx.Unsupported != nil {
 		updateCtx.Unsupported.Add(p, fmt.Sprintf("floating constraint '%s' cannot be updated automatically; remove the constraint or update manually", p.Version))
@@ -285,6 +289,7 @@ func handleExactConstraint(p formats.Package, updateCfg *config.UpdateCfg, origi
 		Target:            p.Version,
 		Group:             NormalizeUpdateGroup(updateCfg, p),
 		OriginalInstalled: p.InstalledVersion,
+		OriginalVersion:   originalVersion,
 	}
 	groupKey := UpdateGroupKey(updateCfg, p)
 	return &PlannedUpdate{Cfg: updateCfg, Res: res, Original: originalVersion, GroupKey: groupKey}
@@ -345,11 +350,12 @@ func planVersionUpdate(
 		versioning = ruleCfg.Outdated.Versioning
 	}
 
-	// Filter versions by package's original constraint (not by scope) to get all available within constraint
-	allWithinConstraint := outdated.FilterVersionsByConstraint(p, versions, outdated.UpdateSelectionFlags{})
+	// Get ALL available versions (including major) without constraint filtering
+	// This ensures users see major updates even when their package uses ^ or ~ constraints
+	allAvailable := outdated.FilterVersionsByConstraint(p, versions, outdated.UpdateSelectionFlags{Major: true})
 
-	// Summarize all versions within constraint (for remaining updates summary)
-	major, minor, patch, summarizeErr := outdated.SummarizeAvailableVersions(outdated.CurrentVersionForOutdated(p), allWithinConstraint, versioning, incremental)
+	// Summarize all available versions (for display - shows what updates exist)
+	major, minor, patch, summarizeErr := outdated.SummarizeAvailableVersions(outdated.CurrentVersionForOutdated(p), allAvailable, versioning, incremental)
 	if summarizeErr != nil {
 		res.Status = constants.StatusSummarizeError
 		res.Err = summarizeErr
@@ -374,7 +380,7 @@ func planVersionUpdate(
 		Res:                  res,
 		Original:             originalVersion,
 		GroupKey:             groupKey,
-		VersionsInConstraint: allWithinConstraint,
+		VersionsInConstraint: allAvailable,
 		Versioning:           versioning,
 		Incremental:          incremental,
 	}

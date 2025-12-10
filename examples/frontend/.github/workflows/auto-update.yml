@@ -33,9 +33,9 @@ env:
   GOUPDATE_REPO: 'ajxudir/goupdate'
 
   # Package Managers (set to 'true' to enable)
-  ENABLE_NPM: 'true'
+  ENABLE_NPM: 'false'
   ENABLE_YARN: 'false'
-  ENABLE_PNPM: 'false'
+  ENABLE_PNPM: 'true'
   ENABLE_COMPOSER: 'false'
   ENABLE_PIP: 'false'
   ENABLE_PIPENV: 'false'
@@ -55,7 +55,7 @@ env:
 
   # PR
   PR_TITLE: 'GoUpdate: Auto update - {type} ({date})'
-  TEST_COMMAND: ''
+  TEST_COMMAND: 'pnpm run build'
   EXCLUDE_PACKAGES: ''
 
 permissions:
