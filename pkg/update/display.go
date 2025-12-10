@@ -312,12 +312,6 @@ func PrintUpdatePreview(plans []*PlannedUpdate, table *output.Table, selection o
 
 	counts := ComputeSummaryFromPlans(plans)
 	PrintUpdateSummaryLines(counts, SummaryModePreview)
-
-	// Show major updates warning at the end for visibility
-	if counts.HasMajor > 0 {
-		fmt.Println()
-		fmt.Printf("⚠️  %d package(s) have MAJOR updates available (not auto-applied)\n", counts.HasMajor)
-	}
 }
 
 // FormatSummaryStrings formats the summary counts into display strings for cmd layer.
