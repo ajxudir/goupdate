@@ -59,11 +59,9 @@ runs:
         VERBOSE: ${{ inputs.verbose }}
         EXCLUDE: ${{ inputs.exclude-packages }}
       run: |
-        # Build exclude flag
-        EXCLUDE_FLAG=""
-        if [[ -n "$EXCLUDE" ]]; then
-          EXCLUDE_FLAG="-e $EXCLUDE"
-        fi
+        # Note: Package exclusion is configured via .goupdate.yml, not CLI flags
+        # The exclude-packages input is kept for documentation but doesn't filter directly
+        # To exclude packages, add them to your .goupdate.yml under rules.<rule>.exclude
 
         # Build verbose flag
         VERBOSE_FLAG=""
@@ -73,7 +71,7 @@ runs:
 
         # Run check once and capture JSON output
         STDERR_FILE=$(mktemp)
-        JSON_OUTPUT=$(goupdate outdated -r mod -o json $EXCLUDE_FLAG $VERBOSE_FLAG 2>"$STDERR_FILE") || {
+        JSON_OUTPUT=$(goupdate outdated -r mod -o json $VERBOSE_FLAG 2>"$STDERR_FILE") || {
           EXIT_CODE=$?
           cat "$STDERR_FILE" >&2
           rm -f "$STDERR_FILE"
@@ -87,7 +85,7 @@ runs:
             echo "Command failed with exit code $EXIT_CODE. Re-running with verbose mode..."
             echo "Exit codes: 0=success, 1=partial failure, 2=complete failure, 3=config error"
             echo ""
-            goupdate outdated -r mod -o json $EXCLUDE_FLAG --verbose 2>&1 || true
+            goupdate outdated -r mod -o json --verbose 2>&1 || true
             echo ""
             echo "════════════════════════════════════════════════════════════════════════"
             echo "End of verbose debug output"
