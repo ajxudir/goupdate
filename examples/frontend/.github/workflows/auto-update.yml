@@ -137,11 +137,11 @@ jobs:
         id: scan
         run: |
           echo "Scanning repository for package managers..."
-          SCAN_OUTPUT=$(goupdate scan --json 2>/dev/null || echo '{"rules":[]}')
+          SCAN_OUTPUT=$(goupdate scan --output json 2>/dev/null || echo '{"files":[]}')
           echo "Scan output: $SCAN_OUTPUT"
 
-          # Extract rules as comma-separated list
-          RULES=$(echo "$SCAN_OUTPUT" | jq -r '.rules // [] | map(.name) | join(",")')
+          # Extract rules as comma-separated list from files array
+          RULES=$(echo "$SCAN_OUTPUT" | jq -r '.files // [] | map(.rule) | unique | join(",")')
           echo "Detected rules: $RULES"
           echo "rules=$RULES" >> $GITHUB_OUTPUT
 
