@@ -1,19 +1,17 @@
 # Goupdate Check Action
 # Modular action for checking dependency updates
 # Part of the modular goupdate action suite
+#
+# Uses .goupdate.yml config for rule detection and package exclusion
 
 name: 'Goupdate Check'
-description: 'Check for available dependency updates'
+description: 'Check for available dependency updates using .goupdate.yml config'
 
 inputs:
   working-directory:
-    description: 'Working directory containing go.mod'
+    description: 'Working directory containing .goupdate.yml config'
     required: false
     default: '.'
-  exclude-packages:
-    description: 'Packages to skip (comma-separated)'
-    required: false
-    default: ''
   verbose:
     description: 'Enable verbose output'
     required: false
@@ -47,6 +45,9 @@ outputs:
   major-packages:
     description: 'Space-separated list of packages with only major updates'
     value: ${{ steps.check.outputs.major_packages }}
+  exit-code:
+    description: 'Exit code from goupdate outdated command'
+    value: ${{ steps.check.outputs.exit_code }}
 
 runs:
   using: 'composite'
@@ -57,45 +58,53 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       env:
         VERBOSE: ${{ inputs.verbose }}
-        EXCLUDE: ${{ inputs.exclude-packages }}
       run: |
-        # Build exclude flag
-        EXCLUDE_FLAG=""
-        if [[ -n "$EXCLUDE" ]]; then
-          EXCLUDE_FLAG="-e $EXCLUDE"
-        fi
-
         # Build verbose flag
         VERBOSE_FLAG=""
         if [[ "$VERBOSE" == "true" ]]; then
           VERBOSE_FLAG="-v"
         fi
 
-        # Run check once and capture JSON output
+        # Run check - goupdate auto-detects rules from .goupdate.yml config
+        # Package exclusion is also configured in .goupdate.yml
+        # Stream output live while capturing to file for later parsing
+        OUTPUT_FILE=$(mktemp)
         STDERR_FILE=$(mktemp)
-        JSON_OUTPUT=$(goupdate outdated -r mod -o json $EXCLUDE_FLAG $VERBOSE_FLAG 2>"$STDERR_FILE") || {
-          EXIT_CODE=$?
+        set +e
+        goupdate outdated -o json $VERBOSE_FLAG 2>"$STDERR_FILE" | tee "$OUTPUT_FILE"
+        EXIT_CODE=${PIPESTATUS[0]}
+        set -e
+        JSON_OUTPUT=$(cat "$OUTPUT_FILE")
+        rm -f "$OUTPUT_FILE"
+
+        # Show any stderr
+        if [[ -s "$STDERR_FILE" ]]; then
           cat "$STDERR_FILE" >&2
-          rm -f "$STDERR_FILE"
-          # If command failed and verbose was not enabled, re-run with verbose for debugging
-          if [[ "$VERBOSE" != "true" ]]; then
-            echo ""
-            echo "════════════════════════════════════════════════════════════════════════"
-            echo "🔍 VERBOSE DEBUG OUTPUT (exit code: $EXIT_CODE)"
-            echo "════════════════════════════════════════════════════════════════════════"
-            echo ""
-            echo "Command failed with exit code $EXIT_CODE. Re-running with verbose mode..."
-            echo "Exit codes: 0=success, 1=partial failure, 2=complete failure, 3=config error"
-            echo ""
-            goupdate outdated -r mod -o json $EXCLUDE_FLAG --verbose 2>&1 || true
-            echo ""
-            echo "════════════════════════════════════════════════════════════════════════"
-            echo "End of verbose debug output"
-            echo "════════════════════════════════════════════════════════════════════════"
-          fi
-          exit $EXIT_CODE
-        }
+        fi
         rm -f "$STDERR_FILE"
+
+        # If command failed and verbose was not enabled, re-run with verbose for debugging
+        if [[ "$EXIT_CODE" -ne 0 && "$VERBOSE" != "true" ]]; then
+          echo ""
+          echo "════════════════════════════════════════════════════════════════════════"
+          echo "🔍 VERBOSE DEBUG OUTPUT (exit code: $EXIT_CODE)"
+          echo "════════════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "Command failed with exit code $EXIT_CODE. Re-running with verbose mode..."
+          echo "Exit codes: 0=success, 1=partial failure, 2=complete failure, 3=config error"
+          echo ""
+          goupdate outdated -o json --verbose 2>&1 || true
+          echo ""
+          echo "════════════════════════════════════════════════════════════════════════"
+          echo "End of verbose debug output"
+          echo "════════════════════════════════════════════════════════════════════════"
+        fi
+
+        # Exit early if command failed
+        if [[ "$EXIT_CODE" -ne 0 ]]; then
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          exit $EXIT_CODE
+        fi
 
         # Parse counts from JSON
         MAJOR_COUNT=$(echo "$JSON_OUTPUT" | jq -r '.summary.has_major // 0')
@@ -132,6 +141,7 @@ runs:
         echo "patch_count=$PATCH_COUNT" >> "$GITHUB_OUTPUT"
         echo "summary=$SUMMARY" >> "$GITHUB_OUTPUT"
         echo "major_packages=$MAJOR_ONLY_PKGS" >> "$GITHUB_OUTPUT"
+        echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
 
         # Store full JSON output (use delimiter for multiline)
         {
@@ -147,7 +157,6 @@ runs:
           echo "EOF"
         } >> "$GITHUB_OUTPUT"
 
-        # Output raw JSON and summary
-        echo "$JSON_OUTPUT"
+        # Output summary (JSON was already streamed via tee)
         echo ""
         echo "Update check complete: $SUMMARY"

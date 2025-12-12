@@ -1,4 +1,4 @@
-# Auto Update Workflow
+# GoUpdate - Auto Update Workflow
 # Automated dependency updates via PR to staging branch
 #
 # Triggers:
@@ -6,39 +6,29 @@
 #   - Manual dispatch: check-only or update mode
 #
 # Flow:
-#   1. Check for dependency updates
-#   2. Apply updates and run tests
-#   3. Create PR to stage branch
-#   4. If AUTO_MERGE_UPDATES is true: wait for checks, merge PR
-#      (release workflow triggers automatically on push to stage)
-#   5. If AUTO_MERGE_UPDATES is false: leave PR for manual review
-#
-# Reusable actions (copy to other Go projects):
-#   - _go-setup: Go environment with caching
-#   - _go-test: Run Go tests
-#   - _goupdate-install: Install goupdate binary
-#   - _goupdate-check: Check for dependency updates
-#   - _goupdate-update: Apply dependency updates
-#   - _gh-pr: Create PRs with auto-merge
+#   1. Scan repository for package managers
+#   2. Check for dependency updates
+#   3. Apply updates and run tests
+#   4. Create PR to target branch
+#   5. If AUTO_MERGE_UPDATES is true: wait for checks, merge PR
+#   6. If AUTO_MERGE_UPDATES is false: leave PR for manual review
 #
 # Configuration (modify in env section below):
-#   - GO_VERSION: Go version to use
-#   - UPDATE_BRANCH_NAME: Branch name for dependency updates
-#   - UPDATE_TARGET_BRANCH: Branch to merge updates into (stage)
+#   - DEFAULT_BRANCH: Repository default branch (main/master)
+#   - BRANCH_PREFIX: Prefix for update branches (goupdate)
+#   - UPDATE_TARGET_BRANCH: Branch to merge updates into
 #   - AUTO_MERGE_UPDATES: Enable auto-merge for update PRs
-#   - DELETE_BRANCH_ON_MERGE: Delete update branch after merge
+#   - *_VERSION: Runtime versions
 #   - PR_TITLE: PR title template (use {date} and {type} placeholders)
 #   - COMMIT_MESSAGE: Commit message template
-#   - EXCLUDE_PACKAGES: Packages to skip updating
+#
+# Package exclusion and rules are configured in .goupdate.yml
 
-name: Auto Update
+name: GoUpdate - Auto Update
 
 on:
-  # Weekly check on Monday at 00:00 UTC
   schedule:
-    - cron: '0 0 * * 1'
-
-  # Manual trigger with multiple modes
+    - cron: '0 0 * * 1'  # Weekly on Monday
   workflow_dispatch:
     inputs:
       mode:
@@ -47,8 +37,8 @@ on:
         default: 'update'
         type: choice
         options:
-          - check-only   # Just check for updates, no changes
-          - update       # Check + apply updates + create PR
+          - check-only
+          - update
       update-type:
         description: 'Dependency update type'
         required: false
@@ -58,7 +48,6 @@ on:
           - minor
           - patch
 
-# Prevent concurrent runs on same branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
@@ -67,16 +56,27 @@ concurrency:
 # CONFIGURATION - Modify for your project
 # ============================================================================
 env:
-  GO_VERSION: '1.24'
-  UPDATE_BRANCH_NAME: 'goupdate/auto-update-minor'
+  GOUPDATE_REPO: 'ajxudir/goupdate'
+
+  # Branches
+  DEFAULT_BRANCH: 'main'
+  BRANCH_PREFIX: 'goupdate'
   UPDATE_TARGET_BRANCH: 'stage'
+
+  # Auto-merge
   AUTO_MERGE_UPDATES: 'true'
-  DELETE_BRANCH_ON_MERGE: 'true'
-  # PR title template - use {date} for current date, {type} for update type (minor/patch/all)
+
+  # Runtime Versions (used when package managers are detected)
+  NODE_VERSION: '20'
+  PHP_VERSION: '8.2'
+  PYTHON_VERSION: '3.12'
+  GO_VERSION: '1.24'
+  DOTNET_VERSION: '8.0'
+
+  # PR title template - use {date} for current date, {type} for update type (minor/patch)
   PR_TITLE: 'GoUpdate: Auto update - {type} ({date})'
   # Commit message template - supports {date} and {type} placeholders
   COMMIT_MESSAGE: 'GoUpdate: Auto update - {type} ({date})'
-  EXCLUDE_PACKAGES: ''
 
 permissions:
   contents: write
@@ -85,18 +85,25 @@ permissions:
 
 jobs:
   # ============================================================================
-  # Prepare - Determine what actions to take based on trigger
+  # Prepare - Scan repository and determine what actions to take
   # ============================================================================
   prepare:
     name: Prepare
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 5
     outputs:
       run-dependency-check: ${{ steps.config.outputs.run_dependency_check }}
       run-updates: ${{ steps.config.outputs.run_updates }}
       check-only: ${{ steps.config.outputs.check_only }}
       update-type: ${{ steps.config.outputs.update_type }}
       auto-merge-updates: ${{ steps.config.outputs.auto_merge_updates }}
+      update-branch-name: ${{ steps.config.outputs.update_branch_name }}
+      rules: ${{ steps.scan.outputs.rules }}
+      use-node: ${{ steps.scan.outputs.use_node }}
+      use-php: ${{ steps.scan.outputs.use_php }}
+      use-python: ${{ steps.scan.outputs.use_python }}
+      use-go: ${{ steps.scan.outputs.use_go }}
+      use-dotnet: ${{ steps.scan.outputs.use_dotnet }}
 
     steps:
       - name: Validate GitHub App credentials
@@ -105,15 +112,75 @@ jobs:
           HAS_APP_PRIVATE_KEY: ${{ secrets.GOUPDATE_APP_PRIVATE_KEY != '' }}
         run: |
           if [ "$HAS_APP_ID" != "true" ] || [ "$HAS_APP_PRIVATE_KEY" != "true" ]; then
-            echo "::error::GitHub App credentials required. Add GOUPDATE_APP_ID and GOUPDATE_APP_PRIVATE_KEY secrets."
-            echo "See: https://github.com/${{ github.repository }}#github-app-setup-required-for-auto-update"
+            echo "::error::GoUpdate: GitHub App credentials required"
+            echo ""
+            echo "To enable auto-merge, configure these repository secrets:"
+            echo "  - GOUPDATE_APP_ID"
+            echo "  - GOUPDATE_APP_PRIVATE_KEY"
+            echo ""
+            echo "See: https://github.com/${{ github.repository }}#github-app-setup"
             exit 1
           fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEFAULT_BRANCH }}
+
+      - name: Install goupdate
+        uses: ./.github/actions/_goupdate-install
+        with:
+          goupdate-repo: ${{ env.GOUPDATE_REPO }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan for package managers
+        id: scan
+        run: |
+          echo "Scanning repository for package managers..."
+          SCAN_OUTPUT=$(goupdate scan --output json 2>/dev/null || echo '{"files":[]}')
+          echo "Scan output: $SCAN_OUTPUT"
+
+          # Extract rules as comma-separated list from files array
+          RULES=$(echo "$SCAN_OUTPUT" | jq -r '.files // [] | map(.rule) | unique | join(",")')
+          echo "Detected rules: $RULES"
+          echo "rules=$RULES" >> $GITHUB_OUTPUT
+
+          # Determine required runtimes based on detected rules
+          USE_NODE="false"
+          USE_PHP="false"
+          USE_PYTHON="false"
+          USE_GO="false"
+          USE_DOTNET="false"
+
+          if echo "$RULES" | grep -qE "(npm|yarn|pnpm)"; then
+            USE_NODE="true"
+          fi
+          if echo "$RULES" | grep -q "composer"; then
+            USE_PHP="true"
+          fi
+          if echo "$RULES" | grep -qE "(requirements|pipfile)"; then
+            USE_PYTHON="true"
+          fi
+          if echo "$RULES" | grep -q "mod"; then
+            USE_GO="true"
+          fi
+          if echo "$RULES" | grep -q "nuget"; then
+            USE_DOTNET="true"
+          fi
+
+          echo "use_node=$USE_NODE" >> $GITHUB_OUTPUT
+          echo "use_php=$USE_PHP" >> $GITHUB_OUTPUT
+          echo "use_python=$USE_PYTHON" >> $GITHUB_OUTPUT
+          echo "use_go=$USE_GO" >> $GITHUB_OUTPUT
+          echo "use_dotnet=$USE_DOTNET" >> $GITHUB_OUTPUT
+
+          echo "Runtime detection: node=$USE_NODE, php=$USE_PHP, python=$USE_PYTHON, go=$USE_GO, dotnet=$USE_DOTNET"
 
       - name: Determine actions
         id: config
         env:
           AUTO_MERGE: ${{ env.AUTO_MERGE_UPDATES }}
+          BRANCH_PREFIX: ${{ env.BRANCH_PREFIX }}
         run: |
           EVENT="${{ github.event_name }}"
           MODE="${{ github.event.inputs.mode }}"
@@ -130,26 +197,23 @@ jobs:
               echo "run_updates=true" >> $GITHUB_OUTPUT
               echo "check_only=false" >> $GITHUB_OUTPUT
               echo "update_type=minor" >> $GITHUB_OUTPUT
+              echo "update_branch_name=${BRANCH_PREFIX}/auto-update-minor" >> $GITHUB_OUTPUT
               ;;
             workflow_dispatch)
+              UTYPE="${UPDATE_TYPE:-minor}"
+              echo "update_branch_name=${BRANCH_PREFIX}/auto-update-${UTYPE}" >> $GITHUB_OUTPUT
               case "$MODE" in
                 check-only)
                   echo "run_dependency_check=true" >> $GITHUB_OUTPUT
                   echo "run_updates=false" >> $GITHUB_OUTPUT
                   echo "check_only=true" >> $GITHUB_OUTPUT
-                  echo "update_type=${UPDATE_TYPE:-minor}" >> $GITHUB_OUTPUT
+                  echo "update_type=$UTYPE" >> $GITHUB_OUTPUT
                   ;;
-                update)
+                update|*)
                   echo "run_dependency_check=true" >> $GITHUB_OUTPUT
                   echo "run_updates=true" >> $GITHUB_OUTPUT
                   echo "check_only=false" >> $GITHUB_OUTPUT
-                  echo "update_type=${UPDATE_TYPE:-minor}" >> $GITHUB_OUTPUT
-                  ;;
-                *)
-                  echo "run_dependency_check=true" >> $GITHUB_OUTPUT
-                  echo "run_updates=true" >> $GITHUB_OUTPUT
-                  echo "check_only=false" >> $GITHUB_OUTPUT
-                  echo "update_type=${UPDATE_TYPE:-minor}" >> $GITHUB_OUTPUT
+                  echo "update_type=$UTYPE" >> $GITHUB_OUTPUT
                   ;;
               esac
               ;;
@@ -168,57 +232,71 @@ jobs:
       has-updates: ${{ steps.goupdate.outputs.has-updates }}
       has-major-only: ${{ steps.goupdate.outputs.has-major-only }}
       summary: ${{ steps.goupdate.outputs.summary }}
-      major-packages: ${{ steps.goupdate.outputs.major-packages }}
       outdated-output: ${{ steps.goupdate.outputs.outdated-output }}
 
     steps:
-      - name: Checkout main first
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ env.DEFAULT_BRANCH }}
           fetch-depth: 0
 
       - name: Ensure target branch exists
         uses: ./.github/actions/_git-branch
         with:
           branch: ${{ env.UPDATE_TARGET_BRANCH }}
-          base: main
+          base: ${{ env.DEFAULT_BRANCH }}
           create-if-missing: 'true'
           push: 'true'
 
-      - name: Setup Go
-        uses: ./.github/actions/_go-setup
+      # Setup runtimes based on scan results
+      - name: Setup runtimes
+        uses: ./.github/actions/_gh-runtimes
         with:
+          use-node: ${{ needs.prepare.outputs.use-node }}
+          use-php: ${{ needs.prepare.outputs.use-php }}
+          use-python: ${{ needs.prepare.outputs.use-python }}
+          use-go: ${{ needs.prepare.outputs.use-go }}
+          use-dotnet: ${{ needs.prepare.outputs.use-dotnet }}
+          node-version: ${{ env.NODE_VERSION }}
+          php-version: ${{ env.PHP_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
           go-version: ${{ env.GO_VERSION }}
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Install goupdate
         uses: ./.github/actions/_goupdate-install
+        with:
+          goupdate-repo: ${{ env.GOUPDATE_REPO }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check for updates
         id: goupdate
         uses: ./.github/actions/_goupdate-check
-        with:
-          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
+
+      - name: Generate job summary
+        env:
+          SUMMARY: ${{ steps.goupdate.outputs.summary }}
+        run: |
+          echo "## GoUpdate - Check Updates" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Update check complete: $SUMMARY" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail on major-only updates
         if: steps.goupdate.outputs.has-major-only == 'true' && steps.goupdate.outputs.has-updates == 'false'
         env:
           SUMMARY: ${{ steps.goupdate.outputs.summary }}
-          MAJOR_PACKAGES: ${{ steps.goupdate.outputs.major-packages }}
         run: |
-          echo "::error::Only major updates available - no minor/patch updates to apply automatically"
+          echo "::error::GoUpdate: Only major updates available"
           echo ""
-          echo "=== MAJOR UPDATES REQUIRE MANUAL REVIEW ==="
+          echo "════════════════════════════════════════════════════════════════"
+          echo "⚠️  MAJOR UPDATES REQUIRE MANUAL REVIEW"
+          echo "════════════════════════════════════════════════════════════════"
           echo ""
-          echo "The following packages have ONLY major version updates available:"
-          echo "$MAJOR_PACKAGES" | tr ' ' '\n' | sed '/^$/d' | sed 's/^/  - /'
-          echo ""
-          echo "Summary: $SUMMARY"
-          echo ""
-          echo "To resolve:"
-          echo "  1. Review the changelogs for breaking changes"
+          echo "Major updates may contain breaking changes. To resolve:"
+          echo "  1. Review changelogs for breaking changes"
           echo "  2. Update packages manually, or"
-          echo "  3. Add packages to EXCLUDE_PACKAGES to skip them"
+          echo "  3. Add to .goupdate.yml exclude section"
           echo ""
           exit 1
 
@@ -242,44 +320,54 @@ jobs:
       pr-number: ${{ steps.pr.outputs.pr-number }}
 
     steps:
-      - name: Checkout main first
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ env.DEFAULT_BRANCH }}
           fetch-depth: 0
 
       - name: Ensure target branch exists
         uses: ./.github/actions/_git-branch
         with:
           branch: ${{ env.UPDATE_TARGET_BRANCH }}
-          base: main
+          base: ${{ env.DEFAULT_BRANCH }}
           create-if-missing: 'true'
           push: 'true'
 
-      - name: Setup Go
-        uses: ./.github/actions/_go-setup
+      # Setup runtimes based on scan results
+      - name: Setup runtimes
+        uses: ./.github/actions/_gh-runtimes
         with:
+          use-node: ${{ needs.prepare.outputs.use-node }}
+          use-php: ${{ needs.prepare.outputs.use-php }}
+          use-python: ${{ needs.prepare.outputs.use-python }}
+          use-go: ${{ needs.prepare.outputs.use-go }}
+          use-dotnet: ${{ needs.prepare.outputs.use-dotnet }}
+          node-version: ${{ env.NODE_VERSION }}
+          php-version: ${{ env.PHP_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
           go-version: ${{ env.GO_VERSION }}
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Create update branch
         uses: ./.github/actions/_git-branch
         with:
-          branch: ${{ env.UPDATE_BRANCH_NAME }}
+          branch: ${{ needs.prepare.outputs.update-branch-name }}
           base: ${{ env.UPDATE_TARGET_BRANCH }}
           delete-remote: 'true'
           push: 'false'
 
       - name: Install goupdate
         uses: ./.github/actions/_goupdate-install
+        with:
+          goupdate-repo: ${{ env.GOUPDATE_REPO }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Apply updates
         id: goupdate
         uses: ./.github/actions/_goupdate-update
         with:
           update-type: ${{ needs.prepare.outputs.update-type }}
-          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
-          # System tests run via .goupdate.yml config (after_each mode)
-          # No separate test step needed - goupdate handles testing
 
       - name: Generate messages
         id: messages
@@ -304,13 +392,14 @@ jobs:
       - name: Commit and push changes
         if: steps.goupdate.outputs.has-changes == 'true'
         env:
-          UPDATED_PKGS: ${{ steps.goupdate.outputs.updated-packages }}
+          UPDATE_OUTPUT: ${{ steps.goupdate.outputs.update-output }}
           COMMIT_MSG: ${{ steps.messages.outputs.commit_msg }}
+          UPDATE_BRANCH: ${{ needs.prepare.outputs.update-branch-name }}
         run: |
-          # Convert space-separated package list to bullet points
-          FORMATTED_PKGS=$(echo "$UPDATED_PKGS" | tr ' ' '\n' | sed '/^$/d' | sed 's/^/- /')
+          # Extract package versions from update output (format: "package v1.0.0 → v2.0.0")
+          FORMATTED_PKGS=$(echo "$UPDATE_OUTPUT" | grep -E "^\s+\S+\s+v?[0-9]" | sed 's/^[[:space:]]*/- /' | head -20)
 
-          git add go.mod go.sum
+          git add -A
           git commit -m "$(cat <<EOF
           $COMMIT_MSG
 
@@ -318,7 +407,7 @@ jobs:
           $FORMATTED_PKGS
           EOF
           )"
-          git push -u origin "${{ env.UPDATE_BRANCH_NAME }}"
+          git push -u origin "$UPDATE_BRANCH"
 
       - name: Generate GitHub App token
         id: app-token
@@ -336,16 +425,14 @@ jobs:
         run: |
           {
             echo "body<<PR_BODY_EOF_7e3c1a"
-            echo "## Automated Dependency Update"
-            echo ""
-            echo "This PR was automatically created by the dependency update workflow."
+            echo "## GoUpdate - Automated Dependency Update"
             echo ""
             echo '```'
             echo "$UPDATE_OUTPUT"
             echo '```'
             echo ""
             echo "---"
-            echo "*Created by [GoUpdate](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})*"
+            echo "*Created by GoUpdate*"
             echo "PR_BODY_EOF_7e3c1a"
           } >> $GITHUB_OUTPUT
 
@@ -358,18 +445,35 @@ jobs:
           title: ${{ steps.messages.outputs.pr_title }}
           body: ${{ steps.pr-body.outputs.body }}
           base: ${{ env.UPDATE_TARGET_BRANCH }}
-          head: ${{ env.UPDATE_BRANCH_NAME }}
-          # Don't use GitHub's native auto-merge - it merges immediately if no branch protection
-          # Instead, the merge-pr job waits for checks to pass and merges explicitly
+          head: ${{ needs.prepare.outputs.update-branch-name }}
           auto-merge: 'false'
           merge-method: 'squash'
           delete-branch: 'false'
 
+      - name: Generate job summary
+        if: steps.goupdate.outputs.has-changes == 'true'
+        env:
+          PR_URL: ${{ steps.pr.outputs.pr-url }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr-number }}
+          UPDATE_BRANCH: ${{ needs.prepare.outputs.update-branch-name }}
+          TARGET_BRANCH: ${{ env.UPDATE_TARGET_BRANCH }}
+          UPDATE_OUTPUT: ${{ steps.goupdate.outputs.update-output }}
+        run: |
+          {
+            echo "## GoUpdate - Apply Updates"
+            echo ""
+            echo "### PR Created"
+            echo "- **PR:** [#$PR_NUMBER]($PR_URL)"
+            echo "- **Branch:** \`$UPDATE_BRANCH\` → \`$TARGET_BRANCH\`"
+            echo ""
+            echo '```'
+            echo "$UPDATE_OUTPUT"
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+
   # ============================================================================
   # Wait for PR checks and merge
   # ============================================================================
-  # This job waits for PR checks to pass then merges the PR.
-  # The release workflow triggers automatically on push to stage branch.
   merge-pr:
     name: Merge PR
     needs: [prepare, apply-updates]
@@ -403,13 +507,7 @@ jobs:
         run: |
           echo "Waiting for PR #$PR_NUMBER checks to pass before merging..."
           echo ""
-          echo "This workflow waits for all CI checks to complete before merging."
-          echo "This ensures PRs are never merged while checks are still running."
-          echo ""
-          echo "Using GitHub App token for authentication"
-          echo ""
 
-          # Poll for PR status (max ~7.5 minutes with 30s intervals)
           MAX_ATTEMPTS=15
           ATTEMPT=0
           CHECKS_COMPLETE=false
@@ -418,14 +516,9 @@ jobs:
             ATTEMPT=$((ATTEMPT + 1))
             echo "═══════════════════════════════════════════════════════════════"
             echo "Checking PR status (attempt $ATTEMPT/$MAX_ATTEMPTS)..."
-            echo ""
 
-            # Get PR state using REST API
-            echo "Fetching PR #$PR_NUMBER data..."
             if ! PR_DATA=$(gh api "repos/$REPO/pulls/$PR_NUMBER" 2>&1); then
-              echo ""
-              echo "❌ Failed to fetch PR data: $PR_DATA"
-              echo "Retrying in 30 seconds..."
+              echo "Failed to fetch PR data, retrying..."
               sleep 30
               continue
             fi
@@ -434,9 +527,6 @@ jobs:
             MERGED=$(echo "$PR_DATA" | jq -r '.merged')
             HEAD_SHA=$(echo "$PR_DATA" | jq -r '.head.sha')
 
-            echo "PR state: $STATE, merged: $MERGED, head SHA: ${HEAD_SHA:0:7}"
-
-            # Check if already merged
             if [ "$MERGED" = "true" ]; then
               echo "✅ PR #$PR_NUMBER has been merged!"
               echo "merged=true" >> $GITHUB_OUTPUT
@@ -444,7 +534,6 @@ jobs:
               exit 0
             fi
 
-            # Check if closed without merging
             if [ "$STATE" = "closed" ]; then
               echo "❌ PR #$PR_NUMBER was closed without merging"
               echo "merged=false" >> $GITHUB_OUTPUT
@@ -452,14 +541,8 @@ jobs:
               exit 1
             fi
 
-            # Check status of CI checks using REST API for check-runs
             if [ "$CHECKS_COMPLETE" = "false" ]; then
-              echo ""
-              echo "Fetching check runs for commit ${HEAD_SHA:0:7}..."
               if ! CHECKS_JSON=$(gh api "repos/$REPO/commits/$HEAD_SHA/check-runs" 2>&1); then
-                echo ""
-                echo "❌ Failed to fetch check runs: $CHECKS_JSON"
-                echo "Retrying in 30 seconds..."
                 sleep 30
                 continue
               fi
@@ -467,85 +550,66 @@ jobs:
               if echo "$CHECKS_JSON" | jq -e '.check_runs' > /dev/null 2>&1; then
                 TOTAL_CHECKS=$(echo "$CHECKS_JSON" | jq '.total_count')
                 PENDING=$(echo "$CHECKS_JSON" | jq '[.check_runs[] | select(.status != "completed")] | length')
-                SUCCESSFUL=$(echo "$CHECKS_JSON" | jq '[.check_runs[] | select(.status == "completed" and (.conclusion == "success" or .conclusion == "skipped" or .conclusion == "neutral"))] | length')
-                FAILED=$(echo "$CHECKS_JSON" | jq '[.check_runs[] | select(.status == "completed" and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .conclusion == "startup_failure"))] | length')
+                FAILED=$(echo "$CHECKS_JSON" | jq '[.check_runs[] | select(.status == "completed" and (.conclusion == "failure" or .conclusion == "cancelled"))] | length')
 
-                echo "Check runs: $TOTAL_CHECKS total, $PENDING pending, $SUCCESSFUL successful, $FAILED failed"
+                echo "Check runs: $TOTAL_CHECKS total, $PENDING pending, $FAILED failed"
 
-                # If any check failed, fail the workflow
                 if [ "$FAILED" -gt 0 ]; then
-                  echo ""
-                  echo "❌ PR checks failed! Auto-merge will not proceed."
-                  echo ""
-                  echo "Failed checks:"
-                  echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status == "completed" and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .conclusion == "startup_failure")) | "  - \(.name): \(.conclusion)"'
-                  echo ""
+                  echo "❌ PR checks failed!"
                   echo "merged=false" >> $GITHUB_OUTPUT
                   echo "checks_passed=false" >> $GITHUB_OUTPUT
                   exit 1
                 fi
 
-                # If all checks completed successfully (none pending)
                 if [ "$PENDING" -eq 0 ] && [ "$TOTAL_CHECKS" -gt 0 ]; then
-                  echo ""
                   echo "✅ All PR checks passed!"
                   CHECKS_COMPLETE=true
                   echo "checks_passed=true" >> $GITHUB_OUTPUT
 
-                  echo "Attempting to merge PR #$PR_NUMBER..."
-                  MERGE_OUTPUT=$(gh pr merge "$PR_NUMBER" --squash --delete-branch 2>&1)
-                  MERGE_EXIT_CODE=$?
-                  if [ $MERGE_EXIT_CODE -eq 0 ]; then
+                  if gh pr merge "$PR_NUMBER" --squash --delete-branch 2>&1; then
                     echo "✅ PR #$PR_NUMBER merged successfully!"
                     echo "merged=true" >> $GITHUB_OUTPUT
                     exit 0
-                  else
-                    echo "Merge command returned exit code $MERGE_EXIT_CODE"
-                    echo "Output: $MERGE_OUTPUT"
-                    echo "Waiting for GitHub to complete merge..."
-                    # Continue polling to confirm merge completed
                   fi
                 elif [ "$TOTAL_CHECKS" -eq 0 ]; then
-                  # No checks found, proceed with merge
-                  echo ""
                   echo "No CI checks configured, proceeding with merge..."
                   CHECKS_COMPLETE=true
                   echo "checks_passed=true" >> $GITHUB_OUTPUT
 
-                  echo "Attempting to merge PR #$PR_NUMBER..."
-                  MERGE_OUTPUT=$(gh pr merge "$PR_NUMBER" --squash --delete-branch 2>&1)
-                  MERGE_EXIT_CODE=$?
-                  if [ $MERGE_EXIT_CODE -eq 0 ]; then
+                  if gh pr merge "$PR_NUMBER" --squash --delete-branch 2>&1; then
                     echo "✅ PR #$PR_NUMBER merged successfully!"
                     echo "merged=true" >> $GITHUB_OUTPUT
                     exit 0
-                  else
-                    echo "Merge failed with exit code $MERGE_EXIT_CODE: $MERGE_OUTPUT"
                   fi
-                else
-                  echo "Waiting for $PENDING checks to complete..."
                 fi
-              else
-                echo ""
-                echo "❌ Failed to parse check runs response"
-                echo "Raw response (first 50 lines):"
-                echo "---"
-                echo "$CHECKS_JSON" | head -50
-                echo "---"
-                echo ""
-                echo "Retrying..."
               fi
             fi
 
-            # Wait 30 seconds before next check
             sleep 30
           done
 
-          echo ""
-          echo "❌ Timeout waiting for PR to merge (~7.5 minutes)"
+          echo "❌ Timeout waiting for PR to merge"
           echo "merged=false" >> $GITHUB_OUTPUT
           echo "checks_passed=false" >> $GITHUB_OUTPUT
           exit 1
+
+      - name: Generate job summary
+        if: always()
+        env:
+          PR_URL: ${{ needs.apply-updates.outputs.pr-url }}
+          PR_NUMBER: ${{ needs.apply-updates.outputs.pr-number }}
+          MERGED: ${{ steps.wait-merge.outputs.merged }}
+        run: |
+          {
+            echo "## GoUpdate - Merge PR"
+            echo ""
+            echo "- **PR:** [#$PR_NUMBER]($PR_URL)"
+            if [ "$MERGED" = "true" ]; then
+              echo "- **Status:** ✅ Merged"
+            else
+              echo "- **Status:** ❌ Not merged"
+            fi
+          } >> $GITHUB_STEP_SUMMARY
 
   # ============================================================================
   # Summary
@@ -562,19 +626,17 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           MODE: ${{ github.event.inputs.mode }}
-          HAS_UPDATES: ${{ needs.check-updates.outputs.has-updates }}
           CHECK_SUMMARY: ${{ needs.check-updates.outputs.summary }}
           UPDATE_OUTPUT: ${{ needs.apply-updates.outputs.update-output }}
-          UPDATED_COUNT: ${{ needs.apply-updates.outputs.updated-count }}
           PR_URL: ${{ needs.apply-updates.outputs.pr-url }}
           PR_NUMBER: ${{ needs.apply-updates.outputs.pr-number }}
           CHECK_RESULT: ${{ needs.check-updates.result }}
           APPLY_RESULT: ${{ needs.apply-updates.result }}
-          MERGE_RESULT: ${{ needs.merge-pr.result }}
           PR_MERGED: ${{ needs.merge-pr.outputs.merged }}
           AUTO_MERGE_ENABLED: ${{ needs.prepare.outputs.auto-merge-updates }}
+          TARGET_BRANCH: ${{ env.UPDATE_TARGET_BRANCH }}
         run: |
-          echo "## 🔄 Auto Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## GoUpdate - Auto Update Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Trigger:** $EVENT" >> $GITHUB_STEP_SUMMARY
           if [ -n "$MODE" ]; then
@@ -584,14 +646,14 @@ jobs:
 
           # PR info if created
           if [ -n "$PR_URL" ]; then
-            echo "### 📋 Pull Request" >> $GITHUB_STEP_SUMMARY
-            echo "**PR:** [#$PR_NUMBER]($PR_URL)" >> $GITHUB_STEP_SUMMARY
+            echo "### Pull Request" >> $GITHUB_STEP_SUMMARY
+            echo "- **PR:** [#$PR_NUMBER]($PR_URL)" >> $GITHUB_STEP_SUMMARY
             if [ "$AUTO_MERGE_ENABLED" = "true" ]; then
               if [ "$PR_MERGED" = "true" ]; then
-                echo "**Status:** ✅ Merged (release workflow triggers automatically)" >> $GITHUB_STEP_SUMMARY
+                echo "- **Status:** ✅ Merged" >> $GITHUB_STEP_SUMMARY
               fi
             else
-              echo "**Status:** 📝 Awaiting manual review" >> $GITHUB_STEP_SUMMARY
+              echo "- **Status:** Awaiting manual review" >> $GITHUB_STEP_SUMMARY
             fi
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
@@ -608,29 +670,7 @@ jobs:
           if [ "$APPLY_RESULT" = "success" ] && [ -n "$UPDATE_OUTPUT" ]; then
             echo "### Apply Updates" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
             echo "$UPDATE_OUTPUT" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # What happens next - show only when PR was merged
-          if [ "$PR_MERGED" = "true" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### 📝 What Happens Next" >> $GITHUB_STEP_SUMMARY
-            echo "The PR was merged to \`stage\`. A prerelease will be created for testing." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "When ready for stable release:" >> $GITHUB_STEP_SUMMARY
-            echo "1. Merge \`stage\` → \`main\`" >> $GITHUB_STEP_SUMMARY
-            echo "2. Create a release using one of these methods:" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Option A: Command Line**" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-            echo "git tag v1.2.3 && git push origin v1.2.3" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Option B: GitHub UI**" >> $GITHUB_STEP_SUMMARY
-            echo "1. Go to **Releases** → **Create a new release**" >> $GITHUB_STEP_SUMMARY
-            echo "2. Click **Choose a tag** → type version (e.g., \`v1.2.3\`) → **Create new tag**" >> $GITHUB_STEP_SUMMARY
-            echo "3. Set **Target** to \`main\` and check **Set as the latest release**" >> $GITHUB_STEP_SUMMARY
-            echo "4. Click **Publish release**" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
           fi
