@@ -422,15 +422,28 @@ func parseLockCommandJSON(output []byte, extraction *config.LockCommandExtractio
 	results := make(map[string]string)
 
 	// Try object format first: {"package-name": "version", ...}
+	// Skip this format if any value is a nested object/array (indicates complex format like yarn/npm)
 	var objFormat map[string]interface{}
 	if err := json.Unmarshal(output, &objFormat); err == nil {
-		for name, val := range objFormat {
-			if version, ok := val.(string); ok && version != "" {
-				results[name] = version
+		hasNestedStructures := false
+		for _, val := range objFormat {
+			switch val.(type) {
+			case map[string]interface{}, []interface{}:
+				hasNestedStructures = true
+			}
+			if hasNestedStructures {
+				break
 			}
 		}
-		if len(results) > 0 {
-			return results, nil
+		if !hasNestedStructures && len(objFormat) > 0 {
+			for name, val := range objFormat {
+				if version, ok := val.(string); ok && version != "" {
+					results[name] = version
+				}
+			}
+			if len(results) > 0 {
+				return results, nil
+			}
 		}
 	}
 
@@ -487,6 +500,22 @@ func parseLockCommandJSON(output []byte, extraction *config.LockCommandExtractio
 								cleanName = name
 							}
 							results[cleanName] = version
+						}
+					}
+				}
+			}
+		}
+		// Check for yarn list format: {"type":"tree","data":{"trees":[{"name":"pkg@version"}]}}
+		if data, ok := nestedFormat["data"].(map[string]interface{}); ok {
+			if trees, ok := data["trees"].([]interface{}); ok {
+				for _, tree := range trees {
+					if treeObj, ok := tree.(map[string]interface{}); ok {
+						if nameAtVersion, ok := treeObj["name"].(string); ok && nameAtVersion != "" {
+							// Parse "package@version" or "@scope/package@version" format
+							name, version := parseYarnNameVersion(nameAtVersion)
+							if name != "" && version != "" {
+								results[name] = version
+							}
 						}
 					}
 				}
@@ -591,4 +620,48 @@ func normalizeLockPackageName(name, alt string) string {
 	resolved = strings.TrimSuffix(resolved, "/go.mod")
 
 	return resolved
+}
+
+// parseYarnNameVersion parses yarn's "name@version" format into separate name and version.
+//
+// It handles both regular packages and scoped packages:
+//   - "lodash@4.17.21" -> ("lodash", "4.17.21")
+//   - "@babel/core@7.26.0" -> ("@babel/core", "7.26.0")
+//   - "@vue/reactivity@3.5.13" -> ("@vue/reactivity", "3.5.13")
+//
+// Parameters:
+//   - nameAtVersion: Combined name@version string from yarn list output
+//
+// Returns:
+//   - string: Package name
+//   - string: Package version
+func parseYarnNameVersion(nameAtVersion string) (string, string) {
+	if nameAtVersion == "" {
+		return "", ""
+	}
+
+	// Handle scoped packages: @scope/package@version
+	// Find the last @ that's not at position 0 (which would be a scope)
+	lastAt := strings.LastIndex(nameAtVersion, "@")
+	if lastAt <= 0 {
+		// No @ found or @ is at position 0 (just a scope, no version)
+		return nameAtVersion, ""
+	}
+
+	// Check if this @ is part of a scoped package name
+	// If there's a / before the last @, and the string starts with @, we need to be careful
+	if strings.HasPrefix(nameAtVersion, "@") {
+		// Scoped package: @scope/package@version
+		// Find the @ after the scope (after the /)
+		slashIdx := strings.Index(nameAtVersion, "/")
+		if slashIdx > 0 && lastAt > slashIdx {
+			// The last @ is after the /, so it's the version separator
+			return nameAtVersion[:lastAt], nameAtVersion[lastAt+1:]
+		}
+		// The @ is part of the scope, no version found
+		return nameAtVersion, ""
+	}
+
+	// Regular package: package@version
+	return nameAtVersion[:lastAt], nameAtVersion[lastAt+1:]
 }

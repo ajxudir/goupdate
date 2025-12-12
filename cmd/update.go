@@ -245,7 +245,6 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		// Print header and process with live output
-		fmt.Println()
 		fmt.Println(table.HeaderRow())
 		fmt.Println(table.SeparatorRow())
 		_ = os.Stdout.Sync()
