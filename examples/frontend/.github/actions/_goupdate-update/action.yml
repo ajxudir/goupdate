@@ -1,25 +1,19 @@
 # Goupdate Update Action
 # Applies dependency updates for any supported package manager
+# Uses .goupdate.yml config for rule detection and package exclusion
 
 name: 'Goupdate Update'
-description: 'Apply dependency updates'
+description: 'Apply dependency updates using .goupdate.yml config'
 
 inputs:
   working-directory:
-    description: 'Working directory containing dependency files'
+    description: 'Working directory containing .goupdate.yml config'
     required: false
     default: '.'
-  rule:
-    description: 'Package manager rule to use (e.g., composer, npm, mod)'
-    required: true
   update-type:
-    description: 'Type of updates: none (use constraints), patch, minor, or all (includes major)'
+    description: 'Type of updates: none (use constraints), patch, minor, or major'
     required: false
     default: 'minor'
-  exclude-packages:
-    description: 'Packages to skip (comma-separated)'
-    required: false
-    default: ''
   system-test-mode:
     description: 'System test run mode: after_each, after_all, or none'
     required: false
@@ -57,9 +51,7 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
-        RULE: ${{ inputs.rule }}
         UPDATE_TYPE: ${{ inputs.update-type }}
-        EXCLUDE: ${{ inputs.exclude-packages }}
         SYSTEM_TEST_MODE: ${{ inputs.system-test-mode }}
         VERBOSE: ${{ inputs.verbose }}
       run: |
@@ -69,13 +61,8 @@ runs:
           patch) UPDATE_FLAG="--patch" ;;
           minor) UPDATE_FLAG="--minor" ;;
           major) UPDATE_FLAG="--major" ;;
-          all)   UPDATE_FLAG="--major" ;;  # 'all' is alias for major
           none)  UPDATE_FLAG="" ;;
         esac
-
-        # Note: Package exclusion is configured via .goupdate.yml, not CLI flags
-        # The exclude-packages input is kept for documentation but doesn't filter directly
-        # To exclude packages, add them to your .goupdate.yml under rules.<rule>.exclude
 
         # Build system test flag
         TEST_FLAG=""
@@ -89,10 +76,10 @@ runs:
           VERBOSE_FLAG="-v"
         fi
 
-        # Run update with continue-on-fail to see all errors
+        # Run update - goupdate auto-detects rules from .goupdate.yml config
         STDERR_FILE=$(mktemp)
         set +e
-        OUTPUT=$(goupdate update -r "$RULE" $UPDATE_FLAG $TEST_FLAG $VERBOSE_FLAG --continue-on-fail -y 2>"$STDERR_FILE")
+        OUTPUT=$(goupdate update $UPDATE_FLAG $TEST_FLAG $VERBOSE_FLAG --continue-on-fail -y 2>"$STDERR_FILE")
         EXIT_CODE=$?
         set -e
 
@@ -111,7 +98,7 @@ runs:
           echo "::group::Re-running with verbose output for debugging"
           echo "Command failed with exit code $EXIT_CODE. Re-running with verbose mode to show detailed failure information..."
           echo ""
-          goupdate update -r "$RULE" $UPDATE_FLAG $TEST_FLAG -v --continue-on-fail -y --dry-run 2>&1 || true
+          goupdate update $UPDATE_FLAG $TEST_FLAG -v --continue-on-fail -y --dry-run 2>&1 || true
           echo "::endgroup::"
         fi
 

@@ -1,21 +1,15 @@
 # Goupdate Check Action
 # Checks for available dependency updates
+# Uses .goupdate.yml config for rule detection and package exclusion
 
 name: 'Goupdate Check'
-description: 'Check for available dependency updates'
+description: 'Check for available dependency updates using .goupdate.yml config'
 
 inputs:
   working-directory:
-    description: 'Working directory containing dependency files'
+    description: 'Working directory containing .goupdate.yml config'
     required: false
     default: '.'
-  rule:
-    description: 'Package manager rule to use (e.g., composer, npm, mod)'
-    required: true
-  exclude-packages:
-    description: 'Packages to skip (comma-separated)'
-    required: false
-    default: ''
   verbose:
     description: 'Enable verbose output'
     required: false
@@ -43,22 +37,16 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
-        RULE: ${{ inputs.rule }}
-        EXCLUDE: ${{ inputs.exclude-packages }}
         VERBOSE: ${{ inputs.verbose }}
       run: |
-        # Note: Package exclusion is configured via .goupdate.yml, not CLI flags
-        # The exclude-packages input is kept for documentation but doesn't filter directly
-        # To exclude packages, add them to your .goupdate.yml under rules.<rule>.exclude
-
         VERBOSE_FLAG=""
         if [[ "$VERBOSE" == "true" ]]; then
           VERBOSE_FLAG="-v"
         fi
 
-        # Get JSON output
+        # Get JSON output - goupdate auto-detects rules from .goupdate.yml config
         STDERR_FILE=$(mktemp)
-        JSON=$(goupdate outdated -r "$RULE" -o json $VERBOSE_FLAG 2>"$STDERR_FILE") || {
+        JSON=$(goupdate outdated -o json $VERBOSE_FLAG 2>"$STDERR_FILE") || {
           EXIT_CODE=$?
           cat "$STDERR_FILE" >&2
           rm -f "$STDERR_FILE"
@@ -68,7 +56,7 @@ runs:
             echo "::group::Re-running with verbose output for debugging"
             echo "Command failed with exit code $EXIT_CODE. Re-running with verbose mode to show detailed failure information..."
             echo ""
-            goupdate outdated -r "$RULE" -o json -v 2>&1 || true
+            goupdate outdated -o json -v 2>&1 || true
             echo "::endgroup::"
           fi
           exit $EXIT_CODE

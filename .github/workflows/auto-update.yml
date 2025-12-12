@@ -21,7 +21,8 @@
 #   - *_VERSION: Runtime versions
 #   - PR_TITLE: PR title template (use {date} and {type} placeholders)
 #   - COMMIT_MESSAGE: Commit message template
-#   - EXCLUDE_PACKAGES: Packages to skip updating
+#
+# Package exclusion and rules are configured in .goupdate.yml
 
 name: GoUpdate - Auto Update
 
@@ -72,11 +73,10 @@ env:
   GO_VERSION: '1.24'
   DOTNET_VERSION: '8.0'
 
-  # PR title template - use {date} for current date, {type} for update type (minor/patch/all)
+  # PR title template - use {date} for current date, {type} for update type (minor/patch)
   PR_TITLE: 'GoUpdate: Auto update - {type} ({date})'
   # Commit message template - supports {date} and {type} placeholders
   COMMIT_MESSAGE: 'GoUpdate: Auto update - {type} ({date})'
-  EXCLUDE_PACKAGES: ''
 
 permissions:
   contents: write
@@ -250,34 +250,18 @@ jobs:
           push: 'true'
 
       # Setup runtimes based on scan results
-      - name: Setup Node.js
-        if: needs.prepare.outputs.use-node == 'true'
-        uses: actions/setup-node@v4
+      - name: Setup runtimes
+        uses: ./.github/actions/_gh-runtimes
         with:
+          use-node: ${{ needs.prepare.outputs.use-node }}
+          use-php: ${{ needs.prepare.outputs.use-php }}
+          use-python: ${{ needs.prepare.outputs.use-python }}
+          use-go: ${{ needs.prepare.outputs.use-go }}
+          use-dotnet: ${{ needs.prepare.outputs.use-dotnet }}
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Setup PHP
-        if: needs.prepare.outputs.use-php == 'true'
-        uses: shivammathur/setup-php@v2
-        with:
           php-version: ${{ env.PHP_VERSION }}
-
-      - name: Setup Python
-        if: needs.prepare.outputs.use-python == 'true'
-        uses: actions/setup-python@v5
-        with:
           python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Setup Go
-        if: needs.prepare.outputs.use-go == 'true'
-        uses: actions/setup-go@v5
-        with:
           go-version: ${{ env.GO_VERSION }}
-
-      - name: Setup .NET
-        if: needs.prepare.outputs.use-dotnet == 'true'
-        uses: actions/setup-dotnet@v4
-        with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Install goupdate
@@ -289,9 +273,6 @@ jobs:
       - name: Check for updates
         id: goupdate
         uses: ./.github/actions/_goupdate-check
-        with:
-          rule: ${{ needs.prepare.outputs.rules }}
-          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
 
       - name: Generate job summary
         env:
@@ -315,7 +296,7 @@ jobs:
           echo "Major updates may contain breaking changes. To resolve:"
           echo "  1. Review changelogs for breaking changes"
           echo "  2. Update packages manually, or"
-          echo "  3. Add to EXCLUDE_PACKAGES to skip"
+          echo "  3. Add to .goupdate.yml exclude section"
           echo ""
           exit 1
 
@@ -354,34 +335,18 @@ jobs:
           push: 'true'
 
       # Setup runtimes based on scan results
-      - name: Setup Node.js
-        if: needs.prepare.outputs.use-node == 'true'
-        uses: actions/setup-node@v4
+      - name: Setup runtimes
+        uses: ./.github/actions/_gh-runtimes
         with:
+          use-node: ${{ needs.prepare.outputs.use-node }}
+          use-php: ${{ needs.prepare.outputs.use-php }}
+          use-python: ${{ needs.prepare.outputs.use-python }}
+          use-go: ${{ needs.prepare.outputs.use-go }}
+          use-dotnet: ${{ needs.prepare.outputs.use-dotnet }}
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Setup PHP
-        if: needs.prepare.outputs.use-php == 'true'
-        uses: shivammathur/setup-php@v2
-        with:
           php-version: ${{ env.PHP_VERSION }}
-
-      - name: Setup Python
-        if: needs.prepare.outputs.use-python == 'true'
-        uses: actions/setup-python@v5
-        with:
           python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Setup Go
-        if: needs.prepare.outputs.use-go == 'true'
-        uses: actions/setup-go@v5
-        with:
           go-version: ${{ env.GO_VERSION }}
-
-      - name: Setup .NET
-        if: needs.prepare.outputs.use-dotnet == 'true'
-        uses: actions/setup-dotnet@v4
-        with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Create update branch
@@ -402,9 +367,7 @@ jobs:
         id: goupdate
         uses: ./.github/actions/_goupdate-update
         with:
-          rule: ${{ needs.prepare.outputs.rules }}
           update-type: ${{ needs.prepare.outputs.update-type }}
-          exclude-packages: ${{ env.EXCLUDE_PACKAGES }}
 
       - name: Generate messages
         id: messages

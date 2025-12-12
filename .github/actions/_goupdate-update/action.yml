@@ -1,23 +1,21 @@
 # Goupdate Update Action
 # Modular action for applying dependency updates
 # Part of the modular goupdate action suite
+#
+# Uses .goupdate.yml config for rule detection and package exclusion
 
 name: 'Goupdate Update'
-description: 'Apply dependency updates'
+description: 'Apply dependency updates using .goupdate.yml config'
 
 inputs:
   working-directory:
-    description: 'Working directory containing go.mod'
+    description: 'Working directory containing .goupdate.yml config'
     required: false
     default: '.'
   update-type:
-    description: 'Type of updates: none (use constraints), patch, minor, or major (includes all)'
+    description: 'Type of updates: none (use constraints), patch, minor, or major'
     required: false
     default: 'minor'
-  exclude-packages:
-    description: 'Packages to skip (comma-separated)'
-    required: false
-    default: ''
   system-test-mode:
     description: 'System test run mode: after_each, after_all, or none'
     required: false
@@ -32,7 +30,7 @@ outputs:
     description: 'Whether any packages were updated'
     value: ${{ steps.update.outputs.updated }}
   has-changes:
-    description: 'Whether go.mod was modified (alias for updated)'
+    description: 'Whether package files were modified (alias for updated)'
     value: ${{ steps.update.outputs.updated }}
   updated-packages:
     description: 'Space-separated list of updated packages'
@@ -56,7 +54,6 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       env:
         UPDATE_TYPE: ${{ inputs.update-type }}
-        EXCLUDE: ${{ inputs.exclude-packages }}
         SYSTEM_TEST_MODE: ${{ inputs.system-test-mode }}
         VERBOSE: ${{ inputs.verbose }}
       run: |
@@ -66,13 +63,8 @@ runs:
           patch) UPDATE_FLAG="--patch" ;;
           minor) UPDATE_FLAG="--minor" ;;
           major) UPDATE_FLAG="--major" ;;
-          all)   UPDATE_FLAG="--major" ;;  # 'all' is alias for major
           none)  UPDATE_FLAG="" ;;
         esac
-
-        # Note: Package exclusion is configured via .goupdate.yml, not CLI flags
-        # The exclude-packages input is kept for documentation but doesn't filter directly
-        # To exclude packages, add them to your .goupdate.yml under rules.<rule>.exclude
 
         # Build system test flag
         TEST_FLAG=""
@@ -86,13 +78,13 @@ runs:
           VERBOSE_FLAG="-v"
         fi
 
-        # Run update with continue-on-fail to see all errors
+        # Run update - goupdate auto-detects rules from .goupdate.yml config
+        # Package exclusion is also configured in .goupdate.yml
         # Stream output live while capturing to file for later parsing
-        # This ensures developers see progress in real-time
         OUTPUT_FILE=$(mktemp)
         STDERR_FILE=$(mktemp)
         set +e
-        goupdate update -r mod $UPDATE_FLAG $TEST_FLAG $VERBOSE_FLAG --continue-on-fail -y 2>"$STDERR_FILE" | tee "$OUTPUT_FILE"
+        goupdate update $UPDATE_FLAG $TEST_FLAG $VERBOSE_FLAG --continue-on-fail -y 2>"$STDERR_FILE" | tee "$OUTPUT_FILE"
         EXIT_CODE=${PIPESTATUS[0]}
         set -e
         OUTPUT=$(cat "$OUTPUT_FILE")
@@ -114,7 +106,7 @@ runs:
           echo "Command failed with exit code $EXIT_CODE. Re-running with verbose mode..."
           echo "Exit codes: 0=success, 1=partial failure, 2=complete failure, 3=config error"
           echo ""
-          goupdate update -r mod $UPDATE_FLAG $TEST_FLAG --verbose --continue-on-fail -y --dry-run 2>&1 || true
+          goupdate update $UPDATE_FLAG $TEST_FLAG --verbose --continue-on-fail -y --dry-run 2>&1 || true
           echo ""
           echo "════════════════════════════════════════════════════════════════════════"
           echo "End of verbose debug output"
@@ -126,9 +118,9 @@ runs:
         UPDATED_PACKAGES=$(echo "$OUTPUT" | grep -E "🟢 Updated" | awk '{print $NF}' | tr '\n' ' ' | sed 's/ $//' || true)
         UPDATED_COUNT=$(echo "$UPDATED_PACKAGES" | wc -w | tr -d ' ')
 
-        # Determine if updates were applied
+        # Determine if updates were applied by checking git status
         UPDATED="false"
-        if ! git diff --quiet go.mod 2>/dev/null; then
+        if ! git diff --quiet 2>/dev/null; then
           UPDATED="true"
         fi
 
