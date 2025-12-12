@@ -487,3 +487,132 @@ func TestIntegration_NuGet(t *testing.T) {
 	assert.Equal(t, InstallStatusLockFound, statusLookup["Newtonsoft.Json"])
 	assert.Equal(t, InstallStatusLockFound, statusLookup["Serilog"])
 }
+
+// TestIntegration_NPM_LockfileV1 tests npm lockfileVersion 1 (npm 5-6 format).
+//
+// This ensures backwards compatibility with older npm lock files that use the
+// flat "dependencies" object format without the "packages" section.
+func TestIntegration_NPM_LockfileV1(t *testing.T) {
+	testdataDir, err := filepath.Abs("../testdata/npm_v1")
+	require.NoError(t, err, "failed to get absolute path to testdata")
+
+	cfg, err := config.LoadConfig("", testdataDir)
+	require.NoError(t, err)
+
+	parser := packages.NewDynamicParser()
+	rule := cfg.Rules["npm"]
+	result, err := parser.ParseFile(filepath.Join(testdataDir, "package.json"), &rule)
+	require.NoError(t, err)
+
+	for i := range result.Packages {
+		result.Packages[i].Rule = "npm"
+	}
+
+	enriched, err := ApplyInstalledVersions(result.Packages, cfg, testdataDir)
+	require.NoError(t, err)
+
+	// Build lookup for easier assertions
+	lookup := make(map[string]string)
+	statusLookup := make(map[string]string)
+	for _, pkg := range enriched {
+		lookup[pkg.Name] = pkg.InstalledVersion
+		statusLookup[pkg.Name] = pkg.InstallStatus
+	}
+
+	// Verify all packages have installed versions from v1 lock file
+	assert.Equal(t, "4.17.21", lookup["lodash"], "lodash should be version 4.17.21")
+	assert.Equal(t, "4.18.3", lookup["express"], "express should be version 4.18.3")
+	assert.Equal(t, "1.6.8", lookup["axios"], "axios should be version 1.6.8")
+	assert.Equal(t, "5.4.5", lookup["typescript"], "typescript should be version 5.4.5")
+	assert.Equal(t, "3.2.5", lookup["prettier"], "prettier should be version 3.2.5")
+
+	// Verify status is correct
+	assert.Equal(t, InstallStatusLockFound, statusLookup["lodash"])
+	assert.Equal(t, InstallStatusLockFound, statusLookup["express"])
+}
+
+// TestIntegration_NPM_LockfileV2 tests npm lockfileVersion 2 (npm 7-8 format).
+//
+// This format includes both "packages" and "dependencies" sections for backwards
+// compatibility. npm ls --package-lock-only should handle both formats.
+func TestIntegration_NPM_LockfileV2(t *testing.T) {
+	testdataDir, err := filepath.Abs("../testdata/npm_v2")
+	require.NoError(t, err, "failed to get absolute path to testdata")
+
+	cfg, err := config.LoadConfig("", testdataDir)
+	require.NoError(t, err)
+
+	parser := packages.NewDynamicParser()
+	rule := cfg.Rules["npm"]
+	result, err := parser.ParseFile(filepath.Join(testdataDir, "package.json"), &rule)
+	require.NoError(t, err)
+
+	for i := range result.Packages {
+		result.Packages[i].Rule = "npm"
+	}
+
+	enriched, err := ApplyInstalledVersions(result.Packages, cfg, testdataDir)
+	require.NoError(t, err)
+
+	// Build lookup for easier assertions
+	lookup := make(map[string]string)
+	statusLookup := make(map[string]string)
+	for _, pkg := range enriched {
+		lookup[pkg.Name] = pkg.InstalledVersion
+		statusLookup[pkg.Name] = pkg.InstallStatus
+	}
+
+	// Verify all packages have installed versions from v2 lock file
+	assert.Equal(t, "4.17.21", lookup["lodash"], "lodash should be version 4.17.21")
+	assert.Equal(t, "4.18.3", lookup["express"], "express should be version 4.18.3")
+	assert.Equal(t, "1.6.8", lookup["axios"], "axios should be version 1.6.8")
+	assert.Equal(t, "5.4.5", lookup["typescript"], "typescript should be version 5.4.5")
+	assert.Equal(t, "3.2.5", lookup["prettier"], "prettier should be version 3.2.5")
+
+	// Verify status is correct
+	assert.Equal(t, InstallStatusLockFound, statusLookup["lodash"])
+	assert.Equal(t, InstallStatusLockFound, statusLookup["express"])
+}
+
+// TestIntegration_PNPM_LockfileV6 tests pnpm lockfileVersion 6.0 (pnpm 8.x format).
+//
+// This ensures backwards compatibility with pnpm 8.x lock files that use the
+// importers section with simpler version strings (no peer dep suffixes).
+func TestIntegration_PNPM_LockfileV6(t *testing.T) {
+	testdataDir, err := filepath.Abs("../testdata/pnpm_v6")
+	require.NoError(t, err, "failed to get absolute path to testdata")
+
+	cfg, err := config.LoadConfig("", testdataDir)
+	require.NoError(t, err)
+
+	parser := packages.NewDynamicParser()
+	rule := cfg.Rules["pnpm"]
+	result, err := parser.ParseFile(filepath.Join(testdataDir, "package.json"), &rule)
+	require.NoError(t, err)
+
+	for i := range result.Packages {
+		result.Packages[i].Rule = "pnpm"
+	}
+
+	enriched, err := ApplyInstalledVersions(result.Packages, cfg, testdataDir)
+	require.NoError(t, err)
+
+	// Build lookup for easier assertions
+	lookup := make(map[string]string)
+	statusLookup := make(map[string]string)
+	for _, pkg := range enriched {
+		lookup[pkg.Name] = pkg.InstalledVersion
+		statusLookup[pkg.Name] = pkg.InstallStatus
+	}
+
+	// Verify all packages have installed versions from v6 lock file
+	assert.Equal(t, "4.17.21", lookup["lodash"], "lodash should be version 4.17.21")
+	assert.Equal(t, "4.18.3", lookup["express"], "express should be version 4.18.3")
+	assert.Equal(t, "1.6.8", lookup["axios"], "axios should be version 1.6.8")
+	assert.Equal(t, "5.4.5", lookup["typescript"], "typescript should be version 5.4.5")
+	assert.Equal(t, "3.2.5", lookup["prettier"], "prettier should be version 3.2.5")
+
+	// Verify status is correct
+	assert.Equal(t, InstallStatusLockFound, statusLookup["lodash"])
+	assert.Equal(t, InstallStatusLockFound, statusLookup["express"])
+}
