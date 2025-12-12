@@ -10,6 +10,8 @@
 - [Main Function](#main-function)
 - [Self-Pinning](#self-pinning)
 - [Lock File Parsing](#lock-file-parsing)
+  - [Command Output JSON Formats](#command-output-json-formats)
+  - [Regex-based Extraction](#regex-based-extraction)
 - [Scope Resolution](#scope-resolution)
 - [Lock File Configuration](#lock-file-configuration)
 - [Package Name Normalization](#package-name-normalization)
@@ -162,6 +164,53 @@ For lock files, versions are extracted using:
        extraction:
          pattern: '(?m)^(?P<n>\S+)\s+(?P<version>v[^\s]+)'
    ```
+
+### Command Output JSON Formats
+
+**Location:** `pkg/lock/resolve.go:449-527`
+
+When using command-based extraction, the output is parsed as JSON. The following formats are supported in order of detection:
+
+**1. Simple Object Format:**
+```json
+{"package-name": "1.0.0", "other-package": "2.0.0"}
+```
+Generic format - skipped if values contain nested objects/arrays.
+
+**2. Array Format:**
+```json
+[{"name": "package-name", "version": "1.0.0"}, ...]
+```
+Custom keys can be configured via `command_extraction.json_name_key` and `json_version_key`.
+
+Also handles **pnpm ls** format with nested dependencies:
+```json
+[{"name": "project", "dependencies": {"pkg": {"version": "1.0.0"}}, "devDependencies": {...}}]
+```
+
+**3. Nested Object Format:**
+
+npm ls --json:
+```json
+{"dependencies": {"pkg": {"version": "1.0.0", "dependencies": {...}}}}
+```
+
+package-lock.json v3:
+```json
+{"packages": {"node_modules/pkg": {"version": "1.0.0"}}}
+```
+
+yarn list --json:
+```json
+{"type": "tree", "data": {"trees": [{"name": "pkg@1.0.0"}]}}
+```
+
+**Package Manager Commands:**
+| Manager | Command |
+|---------|---------|
+| npm | `npm ls --json --all` |
+| pnpm | `pnpm ls --json --depth=Infinity` |
+| yarn v1 | `yarn list --json --depth=0` |
 
 ### Regex-based Extraction
 
