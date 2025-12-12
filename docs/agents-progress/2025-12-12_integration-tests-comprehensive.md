@@ -1740,6 +1740,32 @@ Removed now-redundant `.goupdate.yml` override files:
 - **Hash:** 63a7c9d
 - **Message:** "Use file-based lock extraction for pnpm and yarn in default config"
 
+### 2025-12-12 - Actual Update Command Testing (Per AGENTS.md Section 7)
+
+Per AGENTS.md requirement to test actual updates (not just dry-run), ran `goupdate update --patch -y --skip-lock` on both cloned projects.
+
+#### kpas-api (Composer + npm)
+- **Command:** `goupdate update --patch -y --skip-lock`
+- **Plan:** 10 packages to update (5 composer, 5 npm)
+- **Result:** ✅ composer.json modified successfully
+- **Packages updated:** barryvdh/laravel-debugbar (^3.13 → ^v3.15.4), and others
+- **Rollback:** `git checkout .` - successful
+
+#### matematikk-mooc/frontend (pnpm)
+- **Command:** `goupdate update --patch -y --skip-lock`
+- **Plan:** 20 packages to update (all pnpm)
+- **Result:** ✅ package.json modified successfully
+- **Sample changes:**
+  - `@babel/core`: `^7.26.9` → `^7.26.10`
+  - `@types/node`: `^22.13.8` → `^22.13.17`
+- **Rollback:** `git checkout .` - successful
+
+#### Conclusion
+Actual update command works correctly on real projects:
+- ✅ Manifest files are modified with new versions
+- ✅ Changes can be reviewed with `git diff`
+- ✅ Rollback works with `git checkout .`
+
 ---
 
 ## NOTES
