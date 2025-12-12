@@ -1699,6 +1699,47 @@ Cloned and tested actual production projects that previously had issues with gou
 
 **Conclusion:** Real project battle testing revealed a regex pattern bug that was not caught by unit tests because the synthetic testdata didn't include scoped packages with single quotes. This validates the importance of testing against real-world projects.
 
+### 2025-12-12 - Default Config Improvement: File-Based Lock Extraction
+
+Updated the default config (`pkg/config/default.yml`) to use file-based regex extraction for pnpm and yarn instead of command-based extraction.
+
+#### Problem
+- pnpm: `pnpm ls --json --depth=0` requires node_modules to be installed
+- yarn: `yarn list --json --depth=0` requires node_modules to be installed
+- npm: Already used `--package-lock-only` which reads from lock file (correct!)
+
+#### Solution
+Changed pnpm and yarn rules to use file-based regex extraction from lock files:
+
+**pnpm (pnpm-lock.yaml v9):**
+```regex
+(?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)
+```
+
+**yarn (yarn.lock v1):**
+```regex
+(?m)^"?(?P<n>@?[\w\-\.\/]+)@[^:]+:\s*\n\s+version\s+"(?P<version>[^"]+)"
+```
+
+#### Benefits
+- **Faster:** No need to install node_modules first
+- **Offline:** Works without network access
+- **Portable:** Works when pnpm/yarn not installed
+
+#### Cleanup
+Removed now-redundant `.goupdate.yml` override files:
+- `pkg/testdata/pnpm/.goupdate.yml` - default now works
+- `pkg/testdata/yarn/.goupdate.yml` - default now works
+- `examples/kpas-frontend/.goupdate.yml` - removed lock_files section (kept groups)
+
+#### Verification
+- All 11 integration tests pass
+- Tested against real matematikk-mooc/frontend project (52 packages, all LockFound)
+
+#### Commit
+- **Hash:** 63a7c9d
+- **Message:** "Use file-based lock extraction for pnpm and yarn in default config"
+
 ---
 
 ## NOTES
