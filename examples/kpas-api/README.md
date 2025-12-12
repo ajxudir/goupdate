@@ -10,22 +10,16 @@ The project uses multiple package managers:
 
 ## Configuration Features
 
-### Package Grouping
+### Minimal Grouping
 
-Groups related packages for coordinated updates:
+Only packages with actual version coupling are grouped:
 
-**Composer (PHP):**
-- `laravel` - Laravel framework packages
-- `spatie` - Spatie Laravel packages
-- `sentry` - Sentry monitoring
-- `http` - HTTP/API clients
-- `dev` - Development tools
+**npm:**
+- `vite` - vite + laravel-vite-plugin + @vitejs/plugin-vue (plugins depend on vite)
 
-**npm (Node.js):**
-- `vue` - Vue.js ecosystem
-- `build` - Vite and build tools
-- `sentry` - Sentry frontend
-- `ui` - UI libraries
+**Composer:** No groups needed - all packages are independent.
+
+Most packages update individually. System tests catch any incompatibilities.
 
 ### System Tests
 
@@ -39,9 +33,8 @@ Runs after each update to verify builds don't break:
 # Check for outdated dependencies
 goupdate outdated
 
-# Update by group
-goupdate update --group vue
-goupdate update --group laravel
+# Update Vite ecosystem together
+goupdate update --group vite
 
 # Update all minor/patch versions
 goupdate update --minor

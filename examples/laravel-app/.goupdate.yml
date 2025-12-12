@@ -5,17 +5,12 @@ extends: [default]
 
 rules:
   composer:
+    # Only group packages with actual version coupling
     groups:
-      framework:
+      # Laravel core - sanctum has peer dep on framework
+      laravel:
         - laravel/framework
         - laravel/sanctum
-      plugins:
-        - spatie/laravel-permission
-        - predis/predis
-      dev:
-        - phpunit/phpunit
-        - laravel/pint
-        - nunomaduro/larastan
 
     # Note: Pre-release filtering inherits from default config
     # Default patterns exclude: alpha, beta, rc, dev, canary, snapshot, nightly, preview, next
