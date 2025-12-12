@@ -18,6 +18,10 @@ Add comprehensive integration tests for all 9 officially supported package manag
 - ✅ Critical code path analysis (docblocks, error handling)
 - ✅ **NEW: Mock data vs real data analysis**
 - ✅ **NEW: Testdata directory structure audit**
+- ✅ **NEW: default.yml configuration review (all 9 PMs verified)**
+- ✅ **NEW: examples/ directory review (8 real-world configs)**
+- ✅ **NEW: pkg/testutil/ utilities audit (4 files, ~350 lines)**
+- ✅ **NEW: Integration test gap analysis (only 3/9 PMs covered)**
 
 **Key Insight:** The pnpm --lockfile-only bug would have been caught by:
 1. Integration test that verifies lock resolution after update
@@ -98,6 +102,104 @@ pkg/
 | `_lock-scenarios/` | Multi-lock configs | Real config scenarios - no mocks needed |
 | `malformed-json/` | Broken JSON | Real parse error - no mocks needed |
 | `malformed-xml/` | Broken XML | Real parse error - no mocks needed |
+
+---
+
+## NEW: Comprehensive Codebase Review Findings
+
+### Official Package Managers (from default.yml)
+
+**9 officially supported package managers** confirmed in `pkg/config/default.yml`:
+
+| # | Rule | Manager | Manifest | Lock File | Language |
+|---|------|---------|----------|-----------|----------|
+| 1 | npm | js | package.json | package-lock.json | JavaScript |
+| 2 | pnpm | js | package.json | pnpm-lock.yaml | JavaScript |
+| 3 | yarn | js | package.json | yarn.lock | JavaScript |
+| 4 | composer | php | composer.json | composer.lock | PHP |
+| 5 | requirements | python | requirements*.txt | (self-pinning) | Python |
+| 6 | pipfile | python | Pipfile | Pipfile.lock | Python |
+| 7 | mod | golang | go.mod | go.sum | Go |
+| 8 | msbuild | dotnet | *.csproj | packages.lock.json | .NET |
+| 9 | nuget | dotnet | packages.config | packages.lock.json | .NET |
+
+### examples/ Directory - Real-World Test Configs
+
+The `examples/` directory contains **8 real-world project configurations** that can be used for integration testing:
+
+| Directory | PM Rule | Manifest | Has Lock | Packages |
+|-----------|---------|----------|----------|----------|
+| react-app/ | npm | package.json | No* | react, axios, lodash, typescript, vite |
+| laravel-app/ | composer | composer.json | No* | laravel/framework, guzzlehttp/guzzle |
+| django-app/ | requirements | requirements.txt | (self-pin) | Django, celery, redis, pytest |
+| go-cli/ | mod | go.mod | Yes (go.sum) | cobra, viper, zap |
+| ruby-api/ | (N/A) | Gemfile | No | (Ruby not supported) |
+| kpas-frontend/ | pnpm | .goupdate.yml only | N/A | Config examples |
+| kpas-api/ | composer | .goupdate.yml only | N/A | Config examples |
+| github-workflows/ | N/A | workflows | N/A | CI/CD templates |
+
+**Note:** examples/ can be used for battle testing but need lock files generated for full integration tests.
+
+### Integration Test Coverage Gap Analysis
+
+**Existing integration tests** (pkg/lock/integration_test.go):
+
+| Test Function | PM | Lines | Status |
+|--------------|-----|-------|--------|
+| TestIntegration_NPM | npm | ~35 | ✅ Exists |
+| TestIntegration_GoMod | mod | ~30 | ✅ Exists |
+| TestIntegration_Composer | composer | ~35 | ✅ Exists |
+| TestIntegration_LockNotFound | npm | ~25 | ✅ Exists (error case) |
+| TestIntegration_LockMissing | npm | ~30 | ✅ Exists (error case) |
+
+**Missing integration tests for 6 PMs:**
+
+| PM | testdata/ Exists | Lock File Exists | Integration Test | Action Needed |
+|----|-----------------|------------------|------------------|---------------|
+| pnpm | ❌ | ❌ | ❌ | Create testdata + test |
+| yarn | ❌ | ❌ | ❌ | Create testdata + test |
+| requirements | ✅ | (self-pinning) | ❌ | Add test |
+| pipfile | ✅ | ✅ | ❌ | Add test |
+| msbuild | ✅ | ✅ | ❌ | Add test |
+| nuget | ✅ | ✅ | ❌ | Add test |
+
+### pkg/testutil/ Utilities Analysis
+
+**Existing utilities (4 files, ~350 lines):**
+
+| File | Functions | Purpose | Integration Ready |
+|------|-----------|---------|-------------------|
+| packages.go | PackageBuilder, NPMPackage(), GoPackage(), DotNetPackage(), PythonPackage() | Build test Package structs | ✅ |
+| config.go | ConfigBuilder, NPMRule(), GoModRule(), NuGetRule(), SimpleRule() | Build test Config structs | ✅ |
+| capture.go | CaptureStdout(), CaptureStderr(), CaptureOutput() | Capture CLI output | ✅ |
+| table.go | CreateUpdateTable(), CreateOutdatedTable() | Create test table outputs | ✅ |
+
+**Key observation:** Existing testutil has builders for packages and configs but no helpers for:
+- Copying testdata to temp directories
+- Running integration test workflows
+- Table-driven PM test cases
+
+### Critical Testing Requirements (from docs/developer/testing.md)
+
+**CRITICAL: Display Value Sync**
+> The VERSION and INSTALLED columns must show the NEW version after update, NOT the old cached version.
+
+This is explicitly documented as a critical bug prevention pattern. Current tests do NOT verify this.
+
+### Constraint Handling Test Matrix
+
+The following constraint types need integration test coverage:
+
+| Constraint | Example | Used By |
+|------------|---------|---------|
+| `^` (caret) | ^4.17.0 | npm, pnpm, yarn, composer |
+| `~` (tilde) | ~4.17.0 | npm, pnpm, yarn, composer, requirements |
+| `>=` | >=4.5.0 | requirements, pipfile |
+| `<=` | <=5.0 | requirements, pipfile |
+| `>` | >4.0.0 | requirements |
+| `<` | <5.0 | requirements |
+| `==` | ==3.14.0 | requirements |
+| `*` | * | composer |
 
 ---
 
@@ -938,7 +1040,36 @@ func TestRealPM_PNPM_UpdateCycle(t *testing.T) {
 
 **Following:** docs/internal/chaos-testing.md Battle Testing section
 
-### 3.1: Clone Real-World Projects
+### 3.1: Test with Local examples/ Directory First
+
+**Primary source:** Use the `examples/` directory in the repo for initial battle testing:
+
+```bash
+# Build fresh binary
+go build -o /tmp/goupdate-test ./
+
+# Test react-app (npm)
+/tmp/goupdate-test scan -d examples/react-app
+/tmp/goupdate-test list -d examples/react-app
+/tmp/goupdate-test outdated -d examples/react-app
+
+# Test laravel-app (composer)
+/tmp/goupdate-test scan -d examples/laravel-app
+/tmp/goupdate-test list -d examples/laravel-app
+
+# Test django-app (requirements - self-pinning)
+/tmp/goupdate-test scan -d examples/django-app
+/tmp/goupdate-test list -d examples/django-app
+
+# Test go-cli (mod - has go.sum)
+/tmp/goupdate-test scan -d examples/go-cli
+/tmp/goupdate-test list -d examples/go-cli
+/tmp/goupdate-test outdated -d examples/go-cli
+```
+
+### 3.2: Clone External Real-World Projects
+
+For broader testing, clone external projects:
 
 ```bash
 mkdir -p /tmp/goupdate-battle-test
@@ -960,7 +1091,7 @@ git clone --depth 1 https://github.com/django/django.git
 git clone --depth 1 https://github.com/psf/requests.git
 ```
 
-### 3.2: Test Matrix
+### 3.3: Test Matrix
 
 For each project, run:
 
@@ -991,7 +1122,7 @@ git checkout main
 git branch -D goupdate-test
 ```
 
-### 3.3: Battle Test Checklist
+### 3.4: Battle Test Checklist
 
 **What to verify:**
 
@@ -1006,7 +1137,7 @@ git branch -D goupdate-test
 - [ ] Status column values correct (🟢 UpToDate, 🟠 Outdated, etc.)
 - [ ] Version numbers displayed correctly
 
-### 3.4: Document Results
+### 3.5: Document Results
 
 **File:** `docs/battle-testing-results.md` (NEW)
 
@@ -1404,6 +1535,16 @@ make coverage-func
 - ✅ Planned test file organization to prevent large files (~500 lines max)
 - ✅ Added table-driven test approach to reduce duplication
 - ✅ Updated deliverables with new test utilities (~2,070 lines total)
+
+### 2025-12-12 - Plan Update (Comprehensive Codebase Review)
+- ✅ Verified 9 officially supported PMs in default.yml (npm, pnpm, yarn, composer, requirements, pipfile, mod, msbuild, nuget)
+- ✅ Reviewed examples/ directory - found 8 real-world configs for battle testing
+- ✅ Audited existing integration tests - only 3/9 PMs have tests (npm, mod, composer)
+- ✅ Identified 6 PMs missing integration tests (pnpm, yarn, requirements, pipfile, msbuild, nuget)
+- ✅ Analyzed pkg/testutil/ utilities - found 4 files, ~350 lines, builders ready for integration use
+- ✅ Found CRITICAL requirement from testing.md: Display value sync tests needed
+- ✅ Added constraint handling test matrix (^, ~, >=, <=, >, <, ==, *)
+- ✅ Added "Comprehensive Codebase Review Findings" section to plan
 - ✅ Waiting for approval
 
 ---
