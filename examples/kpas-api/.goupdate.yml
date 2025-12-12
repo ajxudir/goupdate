@@ -1,0 +1,83 @@
+# kpas-api - goupdate configuration
+# Example: Laravel PHP API with Vue.js frontend assets
+#
+# Based on matematikk-mooc/kpas-api project structure
+# This project uses Composer (PHP) and npm (Node.js) package managers
+
+extends: [default]
+
+rules:
+  # PHP/Composer dependencies
+  composer:
+    groups:
+      # Laravel framework - update together for compatibility
+      laravel:
+        - laravel/framework
+        - laravel/tinker
+
+      # Spatie packages - often have Laravel version constraints
+      spatie:
+        - spatie/laravel-data
+        - spatie/laravel-ignition
+
+      # Sentry monitoring
+      sentry:
+        - sentry/sentry-laravel
+
+      # HTTP/API clients
+      http:
+        - guzzlehttp/guzzle
+        - league/oauth2-client
+
+      # Dev tools
+      dev:
+        - barryvdh/laravel-debugbar
+        - mockery/mockery
+        - nunomaduro/collision
+        - filp/whoops
+        - beyondcode/laravel-dump-server
+
+  # Node.js/npm dependencies (frontend assets)
+  npm:
+    groups:
+      # Vue ecosystem - update together
+      vue:
+        - vue
+        - "@vitejs/plugin-vue"
+        - vue-loader
+        - vue-select
+
+      # Build tooling - Vite and related
+      build:
+        - vite
+        - laravel-vite-plugin
+        - postcss
+        - sass
+
+      # Sentry frontend monitoring
+      sentry:
+        - "@sentry/vue"
+
+      # UI libraries
+      ui:
+        - bootstrap
+        - d3
+
+# System tests to verify build after updates
+system_tests:
+  run_preflight: true
+  run_mode: after_each
+  stop_on_fail: true
+  tests:
+    # Install and validate PHP dependencies
+    - name: composer
+      commands: |
+        composer install --no-interaction --prefer-dist
+      timeout_seconds: 300
+
+    # Install and build frontend assets
+    - name: npm-build
+      commands: |
+        npm install
+        npm run build
+      timeout_seconds: 300

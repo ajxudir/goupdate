@@ -20,6 +20,7 @@ exclude_versions:
   - "(?i)[._-]pre"
   - "(?i)[._-]canary"
   - "(?i)[._-]dev"
+  - "(?i)^dev-"
   - "(?i)[._-]snapshot"
   - "(?i)[._-]nightly"
   - "(?i)[._-]preview"

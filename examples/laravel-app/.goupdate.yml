@@ -17,8 +17,5 @@ rules:
         - laravel/pint
         - nunomaduro/larastan
 
-    # Skip prereleases
-    exclude_versions:
-      - "(?i)alpha"
-      - "(?i)beta"
-      - "(?i)RC"
+    # Note: Pre-release filtering inherits from default config
+    # Default patterns exclude: alpha, beta, rc, dev, canary, snapshot, nightly, preview, next
