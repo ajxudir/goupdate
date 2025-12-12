@@ -1663,6 +1663,42 @@ make coverage-func
 | `goupdate outdated -o json` | ✅ Valid JSON | ✅ Valid JSON | ✅ Valid JSON | ✅ Valid JSON | All pass |
 | `goupdate update --dry-run` | ✅ Shows planned | ✅ Shows planned | ✅ Shows planned | ✅ Shows planned | All pass |
 
+### 2025-12-12 - Real Project Battle Testing
+
+Cloned and tested actual production projects that previously had issues with goupdate:
+
+#### matematikk-mooc/kpas-api (Laravel/PHP + npm)
+- **Git clone:** ✅ https://github.com/matematikk-mooc/kpas-api
+- **Applied config:** examples/kpas-api/.goupdate.yml
+- **List command:** ✅ 33 packages found (composer + npm)
+- **Results:** 32 succeeded, 1 GitHub auth failure (expected - symfony/polyfill-iconv requires auth)
+- **Status:** ✅ Working correctly
+
+#### matematikk-mooc/frontend (pnpm Vue.js)
+- **Git clone:** ✅ https://github.com/matematikk-mooc/frontend
+- **Applied config:** examples/kpas-frontend/.goupdate.yml (updated)
+- **Initial issue:** Scoped packages (`@babel/core`, `@playwright/test`, etc.) showed `NotInLock`
+- **Root cause:** Real pnpm-lock.yaml v9 quotes scoped packages with single quotes: `'@babel/core':`
+- **Fix:** Updated regex pattern to handle optional single quotes:
+  ```regex
+  '(?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)'
+  ```
+- **After fix:** ✅ 52 packages found, all `LockFound`
+- **Outdated command:** ✅ Completed successfully, exit code 0
+- **Status:** ✅ Working correctly after regex fix
+
+#### Config Files Updated
+| File | Change |
+|------|--------|
+| `examples/kpas-frontend/.goupdate.yml` | Added `lock_files` override with fixed regex for scoped packages |
+| `pkg/testdata/pnpm/.goupdate.yml` | Updated regex to handle single-quoted scoped packages |
+
+#### Commit
+- **Hash:** 2ac1e10
+- **Message:** "Fix pnpm regex pattern to handle single-quoted scoped packages"
+
+**Conclusion:** Real project battle testing revealed a regex pattern bug that was not caught by unit tests because the synthetic testdata didn't include scoped packages with single quotes. This validates the importance of testing against real-world projects.
+
 ---
 
 ## NOTES
