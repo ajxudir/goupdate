@@ -6,6 +6,10 @@ name: 'Setup Runtimes'
 description: 'Setup language runtimes (Node.js, PHP, Python, Go, .NET) based on detected rules'
 
 inputs:
+  rules:
+    description: 'Comma-separated list of detected rules (e.g., npm,pnpm,yarn,mod)'
+    required: false
+    default: ''
   use-node:
     description: 'Setup Node.js runtime'
     required: false
@@ -60,6 +64,21 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
+
+    - name: Install pnpm
+      if: inputs.use-node == 'true' && contains(inputs.rules, 'pnpm')
+      uses: pnpm/action-setup@v4
+      with:
+        version: latest
+
+    - name: Install yarn
+      if: inputs.use-node == 'true' && contains(inputs.rules, 'yarn')
+      shell: bash
+      run: |
+        echo "Installing Yarn..."
+        corepack enable
+        corepack prepare yarn@stable --activate
+        yarn --version
 
     - name: Setup PHP
       if: inputs.use-php == 'true'
