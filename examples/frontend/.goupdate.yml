@@ -49,24 +49,13 @@ rules:
       rxjs:
         - rxjs
 
-    # Update Vue/React incrementally for stability
-    incremental:
-      - vue
-      - vuex
-      - react
-
-    # Skip pre-release versions
-    exclude_versions:
-      - "(?i)alpha"
-      - "(?i)beta"
-      - "(?i)rc"
-      - "(?i)canary"
-      - "(?i)preview"
+    # Note: Pre-release filtering inherits from default config
+    # Default patterns exclude: alpha, beta, rc, canary, dev, snapshot, nightly, preview, next
 
 # System test to verify no compile errors after updates
 system_tests:
   run_preflight: true
-  run_mode: after_all
+  run_mode: after_each
   stop_on_fail: true
   tests:
     - name: build

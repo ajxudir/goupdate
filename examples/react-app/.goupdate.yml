@@ -33,7 +33,7 @@ rules:
 # System tests validate app health before and after updates
 system_tests:
   run_preflight: true
-  run_mode: after_all
+  run_mode: after_each
   stop_on_fail: true
   tests:
     # Quick type check and lint
