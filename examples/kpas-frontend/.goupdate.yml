@@ -37,23 +37,6 @@ rules:
         - playwright
         - "@playwright/test"
 
-    # Override lock_files for offline testing (when pnpm not installed)
-    # This uses regex extraction instead of pnpm ls --json command
-    lock_files:
-      - files: ["**/pnpm-lock.yaml"]
-        format: raw
-        extraction:
-          # Parse pnpm-lock.yaml v9 importers format:
-          # Both quoted and unquoted package names:
-          #   '@babel/core':
-          #     specifier: ^7.26.9
-          #     version: 7.26.9
-          #   lodash:
-          #     specifier: ^4.17.21
-          #     version: 4.17.21
-          # Also handles complex versions like 7.26.9(@babel/core@7.26.9) by stopping at (
-          pattern: '(?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)'
-
 # System test to verify no compile errors after updates
 system_tests:
   run_preflight: true
