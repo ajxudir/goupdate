@@ -1,6 +1,17 @@
 // Package lock provides functionality for resolving installed package versions
 // from lock files. It supports various lock file formats including package-lock.json,
 // pnpm-lock.yaml, yarn.lock, go.sum, custom extraction patterns, and custom commands.
+//
+// # Design Philosophy
+//
+// The JSON parsing in this package is intentionally designed to handle generic formats
+// rather than package-manager-specific implementations. This approach allows:
+//   - Reuse across multiple package managers (npm, pnpm, yarn all share similar formats)
+//   - Support for custom tools that output standard JSON structures
+//   - Easy extension for new package managers without code changes
+//
+// Package-manager-specific quirks (like yarn's name@version format) are handled when
+// they represent genuinely unique formats that could also be useful for other tools.
 package lock
 
 import (
@@ -312,12 +323,31 @@ func extractVersionsFromLock(path string, cfg *config.LockFileCfg) (map[string]s
 // extractVersionsFromCommand executes custom commands to extract installed versions.
 //
 // This is useful for complex lock files or when maximum compatibility is needed
-// across different lock file versions. The command output should be JSON in one
-// of these formats:
-//   - Object format: {"package-name": "version", ...}
-//   - Array format: [{"name": "package-name", "version": "1.0.0"}, ...]
+// across different lock file versions.
 //
-// Or raw format with regex extraction via CommandExtraction.
+// # Output Formats
+//
+// The command output can be in JSON format (default) or raw text format.
+// See [parseLockCommandJSON] for detailed JSON format support including:
+//   - Simple object: {"package-name": "version", ...}
+//   - Array format: [{"name": "package-name", "version": "1.0.0"}, ...]
+//   - npm ls format: {"dependencies": {"pkg": {"version": "ver"}}}
+//   - pnpm ls format: [{"dependencies": {"pkg": {"version": "ver"}}}]
+//   - yarn list format: {"data": {"trees": [{"name": "pkg@version"}]}}
+//   - package-lock.json v3: {"packages": {"node_modules/pkg": {"version": "ver"}}}
+//
+// For raw format, use CommandExtraction with Format="raw" and a regex Pattern.
+//
+// # Template Variables
+//
+// Commands support these template variables:
+//   - {{lock_file}}: Full path to the lock file
+//   - {{base_dir}}: Directory containing the lock file
+//
+// # Error Handling
+//
+// If a command exits with non-zero status but produces valid output (common with
+// npm ls when packages are missing), the output is still parsed successfully.
 //
 // Parameters:
 //   - path: Absolute or relative path to the lock file
@@ -405,11 +435,39 @@ func parseLockCommandOutput(output []byte, extraction *config.LockCommandExtract
 
 // parseLockCommandJSON parses JSON output from a lock file command supporting multiple formats.
 //
-// It performs the following operations:
-//   - Attempts to parse as object format: {"package-name": "version"}
-//   - Falls back to array format: [{"name": "pkg", "version": "ver"}]
-//   - Handles nested format (npm ls): {"dependencies": {"pkg": {"version": "ver"}}}
-//   - Supports configurable JSON keys via extraction config
+// # Supported JSON Formats
+//
+// The function attempts to parse JSON in the following order, stopping at the first successful match:
+//
+// 1. Simple Object Format (generic):
+//
+//	{"package-name": "version", "other-package": "1.0.0"}
+//
+//	This format is skipped if any value is a nested object/array, as that indicates
+//	a more complex format (like npm/yarn/pnpm output) that should be handled below.
+//
+// 2. Array Format (generic, pnpm ls):
+//
+//	[{"name": "package-name", "version": "1.0.0"}, ...]
+//
+//	Custom JSON keys can be configured via extraction.JSONNameKey and extraction.JSONVersionKey.
+//	Also handles pnpm ls --json output which wraps dependencies in array elements:
+//	[{"name": "project", "dependencies": {"pkg": {"version": "ver"}}, "devDependencies": {...}}]
+//
+// 3. Nested Object Format (npm ls, package-lock.json v3, yarn list):
+//
+//	npm ls --json:           {"dependencies": {"pkg": {"version": "ver", "dependencies": {...}}}}
+//	package-lock.json v3:    {"packages": {"node_modules/pkg": {"version": "ver"}}}
+//	yarn list --json:        {"type": "tree", "data": {"trees": [{"name": "pkg@version"}]}}
+//
+// # Package Manager Compatibility
+//
+// These formats are designed to be generic and reusable across package managers.
+// The specific commands that produce compatible output include:
+//   - npm: npm ls --json --all
+//   - pnpm: pnpm ls --json --depth=Infinity
+//   - yarn v1: yarn list --json --depth=0
+//   - Direct parsing of package-lock.json v3
 //
 // Parameters:
 //   - output: Raw JSON output bytes from the lock file command
@@ -420,6 +478,14 @@ func parseLockCommandOutput(output []byte, extraction *config.LockCommandExtract
 //   - error: When all parsing attempts fail, returns error; otherwise returns nil
 func parseLockCommandJSON(output []byte, extraction *config.LockCommandExtractionCfg) (map[string]string, error) {
 	results := make(map[string]string)
+
+	// Format detection order rationale:
+	// 1. Simple object - most specific constraint (all values must be strings)
+	// 2. Array - supports both generic [{name, version}] and pnpm's nested format
+	// 3. Nested object - catches npm ls, package-lock.json v3, and yarn list
+	//
+	// This order ensures that simpler custom tool outputs are matched first,
+	// while complex package manager outputs fall through to appropriate parsers.
 
 	// Try object format first: {"package-name": "version", ...}
 	// Skip this format if any value is a nested object/array (indicates complex format like yarn/npm)
