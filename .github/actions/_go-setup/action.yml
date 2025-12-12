@@ -55,6 +55,15 @@ runs:
         cache: ${{ steps.check-mod.outputs.has_go_mod == 'true' }}
         cache-dependency-path: ${{ inputs.working-directory }}/go.sum
 
+    - name: Verify Go installation
+      shell: bash
+      run: |
+        if ! command -v go &> /dev/null; then
+          echo "::error::Go installation failed - command not found"
+          exit 1
+        fi
+        echo "go: $(go version)"
+
     - name: Download dependencies
       if: inputs.skip-download != 'true' && steps.check-mod.outputs.has_go_mod == 'true'
       shell: bash
