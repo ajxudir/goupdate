@@ -871,6 +871,33 @@ func TestParseLockCommandJSON(t *testing.T) {
 		assert.Equal(t, "4.17.21", result["lodash"])
 		assert.Equal(t, "1.0.0", result["nested-pkg"])
 	})
+
+	t.Run("parses pnpm ls array format with dependencies", func(t *testing.T) {
+		// pnpm ls --json --depth=0 output format: array with dependencies inside first element
+		input := []byte(`[{"name": "my-project", "version": "1.0.0", "dependencies": {"lodash": {"version": "4.17.21"}, "express": {"version": "4.18.2"}}}]`)
+		result, err := parseLockCommandJSON(input, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "4.17.21", result["lodash"])
+		assert.Equal(t, "4.18.2", result["express"])
+	})
+
+	t.Run("parses pnpm ls array format with devDependencies", func(t *testing.T) {
+		// pnpm ls --json --depth=0 output format: array with both deps and devDeps
+		input := []byte(`[{"name": "my-project", "version": "1.0.0", "dependencies": {"lodash": {"version": "4.17.21"}}, "devDependencies": {"typescript": {"version": "5.0.0"}}}]`)
+		result, err := parseLockCommandJSON(input, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "4.17.21", result["lodash"])
+		assert.Equal(t, "5.0.0", result["typescript"])
+	})
+
+	t.Run("parses pnpm ls with scoped packages", func(t *testing.T) {
+		// pnpm ls --json output with scoped package names
+		input := []byte(`[{"name": "my-project", "dependencies": {"@vue/reactivity": {"version": "3.5.13"}, "@babel/core": {"version": "7.26.0"}}}]`)
+		result, err := parseLockCommandJSON(input, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "3.5.13", result["@vue/reactivity"])
+		assert.Equal(t, "7.26.0", result["@babel/core"])
+	})
 }
 
 // TestExtractNestedDependencies tests the behavior of nested dependency extraction.

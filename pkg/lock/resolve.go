@@ -435,6 +435,7 @@ func parseLockCommandJSON(output []byte, extraction *config.LockCommandExtractio
 	}
 
 	// Try array format: [{"name": "package-name", "version": "1.0.0"}, ...]
+	// Also handles pnpm ls format: [{dependencies: {pkg: {version: "ver"}}, devDependencies: {...}}]
 	var arrFormat []map[string]interface{}
 	if err := json.Unmarshal(output, &arrFormat); err == nil {
 		nameKey := "name"
@@ -454,7 +455,16 @@ func parseLockCommandJSON(output []byte, extraction *config.LockCommandExtractio
 			if nameOK && verOK && name != "" && version != "" {
 				results[name] = version
 			}
+
+			// Handle pnpm ls format: [{dependencies: {pkg: {version: "ver"}}, devDependencies: {...}}]
+			if deps, ok := item["dependencies"].(map[string]interface{}); ok {
+				extractNestedDependencies(deps, results)
+			}
+			if devDeps, ok := item["devDependencies"].(map[string]interface{}); ok {
+				extractNestedDependencies(devDeps, results)
+			}
 		}
+		// Return results (even if empty) since valid array format was parsed
 		return results, nil
 	}
 
