@@ -11,6 +11,7 @@ exclude_versions:
   - "(?i)[._-]pre"
   - "(?i)[._-]canary"
   - "(?i)[._-]dev"
+  - "(?i)^dev-"
   - "(?i)[._-]snapshot"
   - "(?i)[._-]nightly"
   - "(?i)[._-]preview"
@@ -102,7 +103,7 @@ rules:
   requirements:
     manager: python
     include: ["**/requirements*.txt"]
-    exclude: ["**/venv/**", "**/.venv/**"]
+    exclude: ["**/venv/**", "**/.venv/**", "**/vendor/**", "**/node_modules/**"]
     format: raw
     fields:
       packages: prod
@@ -129,7 +130,7 @@ rules:
   pipfile:
     manager: python
     include: ["**/Pipfile"]
-    exclude: ["**/venv/**", "**/.venv/**"]
+    exclude: ["**/venv/**", "**/.venv/**", "**/vendor/**", "**/node_modules/**"]
     format: raw
     fields:
       packages: prod

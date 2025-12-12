@@ -31,7 +31,7 @@ rules:
 # System tests for Django projects
 system_tests:
   run_preflight: true
-  run_mode: after_all
+  run_mode: after_each
   stop_on_fail: true
   tests:
     # Run Django's system checks

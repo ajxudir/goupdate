@@ -177,7 +177,6 @@ func runOutdated(cmd *cobra.Command, args []string) error {
 		table = buildOutdatedTableFromPackages(ordered)
 
 		// Print header
-		fmt.Println()
 		fmt.Println(table.HeaderRow())
 		fmt.Println(table.SeparatorRow())
 	}

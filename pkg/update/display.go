@@ -266,6 +266,20 @@ func PrintUpdatePreview(plans []*PlannedUpdate, table *output.Table, selection o
 		}
 	}
 
+	// Calculate max name width for alignment
+	maxNameWidth := 20
+	for _, plan := range willUpdate {
+		if len(plan.Res.Pkg.Name) > maxNameWidth {
+			maxNameWidth = len(plan.Res.Pkg.Name)
+		}
+	}
+	for _, plan := range hasMoreUpdates {
+		if len(plan.Res.Pkg.Name) > maxNameWidth {
+			maxNameWidth = len(plan.Res.Pkg.Name)
+		}
+	}
+	nameFormat := fmt.Sprintf("  %%-%ds", maxNameWidth)
+
 	scope := DetermineScopeDescription(selection)
 
 	fmt.Println()
@@ -278,7 +292,7 @@ func PrintUpdatePreview(plans []*PlannedUpdate, table *output.Table, selection o
 		for _, plan := range willUpdate {
 			res := plan.Res
 			availableInfo := display.FormatAvailableVersions(res.Target, res.Major, res.Minor, res.Patch)
-			fmt.Printf("  %-20s %s → %s  %s\n",
+			fmt.Printf(nameFormat+" %s → %s  %s\n",
 				res.Pkg.Name,
 				SafeFromVersion(res),
 				res.Target,
@@ -292,7 +306,7 @@ func PrintUpdatePreview(plans []*PlannedUpdate, table *output.Table, selection o
 		for _, plan := range hasMoreUpdates {
 			res := plan.Res
 			availableInfo := display.FormatAvailableVersionsUpToDate(res.Major, res.Minor, res.Patch)
-			fmt.Printf("  %-20s %s  %s\n",
+			fmt.Printf(nameFormat+" %s  %s\n",
 				res.Pkg.Name,
 				display.SafeDeclaredValue(res.Pkg.Version),
 				availableInfo)
@@ -391,6 +405,26 @@ func PrintUpdateSummary(results []UpdateResult, dryRun bool, afterAllTestResult 
 		}
 	}
 
+	// Calculate max name width for alignment
+	maxNameWidth := 20
+	for _, res := range updated {
+		if len(res.Pkg.Name) > maxNameWidth {
+			maxNameWidth = len(res.Pkg.Name)
+		}
+	}
+	for _, res := range failed {
+		if len(res.Pkg.Name) > maxNameWidth {
+			maxNameWidth = len(res.Pkg.Name)
+		}
+	}
+	for _, res := range hasMoreUpdates {
+		if len(res.Pkg.Name) > maxNameWidth {
+			maxNameWidth = len(res.Pkg.Name)
+		}
+	}
+	nameFormat := fmt.Sprintf("  %%-%ds", maxNameWidth)
+	nameFormatWithIcon := fmt.Sprintf("  %%s %%-%ds", maxNameWidth)
+
 	if len(updated) > 0 || len(failed) > 0 {
 		fmt.Println()
 		fmt.Println("Update Summary")
@@ -406,7 +440,7 @@ func PrintUpdateSummary(results []UpdateResult, dryRun bool, afterAllTestResult 
 			fmt.Printf("%s:\n", actionVerb)
 			for _, res := range updated {
 				availableInfo := display.FormatAvailableVersions(res.Target, res.Major, res.Minor, res.Patch)
-				fmt.Printf("  %-20s %s → %s  %s\n",
+				fmt.Printf(nameFormat+" %s → %s  %s\n",
 					res.Pkg.Name,
 					SafeFromVersion(res),
 					res.Target,
@@ -428,7 +462,7 @@ func PrintUpdateSummary(results []UpdateResult, dryRun bool, afterAllTestResult 
 			fmt.Println()
 			fmt.Println("Failed updates:")
 			for _, res := range failed {
-				fmt.Printf("  %s %-20s %s → %s\n",
+				fmt.Printf(nameFormatWithIcon+" %s → %s\n",
 					constants.IconError,
 					res.Pkg.Name,
 					SafeFromVersion(res),
@@ -450,7 +484,7 @@ func PrintUpdateSummary(results []UpdateResult, dryRun bool, afterAllTestResult 
 			fmt.Println("Up to date (other updates available):")
 			for _, res := range hasMoreUpdates {
 				availableInfo := display.FormatAvailableVersionsUpToDate(res.Major, res.Minor, res.Patch)
-				fmt.Printf("  %-20s %s  %s\n",
+				fmt.Printf(nameFormat+" %s  %s\n",
 					res.Pkg.Name,
 					display.SafeDeclaredValue(res.Pkg.Version),
 					availableInfo)
