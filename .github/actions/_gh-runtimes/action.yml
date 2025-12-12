@@ -71,6 +71,16 @@ runs:
       with:
         version: latest
 
+    - name: Verify pnpm installation
+      if: inputs.use-node == 'true' && contains(inputs.rules, 'pnpm')
+      shell: bash
+      run: |
+        if ! command -v pnpm &> /dev/null; then
+          echo "::error::pnpm installation failed - command not found"
+          exit 1
+        fi
+        echo "pnpm version: $(pnpm --version)"
+
     - name: Install yarn
       if: inputs.use-node == 'true' && contains(inputs.rules, 'yarn')
       shell: bash
@@ -78,7 +88,16 @@ runs:
         echo "Installing Yarn..."
         corepack enable
         corepack prepare yarn@stable --activate
-        yarn --version
+
+    - name: Verify yarn installation
+      if: inputs.use-node == 'true' && contains(inputs.rules, 'yarn')
+      shell: bash
+      run: |
+        if ! command -v yarn &> /dev/null; then
+          echo "::error::yarn installation failed - command not found"
+          exit 1
+        fi
+        echo "yarn version: $(yarn --version)"
 
     - name: Setup PHP
       if: inputs.use-php == 'true'
