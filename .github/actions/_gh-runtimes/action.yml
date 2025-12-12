@@ -59,11 +59,25 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    # ========================================
+    # Node.js ecosystem
+    # ========================================
     - name: Setup Node.js
       if: inputs.use-node == 'true'
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
+
+    - name: Verify Node.js installation
+      if: inputs.use-node == 'true'
+      shell: bash
+      run: |
+        if ! command -v node &> /dev/null; then
+          echo "::error::Node.js installation failed - command not found"
+          exit 1
+        fi
+        echo "node: $(node --version)"
+        echo "npm: $(npm --version)"
 
     - name: Install pnpm
       if: inputs.use-node == 'true' && contains(inputs.rules, 'pnpm')
@@ -79,13 +93,12 @@ runs:
           echo "::error::pnpm installation failed - command not found"
           exit 1
         fi
-        echo "pnpm version: $(pnpm --version)"
+        echo "pnpm: $(pnpm --version)"
 
     - name: Install yarn
       if: inputs.use-node == 'true' && contains(inputs.rules, 'yarn')
       shell: bash
       run: |
-        echo "Installing Yarn..."
         corepack enable
         corepack prepare yarn@stable --activate
 
@@ -97,32 +110,94 @@ runs:
           echo "::error::yarn installation failed - command not found"
           exit 1
         fi
-        echo "yarn version: $(yarn --version)"
+        echo "yarn: $(yarn --version)"
 
+    # ========================================
+    # PHP ecosystem
+    # ========================================
     - name: Setup PHP
       if: inputs.use-php == 'true'
       uses: shivammathur/setup-php@v2
       with:
         php-version: ${{ inputs.php-version }}
+        tools: composer
 
+    - name: Verify PHP installation
+      if: inputs.use-php == 'true'
+      shell: bash
+      run: |
+        if ! command -v php &> /dev/null; then
+          echo "::error::PHP installation failed - command not found"
+          exit 1
+        fi
+        echo "php: $(php --version | head -1)"
+        if ! command -v composer &> /dev/null; then
+          echo "::error::Composer installation failed - command not found"
+          exit 1
+        fi
+        echo "composer: $(composer --version | head -1)"
+
+    # ========================================
+    # Python ecosystem
+    # ========================================
     - name: Setup Python
       if: inputs.use-python == 'true'
       uses: actions/setup-python@v5
       with:
         python-version: ${{ inputs.python-version }}
 
+    - name: Verify Python installation
+      if: inputs.use-python == 'true'
+      shell: bash
+      run: |
+        if ! command -v python &> /dev/null; then
+          echo "::error::Python installation failed - command not found"
+          exit 1
+        fi
+        echo "python: $(python --version)"
+        echo "pip: $(pip --version)"
+
+    # ========================================
+    # Go ecosystem
+    # ========================================
     - name: Setup Go
       if: inputs.use-go == 'true'
       uses: actions/setup-go@v5
       with:
         go-version: ${{ inputs.go-version }}
 
+    - name: Verify Go installation
+      if: inputs.use-go == 'true'
+      shell: bash
+      run: |
+        if ! command -v go &> /dev/null; then
+          echo "::error::Go installation failed - command not found"
+          exit 1
+        fi
+        echo "go: $(go version)"
+
+    # ========================================
+    # .NET ecosystem
+    # ========================================
     - name: Setup .NET
       if: inputs.use-dotnet == 'true'
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ inputs.dotnet-version }}
 
+    - name: Verify .NET installation
+      if: inputs.use-dotnet == 'true'
+      shell: bash
+      run: |
+        if ! command -v dotnet &> /dev/null; then
+          echo "::error::.NET installation failed - command not found"
+          exit 1
+        fi
+        echo "dotnet: $(dotnet --version)"
+
+    # ========================================
+    # Summary
+    # ========================================
     - name: Summary
       id: summary
       shell: bash
