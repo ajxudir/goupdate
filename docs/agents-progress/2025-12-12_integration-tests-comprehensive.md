@@ -1766,6 +1766,61 @@ Actual update command works correctly on real projects:
 - ✅ Changes can be reviewed with `git diff`
 - ✅ Rollback works with `git checkout .`
 
+### 2025-12-12 - Lock File Version Compatibility Testing
+
+Researched and tested multiple lock file format versions to ensure backwards compatibility.
+
+#### Lock File Versions Supported
+
+| Package Manager | Lock File | Versions Tested | Status |
+|-----------------|-----------|-----------------|--------|
+| npm | package-lock.json | v1 (npm 5-6), v2 (npm 7-8), v3 (npm 9+) | ✅ All work |
+| pnpm | pnpm-lock.yaml | v6.0 (pnpm 8), v9.0 (pnpm 9-10) | ✅ All work |
+| yarn | yarn.lock | Classic v1 | ✅ Works |
+
+#### Key Findings
+
+**npm package-lock.json:**
+- v1: Uses flat `dependencies` object only (legacy)
+- v2: Uses both `packages` and `dependencies` (backwards compat)
+- v3: Uses `packages` only (current)
+- `npm ls --json --package-lock-only` handles all versions automatically
+
+**pnpm-lock.yaml:**
+- v6.0 and v9.0 both use `importers` section with same structure
+- Our regex pattern works for both:
+  ```regex
+  (?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)
+  ```
+
+**yarn.lock:**
+- Classic v1 format tested against React repo (821KB, 2000+ packages)
+- Scoped packages handled correctly: `"@babel/core@^7.0.0":`
+
+#### New Integration Tests Added
+
+| Test | Lock Version | Packages | Status |
+|------|--------------|----------|--------|
+| TestIntegration_NPM_LockfileV1 | v1 | 5 | ✅ Pass |
+| TestIntegration_NPM_LockfileV2 | v2 | 5 | ✅ Pass |
+| TestIntegration_PNPM_LockfileV6 | v6.0 | 5 | ✅ Pass |
+
+#### New Testdata Created
+- `pkg/testdata/npm_v1/` - npm lockfileVersion 1 format
+- `pkg/testdata/npm_v2/` - npm lockfileVersion 2 format
+- `pkg/testdata/pnpm_v6/` - pnpm lockfileVersion 6.0 format
+
+#### Battle Testing Real Projects
+- **React repo:** yarn.lock v1 with 2000+ packages - all `LockFound`
+- **Vue.js core:** pnpm-lock.yaml v9.0 - works correctly
+- **kpas-frontend:** pnpm-lock.yaml v9.0 with scoped packages - works correctly
+
+#### Commit
+- **Hash:** 22a04d7
+- **Message:** "Add integration tests for multiple lock file versions"
+
+**Total Integration Tests:** 14 (was 11, added 3 for lock versions)
+
 ---
 
 ## NOTES
