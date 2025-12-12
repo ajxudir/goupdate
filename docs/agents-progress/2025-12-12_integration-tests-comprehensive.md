@@ -1776,7 +1776,7 @@ Researched and tested multiple lock file format versions to ensure backwards com
 |-----------------|-----------|-----------------|--------|
 | npm | package-lock.json | v1 (npm 5-6), v2 (npm 7-8), v3 (npm 9+) | ✅ All work |
 | pnpm | pnpm-lock.yaml | v6.0 (pnpm 8), v9.0 (pnpm 9-10) | ✅ All work |
-| yarn | yarn.lock | Classic v1 | ✅ Works |
+| yarn | yarn.lock | Classic v1, Berry v2+ | ✅ All work |
 
 #### Key Findings
 
@@ -1820,6 +1820,68 @@ Researched and tested multiple lock file format versions to ensure backwards com
 - **Message:** "Add integration tests for multiple lock file versions"
 
 **Total Integration Tests:** 14 (was 11, added 3 for lock versions)
+
+### 2025-12-12 - Yarn Berry (v2+) Lock File Support
+
+Researched and added support for yarn berry (v2+) lock file format in addition to classic v1.
+
+#### Yarn Lock File Format Differences
+
+**Classic v1 format:**
+```yaml
+lodash@^4.17.21:
+  version "4.17.21"
+  resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.21.tgz"
+```
+
+**Berry (v2+) format:**
+```yaml
+"lodash@npm:^4.17.21":
+  version: 4.17.21
+  resolution: "lodash@npm:4.17.21"
+```
+
+Key differences:
+- Berry uses `@npm:` prefix in key
+- Berry uses colon syntax for version (`version: 4.17.21` vs `version "4.17.21"`)
+- Berry wraps keys in quotes
+
+#### Updated Yarn Regex Pattern
+
+Updated `pkg/config/default.yml` with unified pattern for both formats:
+```regex
+(?m)^"?(?P<n>@?[\w\-\.\/]+)@(?:npm:)?[^:\n"]+[":]+\s*\n\s+version(?::\s*|\s+")(?P<version>[^"\s\n]+)
+```
+
+Pattern handles:
+- Optional quotes around key
+- Optional `@npm:` prefix (berry)
+- Both `: ` and ` "` version syntax
+
+#### New Testdata Created
+
+**pkg/testdata/yarn_berry/:**
+- `package.json` - Standard JS project with `packageManager: yarn@4.0.0`
+- `yarn.lock` - Berry format with `__metadata:` header
+
+#### New Integration Test
+
+**TestIntegration_Yarn_Berry** added to `pkg/lock/integration_test.go`:
+- Verifies all 6 packages resolve correctly
+- Tests both scoped and non-scoped packages
+- Confirms `LockFound` status for all packages
+
+#### Battle Testing
+
+Tested against official yarnpkg/berry repository:
+- Lock file format correctly identified
+- All packages resolve to `LockFound` status
+
+#### Commit
+- **Hash:** 62e32d8
+- **Message:** "Add yarn berry (v2+) lock file support and integration test"
+
+**Total Integration Tests:** 15 (was 14, added 1 for yarn berry)
 
 ---
 
