@@ -1,4 +1,4 @@
-# Plan: Multi-Pattern Extraction with Version Detection (Updated)
+# Plan: Multi-Pattern Extraction with Version Detection (Updated v2)
 
 **Date:** 2025-12-12
 **Status:** Awaiting Approval
@@ -8,56 +8,227 @@
 
 ## Overview
 
-Implement a **reusable** multi-pattern extraction system that can be used across all config areas that use regex patterns. The key behavior:
+Implement a **reusable** multi-pattern extraction system with corrected behavior:
 
-- **If `detect` is NOT set** → Pattern is ALWAYS applied (match all)
-- **If `detect` IS set** → Pattern only activates if `detect` matches the content
-
-This allows conditional pattern activation while maintaining backwards compatibility.
-
----
-
-## Part 1: All Places Where Multi-Pattern Can Be Reused
-
-### Analysis of Config Fields Using Patterns
-
-| Location | Current Field | Use Case | Multi-Pattern Benefit |
-|----------|---------------|----------|----------------------|
-| `lock_files[].extraction.pattern` | Single pattern | Lock file version parsing | Different patterns for v6/v7/v8/v9 |
-| `lock_files[].command_extraction.pattern` | Single pattern | Command output parsing | Different output formats |
-| `outdated.extraction.pattern` | Single pattern | Registry response parsing | Different registry formats |
-| `outdated.exclude_version_patterns[]` | Pattern array (all match) | Version exclusion | Conditional exclusions per PM |
-| `exclude_versions[]` (global) | Pattern array (all match) | Global exclusions | Conditional exclusions |
-| `rule.extraction.pattern` | Single pattern | Manifest parsing | Format variations |
-| `outdated.versioning.regex` | Single pattern | Version component extraction | Different version schemes |
-
-### Code Locations Using Patterns
-
-| File | Function | Pattern Field | Lines |
-|------|----------|---------------|-------|
-| `pkg/lock/resolve.go` | `extractVersionsFromLock()` | `extraction.pattern` | 297-301 |
-| `pkg/lock/resolve.go` | Lock command extraction | `command_extraction.pattern` | 427, 641 |
-| `pkg/outdated/parsers.go` | `parseRawWithExtraction()` | `extraction.pattern` | 189 |
-| `pkg/outdated/core.go` | `applyExclusions()` | `exclude_version_patterns[]` | 429 |
-| `pkg/formats/raw.go` | `Parse()` | `extraction.pattern` | 42-43 |
-| `pkg/update/raw.go` | `updateDeclaredVersion()` | `extraction.pattern` | 37-42 |
+- **If `detect` is NOT set** → Pattern is ALWAYS applied (default = true)
+- **If `detect` IS set** → Pattern only activates if `detect` matches
+- **Multiple patterns CAN match** → All matching patterns run (NOT exclusive)
+- **Results are combined** → All matching patterns contribute results
 
 ---
 
-## Part 2: Unified Pattern Config Schema
+## Part 1: Corrected Detect Logic
 
-### New Reusable Struct
+### Previous (Wrong) Logic
+```
+First detect match wins (exclusive) ❌
+```
+
+### Corrected Logic
+```
+All patterns with matching detect run (additive) ✅
+Patterns without detect always run (default = true) ✅
+```
+
+### Algorithm
 
 ```go
-// PatternCfg defines a single pattern with optional conditional detection.
-// This struct is reusable across all extraction and exclusion configs.
+// SelectPatterns returns ALL applicable patterns for the given content.
+//
+// Logic:
+//   1. If Patterns array is empty, return single Pattern field
+//   2. For each pattern in Patterns:
+//      - If Detect is empty → ALWAYS include (default = true)
+//      - If Detect is set → Include ONLY if detect matches content
+//   3. Return ALL matching patterns (not just first)
+//   4. Fallback to single pattern field if nothing matched
+func SelectPatterns(content string, cfg *ExtractionCfg) []string {
+    if len(cfg.Patterns) == 0 {
+        if cfg.Pattern != "" {
+            return []string{cfg.Pattern}
+        }
+        return nil
+    }
+
+    var result []string
+
+    for _, p := range cfg.Patterns {
+        if p.Detect == "" {
+            // No detect = always include (default true)
+            result = append(result, p.Pattern)
+        } else if matchesDetect(content, p.Detect) {
+            // Detect set and matches = include
+            result = append(result, p.Pattern)
+        }
+        // Detect set but doesn't match = skip
+    }
+
+    // Fallback to single pattern if nothing matched
+    if len(result) == 0 && cfg.Pattern != "" {
+        return []string{cfg.Pattern}
+    }
+
+    return result
+}
+```
+
+### Example Behavior
+
+```yaml
+patterns:
+  - name: "v9_specific"
+    detect: "lockfileVersion:\\s*'9"  # Only runs for v9
+    pattern: '..v9 pattern..'
+
+  - name: "common_fallback"
+    # No detect = always runs
+    pattern: '..common pattern..'
+
+  - name: "v6_v7_v8"
+    detect: "lockfileVersion:\\s*'[678]"  # Only for v6/v7/v8
+    pattern: '..v6-8 pattern..'
+```
+
+**For v9 file:** Runs `v9_specific` + `common_fallback` (2 patterns)
+**For v6 file:** Runs `v6_v7_v8` + `common_fallback` (2 patterns)
+**For v5 file:** Runs `common_fallback` only (1 pattern)
+
+---
+
+## Part 2: Package Exclusion Status (NEW)
+
+### Current Behavior (Problem)
+Ignored packages are completely filtered out - they don't appear in results.
+
+### New Behavior (Solution)
+Ignored packages appear in results with status explaining why they're excluded.
+
+### New Status Constant
+
+**File:** `pkg/lock/status.go`
+
+```go
+const (
+    // ... existing statuses ...
+
+    // InstallStatusIgnored indicates the package is excluded by config.
+    // The package matches an ignore pattern or has ignore: true in package_overrides.
+    InstallStatusIgnored = "Ignored"
+)
+```
+
+### Display Format
+
+```
+┌──────────────────┬─────────┬───────────┬──────────────────┐
+│ Package          │ Version │ Installed │ Status           │
+├──────────────────┼─────────┼───────────┼──────────────────┤
+│ lodash           │ ^4.17.21│ 4.17.21   │ ✓ LockFound      │
+│ eslint           │ ^8.0.0  │ -         │ ⊘ Ignored        │ ← NEW
+│ babel-core       │ ^7.0.0  │ -         │ ⊘ Ignored        │ ← NEW
+└──────────────────┴─────────┴───────────┴──────────────────┘
+```
+
+### Verbose Output
+
+When `--verbose` is enabled:
+
+```
+[DEBUG] Package 'eslint' ignored: matches pattern 'eslint-*' in ignore config
+[DEBUG] Package 'babel-core' ignored: package_overrides.ignore = true
+```
+
+### Implementation
+
+**File:** `pkg/formats/helpers.go`
+
+```go
+// getIgnoreReason returns the reason a package is ignored, or empty if not ignored.
+func getIgnoreReason(name string, cfg *config.PackageManagerCfg) string {
+    if cfg == nil {
+        return ""
+    }
+
+    for _, pattern := range cfg.Ignore {
+        if matched, _ := regexp.MatchString(pattern, name); matched {
+            return fmt.Sprintf("matches ignore pattern '%s'", pattern)
+        }
+    }
+
+    if override, exists := cfg.PackageOverrides[name]; exists && override.Ignore {
+        return "package_overrides.ignore = true"
+    }
+
+    return ""
+}
+```
+
+**File:** `pkg/formats/json.go`, `pkg/formats/raw.go`, etc.
+
+Instead of:
+```go
+if shouldIgnorePackage(name, cfg) {
+    continue  // Skip completely
+}
+```
+
+Change to:
+```go
+if reason := getIgnoreReason(name, cfg); reason != "" {
+    pkg.InstallStatus = lock.InstallStatusIgnored
+    pkg.IgnoreReason = reason  // New field
+    verbose.PackageFiltered(name, reason)
+    // Continue adding to result, don't skip
+}
+```
+
+---
+
+## Part 3: All Config Fields That Can Use Multi-Pattern
+
+### Complete Analysis
+
+| Field | Type | Current | Multi-Pattern Benefit |
+|-------|------|---------|----------------------|
+| **Extraction** ||||
+| `extraction.pattern` | string | Single | Version-specific manifest parsing |
+| `lock_files[].extraction.pattern` | string | Single | Lock file version support |
+| `lock_files[].command_extraction.pattern` | string | Single | Command output format variations |
+| `outdated.extraction.pattern` | string | Single | Registry response format variations |
+| **Version Exclusion** ||||
+| `exclude_versions` (global) | []string | Array (all match) | Conditional exclusions by package type |
+| `rule.exclude_versions` | []string | Array (all match) | Rule-specific conditional exclusions |
+| `outdated.exclude_version_patterns` | []string | Array (all match) | Conditional per-package exclusions |
+| **Package Filtering** ||||
+| `ignore` | []string | Array (all match) | Conditional ignore by package type |
+| **Versioning** ||||
+| `versioning.regex` | string | Single | SemVer vs CalVer detection |
+
+### Fields NOT Suitable for Multi-Pattern
+
+| Field | Reason |
+|-------|--------|
+| `include`, `exclude` | Glob patterns, not regex |
+| `files` | Glob patterns, not regex |
+| `constraint_mapping` | Key-value mapping, not regex |
+
+---
+
+## Part 4: Unified PatternCfg Schema
+
+### Reusable Struct
+
+```go
+// PatternCfg defines a conditional pattern for extraction or exclusion.
+// This struct is reusable across all config areas that use regex patterns.
 type PatternCfg struct {
     // Name is a descriptive identifier for debugging/logging.
     Name string `yaml:"name,omitempty"`
 
-    // Detect is a regex that must match the content for this pattern to activate.
-    // If empty, the pattern is ALWAYS applied (no condition).
+    // Detect is a regex that must match content for this pattern to activate.
+    // If empty (default), the pattern is ALWAYS applied.
     // If set, pattern only activates when detect matches.
+    // Multiple patterns with detect can all match and run.
     Detect string `yaml:"detect,omitempty"`
 
     // Pattern is the extraction/matching regex.
@@ -70,99 +241,36 @@ type PatternCfg struct {
 ```go
 type ExtractionCfg struct {
     // Pattern is a single regex pattern (backwards compatible).
-    // Used when Patterns array is empty.
     Pattern string `yaml:"pattern,omitempty"`
 
-    // Patterns is an array of conditional patterns.
-    // Behavior:
-    //   - Patterns WITHOUT detect: Always applied, results combined
-    //   - Patterns WITH detect: Only applied if detect matches content
-    //   - First pattern WITH detect that matches wins (exclusive)
-    //   - Patterns without detect are additive
+    // Patterns is an array of conditional patterns (NEW).
+    // All patterns with matching detect (or no detect) are applied.
+    // Results from all matching patterns are combined.
     Patterns []PatternCfg `yaml:"patterns,omitempty"`
 
     // ... existing XML fields unchanged
-    Path           string `yaml:"path,omitempty"`
-    NameAttr       string `yaml:"name_attr,omitempty"`
-    // ...
 }
 ```
 
-### Updated Exclude Version Patterns
+### Updated OutdatedCfg
 
 ```go
 type OutdatedCfg struct {
-    // ExcludeVersionPatterns lists regex patterns for versions to exclude.
-    // Can be simple strings (backwards compatible) or PatternCfg objects.
-    // Behavior with PatternCfg:
+    // ExcludeVersionPatterns can be:
+    // - Simple strings (backwards compatible): ["alpha", "beta"]
+    // - PatternCfg objects (NEW): [{detect: "^@types/", pattern: "next"}]
+    // Behavior:
     //   - Without detect: Pattern always applied
-    //   - With detect: Pattern only applied if detect matches package name/version
+    //   - With detect: Pattern only applied if detect matches package name
     ExcludeVersionPatterns []interface{} `yaml:"exclude_version_patterns,omitempty"`
-
-    // ... rest unchanged
 }
 ```
 
 ---
 
-## Part 3: Pattern Selection Logic
+## Part 5: Example Configurations
 
-### Algorithm
-
-```go
-// SelectPatterns returns all applicable patterns for the given content.
-//
-// Logic:
-//   1. If Patterns array is empty, return single Pattern field
-//   2. For patterns WITH detect field:
-//      - Check if detect matches content
-//      - First matching detect wins (exclusive for that pattern type)
-//   3. For patterns WITHOUT detect field:
-//      - Always included (additive)
-//   4. Return combined list of applicable patterns
-func SelectPatterns(content string, cfg *ExtractionCfg) []string {
-    if len(cfg.Patterns) == 0 {
-        if cfg.Pattern != "" {
-            return []string{cfg.Pattern}
-        }
-        return nil
-    }
-
-    var result []string
-    var foundDetectMatch bool
-
-    // First pass: find pattern with matching detect (exclusive)
-    for _, p := range cfg.Patterns {
-        if p.Detect != "" {
-            if matchesDetect(content, p.Detect) && !foundDetectMatch {
-                result = append(result, p.Pattern)
-                foundDetectMatch = true
-                break // Only first detect match wins
-            }
-        }
-    }
-
-    // Second pass: add all patterns without detect (additive)
-    for _, p := range cfg.Patterns {
-        if p.Detect == "" {
-            result = append(result, p.Pattern)
-        }
-    }
-
-    // Fallback to single pattern if nothing matched
-    if len(result) == 0 && cfg.Pattern != "" {
-        return []string{cfg.Pattern}
-    }
-
-    return result
-}
-```
-
----
-
-## Part 4: Example Configurations
-
-### Lock File Extraction (Version-Specific)
+### Lock File Extraction (Multiple Versions)
 
 ```yaml
 pnpm:
@@ -171,18 +279,20 @@ pnpm:
       format: raw
       extraction:
         patterns:
-          # Version-specific patterns (exclusive - first match wins)
+          # v9-specific pattern (runs for v9 only)
           - name: "v9"
             detect: "lockfileVersion:\\s*'9"
             pattern: '(?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)'
 
+          # v6/v7/v8 pattern (runs for those versions)
           - name: "v6_v7_v8"
             detect: "lockfileVersion:\\s*'[678]"
             pattern: '(?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)'
 
-          - name: "v5_legacy"
-            detect: "lockfileVersion:\\s*5"
-            pattern: '(?m)^\s{4}(?P<n>[@\w\-\.\/]+):\s+(?P<version>[\d\.]+)'
+          # Fallback for unknown versions (always runs if nothing else matches)
+          - name: "fallback"
+            # No detect = always runs
+            pattern: '(?m)^\s+(?P<n>[@\w\-\.\/]+):\s+(?P<version>[\d\.]+)'
 ```
 
 ### Yarn Classic vs Berry
@@ -203,37 +313,37 @@ yarn:
             pattern: '(?m)^"?(?P<n>@?[\w\-\.\/]+)@[^:]+:\\s*\n\\s+version\\s+"(?P<version>[^"]+)"'
 ```
 
-### Exclude Version Patterns (Conditional)
+### Conditional Exclude Version Patterns
 
 ```yaml
-# Global exclusions with conditional patterns
-exclude_versions:
-  # Always applied (no detect)
-  - "(?i)[._-]alpha"
-  - "(?i)[._-]beta"
-  - "(?i)[._-]rc"
-
 rules:
   npm:
     outdated:
       exclude_version_patterns:
-        # Always applied
-        - pattern: "(?i)[._-]canary"
+        # Always exclude alpha/beta (no detect = always runs)
+        - pattern: "(?i)[._-]alpha"
+        - pattern: "(?i)[._-]beta"
+        - pattern: "(?i)[._-]rc"
 
-        # Only for scoped packages
-        - name: "scoped_next"
-          detect: "^@"  # Matches package names starting with @
+        # Only exclude 'next' for @types packages
+        - name: "types_next"
+          detect: "^@types/"
           pattern: "(?i)[._-]next"
 
-        # Only for specific package
+        # Only exclude 'experimental' for react packages
         - name: "react_experimental"
-          detect: "^react$"
+          detect: "^react"
           pattern: "(?i)experimental"
+
+        # Only exclude 'canary' for Next.js
+        - name: "nextjs_canary"
+          detect: "^next$"
+          pattern: "(?i)canary"
 ```
 
 ---
 
-## Part 5: Implementation Plan
+## Part 6: Implementation Plan
 
 ### Phase 1: Add PatternCfg Struct (~30 lines)
 
@@ -252,87 +362,118 @@ type PatternCfg struct {
 
 **File:** `pkg/config/model.go`
 
-Add `Patterns []PatternCfg` field to `ExtractionCfg`.
+Add `Patterns []PatternCfg` to ExtractionCfg, LockCommandExtractionCfg, OutdatedExtractionCfg.
 
-### Phase 3: Add Pattern Selection Utility (~80 lines)
+### Phase 3: Add Pattern Selection Utility (~100 lines)
 
 **File:** `pkg/utils/patterns.go` (NEW)
 
 ```go
 package utils
 
-// SelectExtractionPatterns returns applicable patterns based on content.
+import "regexp"
+
+// SelectExtractionPatterns returns all applicable patterns based on content.
+// All patterns with matching detect (or no detect) are included.
 func SelectExtractionPatterns(content string, singlePattern string, patterns []PatternCfg) []string
 
-// matchesDetect checks if content matches a detect regex.
-func matchesDetect(content, detectPattern string) bool
+// MatchesDetect checks if content matches a detect regex.
+func MatchesDetect(content, detectPattern string) bool
 ```
 
-### Phase 4: Update Lock File Extraction (~40 lines)
+### Phase 4: Add Ignored Status (~80 lines)
+
+**File:** `pkg/lock/status.go`
+- Add `InstallStatusIgnored = "Ignored"`
+
+**File:** `pkg/formats/model.go`
+- Add `IgnoreReason string` field to Package struct
+
+**File:** `pkg/formats/helpers.go`
+- Add `getIgnoreReason()` function
+
+**File:** `pkg/display/status.go`
+- Add formatting for Ignored status
+
+### Phase 5: Update Format Parsers (~60 lines)
+
+**Files:** `pkg/formats/json.go`, `pkg/formats/raw.go`, `pkg/formats/yaml.go`, `pkg/formats/xml.go`
+
+Instead of skipping ignored packages, set status and include them.
+
+### Phase 6: Update Lock File Extraction (~40 lines)
 
 **File:** `pkg/lock/resolve.go`
 
 Update `extractVersionsFromLock()` to use `SelectExtractionPatterns()`.
 
-### Phase 5: Update default.yml (~100 lines)
+### Phase 7: Update default.yml (~100 lines)
 
 **File:** `pkg/config/default.yml`
 
-Add multi-pattern configs for:
-- pnpm (v5, v6, v7, v8, v9)
-- yarn (classic, berry)
-- npm (v1, v2, v3) - if needed beyond command-based
+Add multi-pattern configs for pnpm (v6-v9), yarn (classic/berry).
 
-### Phase 6: Add Missing Testdata (~300 lines)
+### Phase 8: Add Testdata (~350 lines)
 
 | Directory | Version | Files |
 |-----------|---------|-------|
 | `pkg/testdata/npm_v3/` | npm v3 | package.json, package-lock.json |
 | `pkg/testdata/pnpm_v7/` | pnpm v7 | package.json, pnpm-lock.yaml |
 | `pkg/testdata/pnpm_v8/` | pnpm v8 | package.json, pnpm-lock.yaml |
-| `pkg/testdata/pnpm_v9/` | pnpm v9 | (rename existing pnpm/) |
+| `pkg/testdata/pnpm_v9/` | pnpm v9 | package.json, pnpm-lock.yaml |
+| `pkg/testdata/ignored_packages/` | Ignored test | package.json with ignored packages |
 
-### Phase 7: Add Integration Tests (~200 lines)
+### Phase 9: Add Integration Tests (~250 lines)
 
 **File:** `pkg/lock/integration_test.go`
 
 ```go
-// Test version-specific pattern selection
+// Version-specific tests
 func TestIntegration_NPM_LockfileV3(t *testing.T)
 func TestIntegration_PNPM_LockfileV7(t *testing.T)
 func TestIntegration_PNPM_LockfileV8(t *testing.T)
 func TestIntegration_PNPM_LockfileV9(t *testing.T)
 
-// Test pattern detection logic
+// Pattern detection tests
 func TestIntegration_PatternDetection_PNPM(t *testing.T)
 func TestIntegration_PatternDetection_Yarn(t *testing.T)
+
+// Ignored packages test (NEW)
+func TestIntegration_IgnoredPackages_ShowStatus(t *testing.T)
+func TestIntegration_IgnoredPackages_VerboseReason(t *testing.T)
 ```
 
-### Phase 8: Add Unit Tests (~150 lines)
+### Phase 10: Add Unit Tests (~150 lines)
 
 **File:** `pkg/utils/patterns_test.go` (NEW)
 
 ```go
-func TestSelectExtractionPatterns_SinglePattern(t *testing.T)
-func TestSelectExtractionPatterns_WithDetect_FirstMatch(t *testing.T)
-func TestSelectExtractionPatterns_WithoutDetect_AllMatch(t *testing.T)
-func TestSelectExtractionPatterns_Mixed(t *testing.T)
-func TestSelectExtractionPatterns_NoMatch_Fallback(t *testing.T)
+func TestSelectPatterns_AllMatchingRun(t *testing.T)
+func TestSelectPatterns_NoDetect_AlwaysRuns(t *testing.T)
+func TestSelectPatterns_WithDetect_OnlyIfMatches(t *testing.T)
+func TestSelectPatterns_Combined_Results(t *testing.T)
 func TestMatchesDetect(t *testing.T)
+```
+
+**File:** `pkg/formats/helpers_test.go`
+
+```go
+func TestGetIgnoreReason_MatchesPattern(t *testing.T)
+func TestGetIgnoreReason_OverrideIgnore(t *testing.T)
+func TestGetIgnoreReason_NotIgnored(t *testing.T)
 ```
 
 ---
 
-## Part 6: Lock File Version Detection
+## Part 7: Lock File Version Detection
 
-### Detection Regex Patterns
+### Detection Patterns
 
-| Package Manager | Version | Detection Regex | Example in File |
-|-----------------|---------|-----------------|-----------------|
+| Package Manager | Version | Detection Regex | Example |
+|-----------------|---------|-----------------|---------|
 | **npm v1** | 1 | `"lockfileVersion":\s*1[,\s}]` | `"lockfileVersion": 1` |
 | **npm v2** | 2 | `"lockfileVersion":\s*2[,\s}]` | `"lockfileVersion": 2` |
 | **npm v3** | 3 | `"lockfileVersion":\s*3[,\s}]` | `"lockfileVersion": 3` |
-| **pnpm v5** | 5 | `lockfileVersion:\s*5` | `lockfileVersion: 5.x` |
 | **pnpm v6** | 6 | `lockfileVersion:\s*'6` | `lockfileVersion: '6.0'` |
 | **pnpm v7** | 7 | `lockfileVersion:\s*'7` | `lockfileVersion: '7.0'` |
 | **pnpm v8** | 8 | `lockfileVersion:\s*'8` | `lockfileVersion: '8.0'` |
@@ -342,84 +483,62 @@ func TestMatchesDetect(t *testing.T)
 
 ---
 
-## Part 7: Backwards Compatibility
-
-### Existing Configs Still Work
-
-```yaml
-# OLD: Single pattern (still works)
-extraction:
-  pattern: '(?m)^...'
-
-# NEW: Multi-pattern with detection
-extraction:
-  patterns:
-    - name: "v9"
-      detect: "lockfileVersion:\\s*'9"
-      pattern: '...'
-```
-
-### Migration Path
-
-1. Existing `pattern` field continues to work as fallback
-2. `patterns` array is optional - only add when needed
-3. No breaking changes to existing `.goupdate.yml` files
-
----
-
-## Part 8: Future Extensibility
-
-### Where Else This Can Be Used
-
-1. **Outdated extraction** - Different registry response formats
-2. **Exclude version patterns** - Conditional exclusions per package
-3. **Manifest parsing** - Different file format variations
-4. **Version regex** - CalVer vs SemVer detection
-
-### Example: Conditional Exclude Patterns
-
-```yaml
-rules:
-  npm:
-    outdated:
-      exclude_version_patterns:
-        # Always exclude alpha/beta
-        - pattern: "(?i)[._-]alpha"
-        - pattern: "(?i)[._-]beta"
-
-        # Only exclude 'next' for @types packages
-        - name: "types_next"
-          detect: "^@types/"
-          pattern: "(?i)[._-]next"
-```
-
----
-
-## Part 9: Summary
+## Part 8: Summary
 
 ### Files to Create/Modify
 
 | File | Action | Lines |
 |------|--------|-------|
-| `pkg/config/model.go` | Add PatternCfg, update ExtractionCfg | ~50 |
-| `pkg/utils/patterns.go` | NEW - Pattern selection logic | ~80 |
+| `pkg/config/model.go` | Add PatternCfg, update structs | ~50 |
+| `pkg/utils/patterns.go` | NEW - Pattern selection | ~100 |
 | `pkg/utils/patterns_test.go` | NEW - Unit tests | ~150 |
-| `pkg/lock/resolve.go` | Update to use pattern selection | ~40 |
-| `pkg/config/default.yml` | Add multi-pattern configs | ~100 |
-| `pkg/testdata/npm_v3/*` | NEW - npm v3 testdata | ~50 |
-| `pkg/testdata/pnpm_v7/*` | NEW - pnpm v7 testdata | ~50 |
-| `pkg/testdata/pnpm_v8/*` | NEW - pnpm v8 testdata | ~50 |
-| `pkg/lock/integration_test.go` | Add version-specific tests | ~200 |
-| **Total** | | **~770 lines** |
+| `pkg/lock/status.go` | Add InstallStatusIgnored | ~5 |
+| `pkg/formats/model.go` | Add IgnoreReason field | ~5 |
+| `pkg/formats/helpers.go` | Add getIgnoreReason() | ~30 |
+| `pkg/formats/*.go` | Update parsers for ignored status | ~60 |
+| `pkg/display/status.go` | Format Ignored status | ~10 |
+| `pkg/lock/resolve.go` | Use pattern selection | ~40 |
+| `pkg/config/default.yml` | Multi-pattern configs | ~100 |
+| `pkg/testdata/*` | New testdata dirs | ~350 |
+| `pkg/lock/integration_test.go` | New tests | ~250 |
+| **Total** | | **~1150 lines** |
 
 ### Key Design Decisions
 
-1. **Reusable `PatternCfg` struct** - Can be used across all config areas
-2. **Detect field behavior:**
-   - NOT set → Pattern ALWAYS applies (additive)
-   - IS set → Pattern only applies if detect matches (exclusive)
-3. **First detect match wins** - Prevents duplicate results
-4. **Fallback to single pattern** - Backwards compatible
+1. **All matching patterns run** - NOT first match wins
+2. **No detect = always runs** - Default is true
+3. **Ignored packages show in results** - With status explaining why
+4. **Verbose shows reason** - When `--verbose` enabled
+5. **Backwards compatible** - Single `pattern` field still works
+
+---
+
+## Part 9: Documentation Updates
+
+### Add to docs/status-reference.md (or similar)
+
+```markdown
+## Package Status Values
+
+| Status | Icon | Description |
+|--------|------|-------------|
+| LockFound | ✓ | Version found in lock file |
+| NotInLock | ℹ | Package not in lock file |
+| LockMissing | ⚠ | Lock file doesn't exist |
+| Floating | ⊗ | Floating constraint (*, >=x) |
+| NotConfigured | ⊘ | No lock file config for rule |
+| SelfPinned | 📌 | Manifest is self-pinning |
+| VersionMissing | ⊗ | No concrete version found |
+| **Ignored** | ⊘ | **Package excluded by config** |
+
+### Ignored Status
+
+Packages with `Ignored` status are excluded from processing due to:
+- Matching an `ignore` pattern in the rule config
+- Having `ignore: true` in `package_overrides`
+
+Use `--verbose` to see the specific reason each package is ignored.
+```
 
 ---
 
@@ -427,15 +546,17 @@ rules:
 
 Please confirm:
 
-1. **Is the detect behavior correct?**
-   - Without detect = always apply (additive)
-   - With detect = only if matches (first match wins)
+1. **Corrected detect logic?**
+   - All matching patterns run (additive, not exclusive)
+   - No detect = always runs (default true)
 
-2. **Testdata scope:**
+2. **Ignored status implementation?**
+   - Show ignored packages in results with status
+   - Verbose output shows reason
+
+3. **Testdata scope:**
    - npm v3
-   - pnpm v6, v7, v8, v9 (skip deprecated v5?)
-
-3. **Should exclude_version_patterns also support PatternCfg?**
-   - Would enable conditional exclusions per package
+   - pnpm v6, v7, v8, v9
+   - Ignored packages testdata
 
 4. **Any additional requirements?**
