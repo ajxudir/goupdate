@@ -1,4 +1,4 @@
-# Plan: Multi-Pattern Extraction with Version Detection
+# Plan: Multi-Pattern Extraction with Version Detection (Updated)
 
 **Date:** 2025-12-12
 **Status:** Awaiting Approval
@@ -8,175 +8,162 @@
 
 ## Overview
 
-Implement multi-pattern extraction support for lock files, allowing multiple regex patterns with version detection to handle different lock file format versions cleanly.
+Implement a **reusable** multi-pattern extraction system that can be used across all config areas that use regex patterns. The key behavior:
+
+- **If `detect` is NOT set** → Pattern is ALWAYS applied (match all)
+- **If `detect` IS set** → Pattern only activates if `detect` matches the content
+
+This allows conditional pattern activation while maintaining backwards compatibility.
 
 ---
 
-## Part 1: Lock File Version Detection Fields
+## Part 1: All Places Where Multi-Pattern Can Be Reused
 
-### Version Detection Patterns by Format
+### Analysis of Config Fields Using Patterns
 
-| Package Manager | Lock File | Version Field | Detection Pattern |
-|-----------------|-----------|---------------|-------------------|
-| **npm v1** | package-lock.json | `"lockfileVersion": 1` | `"lockfileVersion":\s*1[,\s}]` |
-| **npm v2** | package-lock.json | `"lockfileVersion": 2` | `"lockfileVersion":\s*2[,\s}]` |
-| **npm v3** | package-lock.json | `"lockfileVersion": 3` | `"lockfileVersion":\s*3[,\s}]` |
-| **pnpm v5** | pnpm-lock.yaml | `lockfileVersion: 5.x` | `lockfileVersion:\s*'?5` |
-| **pnpm v6** | pnpm-lock.yaml | `lockfileVersion: '6.0'` | `lockfileVersion:\s*'6` |
-| **pnpm v7** | pnpm-lock.yaml | `lockfileVersion: '7.0'` | `lockfileVersion:\s*'7` |
-| **pnpm v8** | pnpm-lock.yaml | `lockfileVersion: '8.0'` | `lockfileVersion:\s*'8` |
-| **pnpm v9** | pnpm-lock.yaml | `lockfileVersion: '9.0'` | `lockfileVersion:\s*'9` |
-| **yarn classic** | yarn.lock | `# yarn lockfile v1` | `#\s*yarn lockfile v1` |
-| **yarn berry** | yarn.lock | `__metadata:\n  version:` | `__metadata:\s*\n\s+version:` |
+| Location | Current Field | Use Case | Multi-Pattern Benefit |
+|----------|---------------|----------|----------------------|
+| `lock_files[].extraction.pattern` | Single pattern | Lock file version parsing | Different patterns for v6/v7/v8/v9 |
+| `lock_files[].command_extraction.pattern` | Single pattern | Command output parsing | Different output formats |
+| `outdated.extraction.pattern` | Single pattern | Registry response parsing | Different registry formats |
+| `outdated.exclude_version_patterns[]` | Pattern array (all match) | Version exclusion | Conditional exclusions per PM |
+| `exclude_versions[]` (global) | Pattern array (all match) | Global exclusions | Conditional exclusions |
+| `rule.extraction.pattern` | Single pattern | Manifest parsing | Format variations |
+| `outdated.versioning.regex` | Single pattern | Version component extraction | Different version schemes |
+
+### Code Locations Using Patterns
+
+| File | Function | Pattern Field | Lines |
+|------|----------|---------------|-------|
+| `pkg/lock/resolve.go` | `extractVersionsFromLock()` | `extraction.pattern` | 297-301 |
+| `pkg/lock/resolve.go` | Lock command extraction | `command_extraction.pattern` | 427, 641 |
+| `pkg/outdated/parsers.go` | `parseRawWithExtraction()` | `extraction.pattern` | 189 |
+| `pkg/outdated/core.go` | `applyExclusions()` | `exclude_version_patterns[]` | 429 |
+| `pkg/formats/raw.go` | `Parse()` | `extraction.pattern` | 42-43 |
+| `pkg/update/raw.go` | `updateDeclaredVersion()` | `extraction.pattern` | 37-42 |
 
 ---
 
-## Part 2: New Config Schema
+## Part 2: Unified Pattern Config Schema
 
-### Current Schema (Single Pattern)
-
-```yaml
-lock_files:
-  - files: ["**/pnpm-lock.yaml"]
-    format: raw
-    extraction:
-      pattern: '(?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:...'
-```
-
-### Proposed Schema (Multi-Pattern with Detection)
-
-```yaml
-lock_files:
-  - files: ["**/pnpm-lock.yaml"]
-    format: raw
-    extraction:
-      # Multiple patterns with version detection
-      patterns:
-        - name: "v9"
-          detect: "lockfileVersion:\\s*'9"    # Regex to detect this format
-          pattern: '(?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)'
-
-        - name: "v6_v7_v8"
-          detect: "lockfileVersion:\\s*'[678]"
-          pattern: '(?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)'
-
-        - name: "v5"
-          detect: "lockfileVersion:\\s*'?5"
-          pattern: '...different pattern for v5...'
-
-      # Fallback pattern if no detection matches (backwards compatible)
-      pattern: '...default pattern...'
-```
-
-### Schema Definition Changes
-
-**File:** `pkg/config/model.go`
+### New Reusable Struct
 
 ```go
-// ExtractionPatternCfg defines a single extraction pattern with optional detection.
-type ExtractionPatternCfg struct {
-    // Name is a descriptive name for this pattern (for debugging/logging).
+// PatternCfg defines a single pattern with optional conditional detection.
+// This struct is reusable across all extraction and exclusion configs.
+type PatternCfg struct {
+    // Name is a descriptive identifier for debugging/logging.
     Name string `yaml:"name,omitempty"`
 
-    // Detect is a regex pattern that must match the file content for this pattern to activate.
-    // Only one pattern can activate per file. First matching detection wins.
+    // Detect is a regex that must match the content for this pattern to activate.
+    // If empty, the pattern is ALWAYS applied (no condition).
+    // If set, pattern only activates when detect matches.
     Detect string `yaml:"detect,omitempty"`
 
-    // Pattern is the extraction regex with named groups (n/name, version).
+    // Pattern is the extraction/matching regex.
     Pattern string `yaml:"pattern"`
-}
-
-// ExtractionCfg holds configuration for version extraction from files.
-type ExtractionCfg struct {
-    // Pattern is a single regex pattern (backwards compatible, used as fallback).
-    Pattern string `yaml:"pattern,omitempty"`
-
-    // Patterns is an array of patterns with version detection.
-    // Only one pattern activates per file based on the Detect field.
-    Patterns []ExtractionPatternCfg `yaml:"patterns,omitempty"`
-
-    // ... existing fields (Path, NameAttr, etc.)
 }
 ```
 
----
+### Updated ExtractionCfg
 
-## Part 3: Implementation Plan
-
-### Phase 1: Schema & Model Changes (~50 lines)
-
-**Files to modify:**
-- `pkg/config/model.go` - Add `ExtractionPatternCfg` struct, update `ExtractionCfg`
-
-**Changes:**
 ```go
-// Add new struct
-type ExtractionPatternCfg struct {
-    Name    string `yaml:"name,omitempty"`
-    Detect  string `yaml:"detect,omitempty"`
-    Pattern string `yaml:"pattern"`
-}
-
-// Update existing struct
 type ExtractionCfg struct {
-    Pattern  string                  `yaml:"pattern,omitempty"`
-    Patterns []ExtractionPatternCfg  `yaml:"patterns,omitempty"`  // NEW
+    // Pattern is a single regex pattern (backwards compatible).
+    // Used when Patterns array is empty.
+    Pattern string `yaml:"pattern,omitempty"`
+
+    // Patterns is an array of conditional patterns.
+    // Behavior:
+    //   - Patterns WITHOUT detect: Always applied, results combined
+    //   - Patterns WITH detect: Only applied if detect matches content
+    //   - First pattern WITH detect that matches wins (exclusive)
+    //   - Patterns without detect are additive
+    Patterns []PatternCfg `yaml:"patterns,omitempty"`
+
+    // ... existing XML fields unchanged
+    Path           string `yaml:"path,omitempty"`
+    NameAttr       string `yaml:"name_attr,omitempty"`
+    // ...
+}
+```
+
+### Updated Exclude Version Patterns
+
+```go
+type OutdatedCfg struct {
+    // ExcludeVersionPatterns lists regex patterns for versions to exclude.
+    // Can be simple strings (backwards compatible) or PatternCfg objects.
+    // Behavior with PatternCfg:
+    //   - Without detect: Pattern always applied
+    //   - With detect: Pattern only applied if detect matches package name/version
+    ExcludeVersionPatterns []interface{} `yaml:"exclude_version_patterns,omitempty"`
+
     // ... rest unchanged
 }
 ```
 
-### Phase 2: Pattern Selection Logic (~80 lines)
+---
 
-**Files to modify:**
-- `pkg/lock/resolve.go` - Add pattern selection logic in `extractVersionsFromLock()`
+## Part 3: Pattern Selection Logic
 
-**New function:**
+### Algorithm
+
 ```go
-// selectExtractionPattern selects the appropriate pattern based on file content.
+// SelectPatterns returns all applicable patterns for the given content.
 //
-// It performs the following:
-//   - If Patterns is empty, returns the single Pattern field (backwards compatible)
-//   - Iterates through Patterns array in order
-//   - For each pattern with a Detect field, checks if content matches
-//   - Returns first pattern where Detect matches
-//   - If no Detect matches, returns first pattern without Detect field
-//   - If still no match, returns empty string (will use fallback Pattern)
-func selectExtractionPattern(content string, cfg *ExtractionCfg) (string, string) {
+// Logic:
+//   1. If Patterns array is empty, return single Pattern field
+//   2. For patterns WITH detect field:
+//      - Check if detect matches content
+//      - First matching detect wins (exclusive for that pattern type)
+//   3. For patterns WITHOUT detect field:
+//      - Always included (additive)
+//   4. Return combined list of applicable patterns
+func SelectPatterns(content string, cfg *ExtractionCfg) []string {
     if len(cfg.Patterns) == 0 {
-        return cfg.Pattern, ""
+        if cfg.Pattern != "" {
+            return []string{cfg.Pattern}
+        }
+        return nil
     }
 
+    var result []string
+    var foundDetectMatch bool
+
+    // First pass: find pattern with matching detect (exclusive)
+    for _, p := range cfg.Patterns {
+        if p.Detect != "" {
+            if matchesDetect(content, p.Detect) && !foundDetectMatch {
+                result = append(result, p.Pattern)
+                foundDetectMatch = true
+                break // Only first detect match wins
+            }
+        }
+    }
+
+    // Second pass: add all patterns without detect (additive)
     for _, p := range cfg.Patterns {
         if p.Detect == "" {
-            continue // Skip patterns without detect for now
-        }
-        re, err := regexp.Compile(p.Detect)
-        if err != nil {
-            continue
-        }
-        if re.MatchString(content) {
-            return p.Pattern, p.Name
+            result = append(result, p.Pattern)
         }
     }
 
-    // Try first pattern without Detect (default)
-    for _, p := range cfg.Patterns {
-        if p.Detect == "" {
-            return p.Pattern, p.Name
-        }
+    // Fallback to single pattern if nothing matched
+    if len(result) == 0 && cfg.Pattern != "" {
+        return []string{cfg.Pattern}
     }
 
-    // Fallback to single pattern field
-    return cfg.Pattern, ""
+    return result
 }
 ```
 
-### Phase 3: Update default.yml with Multi-Pattern Support (~100 lines)
+---
 
-**File to modify:**
-- `pkg/config/default.yml`
+## Part 4: Example Configurations
 
-**Changes for pnpm:**
+### Lock File Extraction (Version-Specific)
+
 ```yaml
 pnpm:
   lock_files:
@@ -184,6 +171,7 @@ pnpm:
       format: raw
       extraction:
         patterns:
+          # Version-specific patterns (exclusive - first match wins)
           - name: "v9"
             detect: "lockfileVersion:\\s*'9"
             pattern: '(?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)'
@@ -192,12 +180,13 @@ pnpm:
             detect: "lockfileVersion:\\s*'[678]"
             pattern: '(?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)'
 
-          - name: "v5_fallback"
-            # No detect = fallback for older formats
-            pattern: '(?m)^\s+(?P<n>[@\w\-\.\/]+):\s+(?P<version>[\d\.]+)'
+          - name: "v5_legacy"
+            detect: "lockfileVersion:\\s*5"
+            pattern: '(?m)^\s{4}(?P<n>[@\w\-\.\/]+):\s+(?P<version>[\d\.]+)'
 ```
 
-**Changes for yarn:**
+### Yarn Classic vs Berry
+
 ```yaml
 yarn:
   lock_files:
@@ -214,200 +203,239 @@ yarn:
             pattern: '(?m)^"?(?P<n>@?[\w\-\.\/]+)@[^:]+:\\s*\n\\s+version\\s+"(?P<version>[^"]+)"'
 ```
 
-### Phase 4: Add Missing Testdata (~200 lines of test files)
+### Exclude Version Patterns (Conditional)
 
-**New directories to create:**
+```yaml
+# Global exclusions with conditional patterns
+exclude_versions:
+  # Always applied (no detect)
+  - "(?i)[._-]alpha"
+  - "(?i)[._-]beta"
+  - "(?i)[._-]rc"
 
-| Directory | Version | Content |
-|-----------|---------|---------|
-| `pkg/testdata/npm_v3/` | npm v3 | package.json + package-lock.json (lockfileVersion: 3) |
-| `pkg/testdata/pnpm_v7/` | pnpm v7 | package.json + pnpm-lock.yaml (lockfileVersion: '7.0') |
-| `pkg/testdata/pnpm_v8/` | pnpm v8 | package.json + pnpm-lock.yaml (lockfileVersion: '8.0') |
-| `pkg/testdata/pnpm_v9/` | pnpm v9 | Already exists as `pkg/testdata/pnpm/` - rename for consistency |
+rules:
+  npm:
+    outdated:
+      exclude_version_patterns:
+        # Always applied
+        - pattern: "(?i)[._-]canary"
 
-**Note:** pnpm v5 is deprecated and auto-converts, so we'll skip it.
+        # Only for scoped packages
+        - name: "scoped_next"
+          detect: "^@"  # Matches package names starting with @
+          pattern: "(?i)[._-]next"
 
-### Phase 5: Add Integration Tests (~150 lines)
-
-**File to modify:**
-- `pkg/lock/integration_test.go`
-
-**New tests:**
-```go
-// TestIntegration_NPM_LockfileV3 tests npm lockfileVersion 3 (npm 9+ format).
-func TestIntegration_NPM_LockfileV3(t *testing.T) { ... }
-
-// TestIntegration_PNPM_LockfileV7 tests pnpm lockfileVersion 7.0.
-func TestIntegration_PNPM_LockfileV7(t *testing.T) { ... }
-
-// TestIntegration_PNPM_LockfileV8 tests pnpm lockfileVersion 8.0.
-func TestIntegration_PNPM_LockfileV8(t *testing.T) { ... }
-
-// TestIntegration_PNPM_LockfileV9 tests pnpm lockfileVersion 9.0.
-func TestIntegration_PNPM_LockfileV9(t *testing.T) { ... }
-
-// TestIntegration_PatternDetection tests that correct pattern is selected.
-func TestIntegration_PatternDetection(t *testing.T) { ... }
-```
-
-### Phase 6: Unit Tests for Pattern Selection (~100 lines)
-
-**New file:**
-- `pkg/lock/pattern_selection_test.go`
-
-**Tests:**
-```go
-func TestSelectExtractionPattern_SinglePattern(t *testing.T) { ... }
-func TestSelectExtractionPattern_MultiPattern_FirstMatch(t *testing.T) { ... }
-func TestSelectExtractionPattern_MultiPattern_SecondMatch(t *testing.T) { ... }
-func TestSelectExtractionPattern_MultiPattern_NoMatch_Fallback(t *testing.T) { ... }
-func TestSelectExtractionPattern_EmptyPatterns_UsesSinglePattern(t *testing.T) { ... }
+        # Only for specific package
+        - name: "react_experimental"
+          detect: "^react$"
+          pattern: "(?i)experimental"
 ```
 
 ---
 
-## Part 4: Testdata Structure
+## Part 5: Implementation Plan
 
-### npm v3 Testdata
+### Phase 1: Add PatternCfg Struct (~30 lines)
 
-**File:** `pkg/testdata/npm_v3/package-lock.json`
-```json
-{
-  "name": "test-npm-v3-lockfile",
-  "version": "1.0.0",
-  "lockfileVersion": 3,
-  "requires": true,
-  "packages": {
-    "": {
-      "name": "test-npm-v3-lockfile",
-      "version": "1.0.0",
-      "dependencies": {
-        "lodash": "^4.17.21",
-        "express": "~4.18.2"
-      }
-    },
-    "node_modules/lodash": {
-      "version": "4.17.21"
-    },
-    "node_modules/express": {
-      "version": "4.18.3"
-    }
-  }
+**File:** `pkg/config/model.go`
+
+```go
+// PatternCfg defines a conditional pattern for extraction or exclusion.
+type PatternCfg struct {
+    Name    string `yaml:"name,omitempty"`
+    Detect  string `yaml:"detect,omitempty"`
+    Pattern string `yaml:"pattern"`
 }
 ```
 
-### pnpm v7/v8/v9 Testdata
+### Phase 2: Update ExtractionCfg (~20 lines)
 
-All three versions use the same `importers` structure, just different `lockfileVersion` values:
+**File:** `pkg/config/model.go`
 
-**File:** `pkg/testdata/pnpm_v7/pnpm-lock.yaml`
-```yaml
-lockfileVersion: '7.0'
+Add `Patterns []PatternCfg` field to `ExtractionCfg`.
 
-settings:
-  autoInstallPeers: true
+### Phase 3: Add Pattern Selection Utility (~80 lines)
 
-importers:
-  .:
-    dependencies:
-      lodash:
-        specifier: ^4.17.21
-        version: 4.17.21
-      express:
-        specifier: ~4.18.2
-        version: 4.18.3
+**File:** `pkg/utils/patterns.go` (NEW)
+
+```go
+package utils
+
+// SelectExtractionPatterns returns applicable patterns based on content.
+func SelectExtractionPatterns(content string, singlePattern string, patterns []PatternCfg) []string
+
+// matchesDetect checks if content matches a detect regex.
+func matchesDetect(content, detectPattern string) bool
+```
+
+### Phase 4: Update Lock File Extraction (~40 lines)
+
+**File:** `pkg/lock/resolve.go`
+
+Update `extractVersionsFromLock()` to use `SelectExtractionPatterns()`.
+
+### Phase 5: Update default.yml (~100 lines)
+
+**File:** `pkg/config/default.yml`
+
+Add multi-pattern configs for:
+- pnpm (v5, v6, v7, v8, v9)
+- yarn (classic, berry)
+- npm (v1, v2, v3) - if needed beyond command-based
+
+### Phase 6: Add Missing Testdata (~300 lines)
+
+| Directory | Version | Files |
+|-----------|---------|-------|
+| `pkg/testdata/npm_v3/` | npm v3 | package.json, package-lock.json |
+| `pkg/testdata/pnpm_v7/` | pnpm v7 | package.json, pnpm-lock.yaml |
+| `pkg/testdata/pnpm_v8/` | pnpm v8 | package.json, pnpm-lock.yaml |
+| `pkg/testdata/pnpm_v9/` | pnpm v9 | (rename existing pnpm/) |
+
+### Phase 7: Add Integration Tests (~200 lines)
+
+**File:** `pkg/lock/integration_test.go`
+
+```go
+// Test version-specific pattern selection
+func TestIntegration_NPM_LockfileV3(t *testing.T)
+func TestIntegration_PNPM_LockfileV7(t *testing.T)
+func TestIntegration_PNPM_LockfileV8(t *testing.T)
+func TestIntegration_PNPM_LockfileV9(t *testing.T)
+
+// Test pattern detection logic
+func TestIntegration_PatternDetection_PNPM(t *testing.T)
+func TestIntegration_PatternDetection_Yarn(t *testing.T)
+```
+
+### Phase 8: Add Unit Tests (~150 lines)
+
+**File:** `pkg/utils/patterns_test.go` (NEW)
+
+```go
+func TestSelectExtractionPatterns_SinglePattern(t *testing.T)
+func TestSelectExtractionPatterns_WithDetect_FirstMatch(t *testing.T)
+func TestSelectExtractionPatterns_WithoutDetect_AllMatch(t *testing.T)
+func TestSelectExtractionPatterns_Mixed(t *testing.T)
+func TestSelectExtractionPatterns_NoMatch_Fallback(t *testing.T)
+func TestMatchesDetect(t *testing.T)
 ```
 
 ---
 
-## Part 5: Benefits of This Approach
+## Part 6: Lock File Version Detection
 
-### 1. Version-Specific Pattern Selection
-- Only one pattern activates per file
-- No duplicate results
-- Guaranteed correct regex for file version
+### Detection Regex Patterns
 
-### 2. Self-Documenting
-- Each pattern has a name
-- Detection regex is explicit
-- Easy to understand which pattern applies
-
-### 3. Backwards Compatible
-- Single `pattern` field still works
-- `patterns` array is optional
-- Existing configs don't break
-
-### 4. Easy to Extend
-- Adding new version = add new pattern entry
-- No code changes needed for new versions
-- Users can add custom patterns in their `.goupdate.yml`
-
-### 5. Better Debugging
-- Logs can show which pattern was selected
-- Easier to troubleshoot extraction issues
+| Package Manager | Version | Detection Regex | Example in File |
+|-----------------|---------|-----------------|-----------------|
+| **npm v1** | 1 | `"lockfileVersion":\s*1[,\s}]` | `"lockfileVersion": 1` |
+| **npm v2** | 2 | `"lockfileVersion":\s*2[,\s}]` | `"lockfileVersion": 2` |
+| **npm v3** | 3 | `"lockfileVersion":\s*3[,\s}]` | `"lockfileVersion": 3` |
+| **pnpm v5** | 5 | `lockfileVersion:\s*5` | `lockfileVersion: 5.x` |
+| **pnpm v6** | 6 | `lockfileVersion:\s*'6` | `lockfileVersion: '6.0'` |
+| **pnpm v7** | 7 | `lockfileVersion:\s*'7` | `lockfileVersion: '7.0'` |
+| **pnpm v8** | 8 | `lockfileVersion:\s*'8` | `lockfileVersion: '8.0'` |
+| **pnpm v9** | 9 | `lockfileVersion:\s*'9` | `lockfileVersion: '9.0'` |
+| **yarn classic** | v1 | `#\s*yarn lockfile v1` | `# yarn lockfile v1` |
+| **yarn berry** | v2+ | `__metadata:\s*\n\s+version:` | `__metadata:\n  version: 8` |
 
 ---
 
-## Part 6: Implementation Order
+## Part 7: Backwards Compatibility
 
-| Step | Description | Files | Lines | Time Est. |
-|------|-------------|-------|-------|-----------|
-| 1 | Add `ExtractionPatternCfg` struct | model.go | ~20 | 10 min |
-| 2 | Implement `selectExtractionPattern()` | resolve.go | ~50 | 20 min |
-| 3 | Update `extractVersionsFromLock()` to use selection | resolve.go | ~20 | 10 min |
-| 4 | Create npm_v3 testdata | testdata/npm_v3/* | ~50 | 15 min |
-| 5 | Create pnpm_v7, v8, v9 testdata | testdata/pnpm_v*/* | ~100 | 30 min |
-| 6 | Update default.yml with multi-pattern | default.yml | ~60 | 20 min |
-| 7 | Add integration tests | integration_test.go | ~120 | 30 min |
-| 8 | Add unit tests for pattern selection | pattern_selection_test.go | ~80 | 20 min |
-| 9 | Run full test suite | - | - | 10 min |
-| 10 | Update progress report | docs/ | ~50 | 10 min |
-
-**Total Estimated: ~550 lines, ~3 hours**
-
----
-
-## Part 7: Validation Criteria
-
-- [ ] All existing integration tests still pass (backwards compatible)
-- [ ] New `TestIntegration_NPM_LockfileV3` passes
-- [ ] New `TestIntegration_PNPM_LockfileV7` passes
-- [ ] New `TestIntegration_PNPM_LockfileV8` passes
-- [ ] New `TestIntegration_PNPM_LockfileV9` passes
-- [ ] `TestIntegration_PatternDetection` verifies correct pattern selection
-- [ ] Unit tests for `selectExtractionPattern` all pass
-- [ ] Race detector clean: `go test -race ./pkg/lock/...`
-- [ ] Coverage maintained ≥95% for pkg/lock
-
----
-
-## Part 8: Example Usage in User Config
-
-Users can override patterns in their `.goupdate.yml`:
+### Existing Configs Still Work
 
 ```yaml
-extends: [default]
+# OLD: Single pattern (still works)
+extraction:
+  pattern: '(?m)^...'
 
+# NEW: Multi-pattern with detection
+extraction:
+  patterns:
+    - name: "v9"
+      detect: "lockfileVersion:\\s*'9"
+      pattern: '...'
+```
+
+### Migration Path
+
+1. Existing `pattern` field continues to work as fallback
+2. `patterns` array is optional - only add when needed
+3. No breaking changes to existing `.goupdate.yml` files
+
+---
+
+## Part 8: Future Extensibility
+
+### Where Else This Can Be Used
+
+1. **Outdated extraction** - Different registry response formats
+2. **Exclude version patterns** - Conditional exclusions per package
+3. **Manifest parsing** - Different file format variations
+4. **Version regex** - CalVer vs SemVer detection
+
+### Example: Conditional Exclude Patterns
+
+```yaml
 rules:
-  pnpm:
-    lock_files:
-      - files: ["**/pnpm-lock.yaml"]
-        format: raw
-        extraction:
-          patterns:
-            # Custom pattern for their specific pnpm setup
-            - name: "custom_monorepo"
-              detect: "lockfileVersion:\\s*'9"
-              pattern: '(?m)^\s{4}''(?P<n>[@\w\-\.\/]+)'':\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)'
+  npm:
+    outdated:
+      exclude_version_patterns:
+        # Always exclude alpha/beta
+        - pattern: "(?i)[._-]alpha"
+        - pattern: "(?i)[._-]beta"
+
+        # Only exclude 'next' for @types packages
+        - name: "types_next"
+          detect: "^@types/"
+          pattern: "(?i)[._-]next"
 ```
+
+---
+
+## Part 9: Summary
+
+### Files to Create/Modify
+
+| File | Action | Lines |
+|------|--------|-------|
+| `pkg/config/model.go` | Add PatternCfg, update ExtractionCfg | ~50 |
+| `pkg/utils/patterns.go` | NEW - Pattern selection logic | ~80 |
+| `pkg/utils/patterns_test.go` | NEW - Unit tests | ~150 |
+| `pkg/lock/resolve.go` | Update to use pattern selection | ~40 |
+| `pkg/config/default.yml` | Add multi-pattern configs | ~100 |
+| `pkg/testdata/npm_v3/*` | NEW - npm v3 testdata | ~50 |
+| `pkg/testdata/pnpm_v7/*` | NEW - pnpm v7 testdata | ~50 |
+| `pkg/testdata/pnpm_v8/*` | NEW - pnpm v8 testdata | ~50 |
+| `pkg/lock/integration_test.go` | Add version-specific tests | ~200 |
+| **Total** | | **~770 lines** |
+
+### Key Design Decisions
+
+1. **Reusable `PatternCfg` struct** - Can be used across all config areas
+2. **Detect field behavior:**
+   - NOT set → Pattern ALWAYS applies (additive)
+   - IS set → Pattern only applies if detect matches (exclusive)
+3. **First detect match wins** - Prevents duplicate results
+4. **Fallback to single pattern** - Backwards compatible
 
 ---
 
 ## Awaiting Approval
 
-Please review this plan and confirm:
+Please confirm:
 
-1. **Schema design** - Is the `patterns` array with `name`, `detect`, `pattern` fields acceptable?
-2. **Detection approach** - Is "first matching detection wins" the right logic?
-3. **Testdata scope** - npm v3 + pnpm v7/v8/v9 (skip deprecated v5)?
+1. **Is the detect behavior correct?**
+   - Without detect = always apply (additive)
+   - With detect = only if matches (first match wins)
+
+2. **Testdata scope:**
+   - npm v3
+   - pnpm v6, v7, v8, v9 (skip deprecated v5?)
+
+3. **Should exclude_version_patterns also support PatternCfg?**
+   - Would enable conditional exclusions per package
+
 4. **Any additional requirements?**
