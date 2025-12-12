@@ -16,11 +16,88 @@ Add comprehensive integration tests for all 9 officially supported package manag
 - ✅ GitHub workflow requirements (95% total coverage, 75% function minimum)
 - ✅ Documentation review (testing.md, chaos-testing.md, AGENTS.md)
 - ✅ Critical code path analysis (docblocks, error handling)
+- ✅ **NEW: Mock data vs real data analysis**
+- ✅ **NEW: Testdata directory structure audit**
 
 **Key Insight:** The pnpm --lockfile-only bug would have been caught by:
 1. Integration test that verifies lock resolution after update
 2. Command execution test that runs pnpm ls --json (would fail if node_modules missing)
 3. Real PM test that executes full update cycle
+
+---
+
+## UPDATED: Mock Data Organization Plan
+
+### Problem Statement
+
+Currently, test data that requires command mocking is mixed with test data that can work with real package files. This creates confusion and makes it hard to:
+1. Run integration tests with real package managers
+2. Understand which tests need mocks vs real data
+3. Maintain clear separation of concerns
+
+### Solution: mocksdata and mocksdata_errors Directories
+
+Create parallel directory structures for mock-dependent test data:
+
+```
+pkg/
+├── testdata/                    # REAL package files only
+│   ├── npm/                     # Real npm project
+│   ├── pnpm/                    # Real pnpm project (NEW)
+│   ├── yarn/                    # Real yarn project (NEW)
+│   ├── composer/                # Real composer project
+│   ├── mod/                     # Real Go module
+│   ├── requirements/            # Real requirements.txt
+│   ├── pipfile/                 # Real Pipfile project
+│   ├── msbuild/                 # Real MSBuild project
+│   ├── nuget/                   # Real NuGet project
+│   └── groups/                  # Feature tests (real files)
+│
+├── testdata_errors/             # Error scenarios with REAL malformed files
+│   ├── _config-errors/          # Config validation errors
+│   ├── _invalid-syntax/         # Malformed syntax (real broken files)
+│   ├── _malformed/              # Structurally broken files
+│   ├── _lock-errors/            # Lock file parse errors
+│   ├── _lock-missing/           # Missing lock files
+│   ├── _lock-not-found/         # Lock file not found
+│   └── _lock-scenarios/         # Multi-lock config tests
+│
+├── mocksdata/                   # Test data requiring MOCKED commands (NEW)
+│   └── README.md                # Explains mock data purpose
+│
+└── mocksdata_errors/            # Error scenarios requiring MOCKED commands (NEW)
+    ├── invalid-command/         # MOVED from testdata_errors
+    │   └── package.json
+    ├── command-timeout/         # MOVED from testdata_errors
+    │   └── package.json
+    └── package-not-found/       # MOVED from testdata_errors
+        └── npm/
+            ├── package.json
+            ├── package-lock.json
+            └── .goupdate.yml
+```
+
+### Files to Move from testdata_errors to mocksdata_errors
+
+| Current Location | New Location | Reason |
+|-----------------|--------------|--------|
+| `testdata_errors/invalid-command/` | `mocksdata_errors/invalid-command/` | Tests non-existent command execution - requires mocked failure |
+| `testdata_errors/command-timeout/` | `mocksdata_errors/command-timeout/` | Tests timeout handling - requires mocked slow command |
+| `testdata_errors/package-not-found/npm/` | `mocksdata_errors/package-not-found/npm/` | Tests registry 404 - requires mocked registry response |
+
+### Files That Stay in testdata_errors (Real Error Scenarios)
+
+| Directory | Content | Why It Stays |
+|-----------|---------|--------------|
+| `_config-errors/` | Invalid YAML, duplicate groups, unknown extends | Real config validation - no mocks needed |
+| `_invalid-syntax/` | Malformed JSON/XML/TOML files | Real parse errors - no mocks needed |
+| `_malformed/` | Structurally broken package files | Real structure validation - no mocks needed |
+| `_lock-errors/` | Broken lock files | Real lock parsing errors - no mocks needed |
+| `_lock-missing/` | Missing lock files | Real file-not-found - no mocks needed |
+| `_lock-not-found/` | No lock file present | Real scenario - no mocks needed |
+| `_lock-scenarios/` | Multi-lock configs | Real config scenarios - no mocks needed |
+| `malformed-json/` | Broken JSON | Real parse error - no mocks needed |
+| `malformed-xml/` | Broken XML | Real parse error - no mocks needed |
 
 ---
 
@@ -57,21 +134,24 @@ Implement **defense-in-depth** testing strategy:
 
 **CI Requirement:** Total ≥95%, All functions ≥75%
 
-### Package Manager Testdata Matrix
+### Package Manager Testdata Matrix (UPDATED)
 
-| Manager | Manifest | Lock File | Testdata | Integration Test | Missing |
-|---------|----------|-----------|----------|------------------|---------|
-| npm | package.json | package-lock.json | ✅ | ✅ TestIntegration_NPM | None |
-| pnpm | package.json | pnpm-lock.yaml | ❌ | ❌ | **testdata + test** |
-| yarn | package.json | yarn.lock | ⚠️ errors only | ❌ | **testdata + test** |
-| composer | composer.json | composer.lock | ✅ | ✅ TestIntegration_Composer | None |
-| mod | go.mod | go.sum | ✅ | ✅ TestIntegration_GoMod | None |
-| requirements | requirements*.txt | (self-pinning) | ✅ | ❌ | **test only** |
-| pipfile | Pipfile | Pipfile.lock | ✅ | ❌ | **test only** |
-| msbuild | *.csproj | packages.lock.json | ✅ | ❌ | **test only** |
-| nuget | packages.config | packages.lock.json | ✅ | ❌ | **test only** |
+| Manager | Manifest | Lock File | testdata/ | testdata_errors/ | Integration Test | Missing |
+|---------|----------|-----------|-----------|------------------|------------------|---------|
+| npm | package.json | package-lock.json | ✅ | ✅ | ✅ TestIntegration_NPM | None |
+| pnpm | package.json | pnpm-lock.yaml | ❌ | ✅ (errors only) | ❌ | **testdata + test** |
+| yarn | package.json | yarn.lock | ❌ | ✅ (errors only) | ❌ | **testdata + test** |
+| composer | composer.json | composer.lock | ✅ | ✅ | ✅ TestIntegration_Composer | None |
+| mod | go.mod | go.sum | ✅ | ✅ | ✅ TestIntegration_GoMod | None |
+| requirements | requirements*.txt | (self-pinning) | ✅ | ✅ | ❌ | **test only** |
+| pipfile | Pipfile | Pipfile.lock | ✅ | ✅ | ❌ | **test only** |
+| msbuild | *.csproj | packages.lock.json | ✅ | ✅ | ❌ | **test only** |
+| nuget | packages.config | packages.lock.json | ✅ | ✅ | ❌ | **test only** |
 
-**Priority:** Add missing testdata first (pnpm, yarn), then integration tests for all 9 PMs.
+**Priority:**
+1. Create mocksdata/mocksdata_errors structure and move mock-dependent files
+2. Add missing testdata for pnpm and yarn
+3. Add integration tests for all 9 PMs
 
 ### Existing Test Infrastructure
 
@@ -82,12 +162,13 @@ Implement **defense-in-depth** testing strategy:
 - ✅ Race detector enabled in all test targets
 - ✅ Make targets: test, test-unit, test-e2e, coverage, coverage-func
 - ✅ Chaos testing methodology documented (docs/internal/chaos-testing.md)
+- ✅ E2E tests exist (cmd/e2e_test.go) using mocks
 
 **Gaps:**
-- ❌ No command execution tests (would catch --lockfile-only bug)
-- ❌ No end-to-end CLI workflow tests
-- ❌ No real PM tests (optional, skip if tool not installed)
-- ❌ Missing integration tests for 5 package managers
+- ❌ Mock data mixed with real data in testdata_errors
+- ❌ No testdata for pnpm (valid project)
+- ❌ No testdata for yarn (valid project)
+- ❌ Missing integration tests for 6 package managers
 - ❌ pkg/outdated below 80% coverage target
 
 ---
@@ -145,6 +226,8 @@ Following **AGENTS.md Section 0: TASK-FIRST WORKFLOW**
 
 ### Phase Flow
 ```
+Phase 0: Mock Data Organization (NEW - Prerequisite)
+  ↓
 Phase 1: Implementation (Get it working)
   ↓
 Phase 2: Testing (Add tests after implementation)
@@ -155,6 +238,84 @@ Phase 4: Chaos Engineering (Validate test coverage)
   ↓
 Phase 5: Validation & Polish (Coverage, docs, Makefile)
 ```
+
+---
+
+## PHASE 0: MOCK DATA ORGANIZATION (NEW)
+
+**Goal:** Separate mock-dependent test data from real test data.
+
+### 0.1: Create mocksdata Directory Structure
+
+```bash
+mkdir -p pkg/mocksdata
+mkdir -p pkg/mocksdata_errors/invalid-command
+mkdir -p pkg/mocksdata_errors/command-timeout
+mkdir -p pkg/mocksdata_errors/package-not-found/npm
+```
+
+### 0.2: Create mocksdata/README.md
+
+```markdown
+# Mock Test Data
+
+This directory contains test data that requires **mocked commands** to function.
+These tests cannot run with real package managers because they test error scenarios
+that require controlled command failures.
+
+## Why This Exists
+
+Real integration tests use `pkg/testdata/` with real package files.
+Mock-dependent error tests use this directory with controlled failures.
+
+## Contents
+
+See `mocksdata_errors/` for error scenarios:
+- `invalid-command/` - Tests non-existent command handling
+- `command-timeout/` - Tests command timeout handling
+- `package-not-found/` - Tests registry 404 handling
+
+## Running Tests
+
+Tests using this data require mock injection. See the corresponding
+`*_test.go` files for how mocks are set up.
+```
+
+### 0.3: Move Mock-Dependent Files
+
+**Files to move:**
+
+```bash
+# Move invalid-command
+mv pkg/testdata_errors/invalid-command/* pkg/mocksdata_errors/invalid-command/
+
+# Move command-timeout
+mv pkg/testdata_errors/command-timeout/* pkg/mocksdata_errors/command-timeout/
+
+# Move package-not-found
+mv pkg/testdata_errors/package-not-found/* pkg/mocksdata_errors/package-not-found/
+
+# Remove empty directories
+rmdir pkg/testdata_errors/invalid-command
+rmdir pkg/testdata_errors/command-timeout
+rmdir pkg/testdata_errors/package-not-found
+```
+
+### 0.4: Update Test Files That Reference Moved Data
+
+Search for and update any test files that reference:
+- `testdata_errors/invalid-command`
+- `testdata_errors/command-timeout`
+- `testdata_errors/package-not-found`
+
+Change to:
+- `mocksdata_errors/invalid-command`
+- `mocksdata_errors/command-timeout`
+- `mocksdata_errors/package-not-found`
+
+### 0.5: Update testdata_errors/README.md
+
+Update to clarify that only real (non-mock) error scenarios belong here.
 
 ---
 
@@ -243,7 +404,7 @@ yarn install
 **Required for offline testing (no network calls in CI):**
 
 Check each directory:
-- [ ] `pkg/testdata/npm/.goupdate.yml` - Override npm ls command with regex extraction
+- [x] `pkg/testdata/npm/.goupdate.yml` - Override npm ls command with regex extraction ✅
 - [ ] `pkg/testdata/composer/.goupdate.yml` - Override composer show with file parsing
 - [ ] `pkg/testdata/mod/.goupdate.yml` - Verify go.sum regex extraction
 - [ ] `pkg/testdata/requirements/.goupdate.yml` - Self-pinning mode
@@ -860,9 +1021,11 @@ chaos-test:
    ```
    ```
 
-4. **docs/battle-testing-results.md** (CREATE) - From Phase 3
+4. **pkg/mocksdata/README.md** (CREATE) - From Phase 0
 
-5. **docs/chaos-testing-results.md** (UPDATE) - From Phase 4
+5. **docs/battle-testing-results.md** (CREATE) - From Phase 3
+
+6. **docs/chaos-testing-results.md** (UPDATE) - From Phase 4
 
 ### 5.5: CI/CD Verification
 
@@ -897,6 +1060,8 @@ make coverage-func
 
 | File | Type | Lines | Purpose |
 |------|------|-------|---------|
+| pkg/mocksdata/README.md | NEW | ~20 | Explains mock data directory |
+| pkg/mocksdata_errors/* | MOVED | ~50 | Relocated mock-dependent test data |
 | pkg/testdata/pnpm/* | NEW | ~100 | PNPM testdata with real lock file |
 | pkg/testdata/yarn/* | NEW | ~100 | Yarn testdata with real lock file |
 | pkg/testdata_samples/* | NEW | ~50 | Captured command outputs |
@@ -906,13 +1071,14 @@ make coverage-func
 | pkg/outdated/integration_test.go | NEW | ~100 | Registry parsing tests |
 | cmd/e2e_workflow_test.go | NEW | ~300 | End-to-end workflow tests |
 | tests/real_pm_test.go | NEW | ~400 | Real PM execution tests |
-| **Total** | | **~1,550** | **New test code** |
+| **Total** | | **~1,620** | **New test code + reorganization** |
 
 ### Documentation
 
 | File | Type | Purpose |
 |------|------|---------|
 | pkg/testdata/README.md | NEW | Testdata structure guide |
+| pkg/mocksdata/README.md | NEW | Mock data explanation |
 | pkg/testdata_samples/README.md | NEW | Samples regeneration guide |
 | docs/battle-testing-results.md | NEW | Battle test results |
 | docs/chaos-testing-results.md | UPDATE | Chaos test results |
@@ -942,7 +1108,7 @@ make coverage-func
 
 **Likelihood:** Low (following TASK-FIRST)
 **Impact:** High (blocks PR)
-**Mitigation:** Phase 1 only adds testdata (no code changes), Phase 2 adds tests
+**Mitigation:** Phase 0 only reorganizes files (no code changes), Phase 1 only adds testdata
 
 ### Risk 3: Real PM tests fail in CI
 
@@ -962,40 +1128,31 @@ make coverage-func
 **Impact:** Medium
 **Mitigation:** Add missing tests immediately, re-run chaos tests
 
+### Risk 6: Moving mock data breaks existing tests
+
+**Likelihood:** Low
+**Impact:** Medium
+**Mitigation:** Update all test file references in same commit
+
 ---
 
 ## SUCCESS CRITERIA
 
-- [x] All 9 package managers have complete testdata with .goupdate.yml overrides
-- [x] All 9 package managers have integration tests in pkg/lock/integration_test.go
-- [x] Command output parsing tests prevent format breakage
-- [x] Display value sync tests prevent cached value bugs
-- [x] End-to-end workflow tests validate CLI integration
-- [x] pkg/outdated coverage ≥80%
-- [x] Total coverage ≥95%
-- [x] All functions ≥75% coverage
-- [x] Battle tested on 7+ real-world projects with no critical issues
-- [x] Chaos testing validates test coverage catches breakages
-- [x] All tests pass: `go test ./...`
-- [x] Race detector clean: `go test -race ./...`
-- [x] Lint passes: `golangci-lint run`
-- [x] Documentation complete and accurate
-
----
-
-## TIMELINE ESTIMATE
-
-| Phase | Effort | Dependencies |
-|-------|--------|--------------|
-| Phase 1: Implementation | 2-3 hours | None |
-| Phase 2: Testing | 4-5 hours | Phase 1 complete |
-| Phase 3: Battle Testing | 2-3 hours | Phase 2 complete |
-| Phase 4: Chaos Engineering | 2-3 hours | Phase 2 complete |
-| Phase 5: Validation & Polish | 2 hours | All above complete |
-| **Total** | **12-16 hours** | Sequential execution |
-
-**Parallelization opportunities:**
-- Phase 3 and 4 can run in parallel after Phase 2
+- [ ] Mock data separated from real data (mocksdata/ created)
+- [ ] All 9 package managers have complete testdata with .goupdate.yml overrides
+- [ ] All 9 package managers have integration tests in pkg/lock/integration_test.go
+- [ ] Command output parsing tests prevent format breakage
+- [ ] Display value sync tests prevent cached value bugs
+- [ ] End-to-end workflow tests validate CLI integration
+- [ ] pkg/outdated coverage ≥80%
+- [ ] Total coverage ≥95%
+- [ ] All functions ≥75% coverage
+- [ ] Battle tested on 7+ real-world projects with no critical issues
+- [ ] Chaos testing validates test coverage catches breakages
+- [ ] All tests pass: `go test ./...`
+- [ ] Race detector clean: `go test -race ./...`
+- [ ] Lint passes: `golangci-lint run`
+- [ ] Documentation complete and accurate
 
 ---
 
@@ -1003,21 +1160,39 @@ make coverage-func
 
 **Awaiting approval to proceed with:**
 
-1. ✅ Phase 1: Create pnpm/yarn testdata + testdata_samples directory
-2. ✅ Phase 2: Add 1,550 lines of integration/e2e/real PM tests
-3. ✅ Phase 3: Battle test on Express, React, Laravel, Django, Cobra, etc.
-4. ✅ Phase 4: Chaos test 10+ critical features
-5. ✅ Phase 5: Verify coverage, update docs, polish
+1. ✅ Phase 0: Create mocksdata/ directories and move mock-dependent test data
+2. ✅ Phase 1: Create pnpm/yarn testdata + testdata_samples directory
+3. ✅ Phase 2: Add 1,620 lines of integration/e2e/real PM tests
+4. ✅ Phase 3: Battle test on Express, React, Laravel, Django, Cobra, etc.
+5. ✅ Phase 4: Chaos test 10+ critical features
+6. ✅ Phase 5: Verify coverage, update docs, polish
 
 **Ready to start?** Approval needed to proceed with implementation.
+
+---
+
+## PROGRESS LOG
+
+### 2025-12-12 - Initial Planning
+- ✅ Reviewed existing integration_test.go pattern
+- ✅ Analyzed testdata and testdata_errors structure
+- ✅ Identified mock data vs real data
+- ✅ Created comprehensive implementation plan
+
+### 2025-12-12 - Plan Update (Codebase Review)
+- ✅ Audited all testdata directories
+- ✅ Identified 3 directories requiring mock commands
+- ✅ Added Phase 0: Mock Data Organization
+- ✅ Updated plan with mocksdata/mocksdata_errors structure
+- ✅ Waiting for approval
 
 ---
 
 ## NOTES
 
 - Following AGENTS.md TASK-FIRST WORKFLOW strictly
-- Real package files only (no mocks for testdata)
+- Real package files only in testdata/ (no mocks)
+- Mock-dependent tests go in mocksdata_errors/
 - All changes on branch: `claude/review-config-tests-LwFiQ`
 - This plan designed to prevent bugs like pnpm --lockfile-only from reaching production
 - Comprehensive testing = confidence in releases
-
