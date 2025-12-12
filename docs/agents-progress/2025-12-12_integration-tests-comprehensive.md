@@ -173,6 +173,203 @@ Implement **defense-in-depth** testing strategy:
 
 ---
 
+## NEW: Modular Test Organization Strategy
+
+### Goal: Avoid Test Code Duplication
+
+After reviewing the codebase, I identified several opportunities to reduce test code duplication and organize integration tests more effectively.
+
+### Existing Test Utilities (pkg/testutil/)
+
+The codebase already has a solid foundation for test utilities:
+
+| File | Contents | Purpose |
+|------|----------|---------|
+| `packages.go` | PackageBuilder, NPMPackage(), GoPackage(), etc. | Build test packages with fluent API |
+| `config.go` | ConfigBuilder, NPMRule(), GoModRule(), etc. | Build test configs with fluent API |
+| `capture.go` | CaptureStdout(), CaptureStderr(), CaptureOutput() | Capture CLI output for testing |
+| `table.go` | CreateUpdateTable(), CreateOutdatedTable() | Create test table outputs |
+
+### NEW Test Utilities to Add (pkg/testutil/)
+
+**File:** `pkg/testutil/integration.go` (NEW ~150 lines)
+
+```go
+// IntegrationTestHelper provides shared utilities for integration tests
+type IntegrationTestHelper struct {
+    t        *testing.T
+    testdata string  // Path to testdata directory
+    tempDir  string  // Temporary directory for test isolation
+}
+
+// NewIntegrationHelper creates a helper for integration tests
+func NewIntegrationHelper(t *testing.T, testdataSubdir string) *IntegrationTestHelper
+
+// CopyTestdata copies testdata to temp directory for isolated testing
+func (h *IntegrationTestHelper) CopyTestdata() string
+
+// LoadConfig loads config from the temp directory
+func (h *IntegrationTestHelper) LoadConfig() *config.Config
+
+// ParsePackages parses packages from manifest file
+func (h *IntegrationTestHelper) ParsePackages(manifestFile, rule string) []formats.Package
+
+// ResolveVersions applies installed versions to packages
+func (h *IntegrationTestHelper) ResolveVersions(pkgs []formats.Package) []formats.Package
+
+// RunCommand executes a goupdate CLI command and returns output
+func (h *IntegrationTestHelper) RunCommand(args ...string) string
+
+// AssertPackageVersion asserts a package has expected version
+func (h *IntegrationTestHelper) AssertPackageVersion(pkgs []formats.Package, name, version string)
+
+// Cleanup removes temp directory (called automatically via t.Cleanup)
+func (h *IntegrationTestHelper) Cleanup()
+```
+
+**File:** `pkg/testutil/pm_helpers.go` (NEW ~100 lines)
+
+```go
+// Package manager specific helpers for integration tests
+
+// PMTestCase defines a test case for package manager integration tests
+type PMTestCase struct {
+    Name          string   // Test name
+    Rule          string   // Rule name (npm, pnpm, mod, etc.)
+    TestdataDir   string   // Relative path to testdata
+    ManifestFile  string   // Name of manifest file
+    Packages      []string // Expected package names
+    ExpectLock    bool     // Whether lock file should be present
+}
+
+// StandardPMTests returns test cases for all 9 package managers
+func StandardPMTests() []PMTestCase
+
+// RunPMIntegrationTest runs a standard integration test for a PM
+func RunPMIntegrationTest(t *testing.T, tc PMTestCase)
+
+// VerifyLockResolution verifies lock resolution works for a PM
+func VerifyLockResolution(t *testing.T, tc PMTestCase)
+```
+
+### Test File Organization Strategy
+
+To prevent integration test files from becoming too large, organize tests as follows:
+
+```
+pkg/lock/
+├── integration_test.go           # Shared setup + TestIntegration_NPM, _GoMod, _Composer (existing)
+├── integration_js_test.go        # NEW: pnpm, yarn (similar to npm)
+├── integration_python_test.go    # NEW: requirements, pipfile
+├── integration_dotnet_test.go    # NEW: msbuild, nuget
+
+pkg/update/
+├── update_test.go                # Existing unit tests
+├── integration_test.go           # NEW: Display value sync tests
+
+pkg/outdated/
+├── outdated_test.go              # Existing unit tests
+├── integration_test.go           # NEW: Registry parsing tests
+
+cmd/
+├── e2e_test.go                   # Existing E2E tests (mocked)
+├── e2e_workflow_test.go          # NEW: Real testdata E2E workflows
+├── e2e_npm_test.go               # NEW: NPM-specific E2E (if needed)
+```
+
+### Reducing Duplication: Table-Driven Integration Tests
+
+Instead of repeating similar code for each PM, use table-driven tests:
+
+```go
+// pkg/lock/integration_test.go
+func TestIntegration_AllPackageManagers(t *testing.T) {
+    tests := testutil.StandardPMTests()
+
+    for _, tc := range tests {
+        t.Run(tc.Name, func(t *testing.T) {
+            testutil.RunPMIntegrationTest(t, tc)
+        })
+    }
+}
+```
+
+**Benefits:**
+- Single source of truth for PM test cases
+- Easy to add new PMs (just add to StandardPMTests)
+- Consistent test coverage across all PMs
+- Less code duplication
+
+### CLI Command Test Coverage Matrix
+
+| Command | Unit Tests | Integration Tests | E2E Tests | Real Testdata |
+|---------|------------|-------------------|-----------|---------------|
+| `scan` | ✅ 12 tests | ❌ | ✅ | ✅ Uses testdata/ |
+| `list` | ✅ 25 tests | ❌ | ✅ | ✅ Uses testdata/ |
+| `outdated` | ✅ 20 tests | ❌ | ✅ | ⚠️ Mocked only |
+| `update` | ✅ 30 tests | ❌ | ✅ | ⚠️ Mocked only |
+| `config` | ✅ 15 tests | ❌ | ❌ | ✅ Uses testdata_errors/ |
+| `version` | ✅ 1 test | ❌ | ❌ | N/A |
+
+**Gap Analysis:**
+- `outdated` and `update` commands primarily use mocked functions
+- Need E2E workflow tests that use real testdata
+- Need integration tests for all 9 PMs through CLI
+
+### Integration Test Strategy by Command
+
+**1. `scan` command:**
+- Already uses real testdata in tests
+- Need tests for pnpm and yarn detection
+
+**2. `list` command:**
+- Already uses real testdata (testdata/npm, testdata_errors/)
+- Need tests for all 9 PMs with real lock files
+
+**3. `outdated` command:**
+- Currently mocks `listNewerVersionsFunc`
+- Need integration tests using testdata_samples/ captured output
+- Need tests with real testdata + .goupdate.yml overrides
+
+**4. `update` command:**
+- Currently mocks `updatePackageFunc` and `listNewerVersionsFunc`
+- Need integration tests that actually modify temp testdata
+- Need display value sync tests
+
+**5. `config` command:**
+- Uses testdata_errors/_config-errors/ for validation
+- Already well tested
+
+### Error Testing Organization
+
+**Real Error Files (testdata_errors/):**
+- `_config-errors/` - Config validation errors
+- `_invalid-syntax/` - Parse errors (malformed JSON/XML/TOML)
+- `_malformed/` - Structurally broken files
+- `_lock-errors/` - Broken lock files
+- `_lock-missing/` - Missing lock files
+- `_lock-not-found/` - Lock file not found
+- `_lock-scenarios/` - Multi-lock configs
+- `malformed-json/` - JSON parse errors
+- `malformed-xml/` - XML parse errors
+
+**Mock-Dependent Errors (mocksdata_errors/):**
+- `invalid-command/` - Non-existent command execution
+- `command-timeout/` - Command timeout handling
+- `package-not-found/` - Registry 404 response
+
+### File Size Guidelines
+
+To prevent test files from becoming too large:
+
+1. **Max ~500 lines per test file** - Split if larger
+2. **Separate integration tests** from unit tests
+3. **Use table-driven tests** to reduce repetition
+4. **Share helpers** via pkg/testutil/
+5. **Group tests by feature** (lock resolution, update, outdated)
+
+---
+
 ## Critical Code Paths (From Docblock Analysis)
 
 ### 1. Lock Resolution Flow (pkg/lock/resolve.go)
@@ -1060,18 +1257,31 @@ make coverage-func
 
 | File | Type | Lines | Purpose |
 |------|------|-------|---------|
+| **Test Utilities (pkg/testutil/)** | | | |
+| pkg/testutil/integration.go | NEW | ~150 | IntegrationTestHelper for shared test logic |
+| pkg/testutil/pm_helpers.go | NEW | ~100 | PMTestCase + StandardPMTests() for table-driven tests |
+| **Mock Data Organization** | | | |
 | pkg/mocksdata/README.md | NEW | ~20 | Explains mock data directory |
 | pkg/mocksdata_errors/* | MOVED | ~50 | Relocated mock-dependent test data |
+| **Testdata** | | | |
 | pkg/testdata/pnpm/* | NEW | ~100 | PNPM testdata with real lock file |
 | pkg/testdata/yarn/* | NEW | ~100 | Yarn testdata with real lock file |
 | pkg/testdata_samples/* | NEW | ~50 | Captured command outputs |
-| pkg/lock/integration_test.go | UPDATE | +150 | 5 new integration tests |
+| **Lock Resolution Tests** | | | |
+| pkg/lock/integration_test.go | UPDATE | +50 | Table-driven tests for all PMs |
+| pkg/lock/integration_js_test.go | NEW | ~100 | pnpm + yarn tests |
+| pkg/lock/integration_python_test.go | NEW | ~100 | requirements + pipfile tests |
+| pkg/lock/integration_dotnet_test.go | NEW | ~100 | msbuild + nuget tests |
 | pkg/lock/command_output_test.go | NEW | ~200 | Command output parsing tests |
-| pkg/update/display_sync_integration_test.go | NEW | ~150 | Display value sync tests |
+| **Update Tests** | | | |
+| pkg/update/integration_test.go | NEW | ~150 | Display value sync tests |
+| **Outdated Tests** | | | |
 | pkg/outdated/integration_test.go | NEW | ~100 | Registry parsing tests |
-| cmd/e2e_workflow_test.go | NEW | ~300 | End-to-end workflow tests |
-| tests/real_pm_test.go | NEW | ~400 | Real PM execution tests |
-| **Total** | | **~1,620** | **New test code + reorganization** |
+| **CLI E2E Tests** | | | |
+| cmd/e2e_workflow_test.go | NEW | ~300 | Real testdata E2E workflows |
+| **Real PM Tests** | | | |
+| tests/real_pm_test.go | NEW | ~400 | Real PM execution tests (skip if unavailable) |
+| **Total** | | **~2,070** | **New test code + reorganization** |
 
 ### Documentation
 
@@ -1184,6 +1394,16 @@ make coverage-func
 - ✅ Identified 3 directories requiring mock commands
 - ✅ Added Phase 0: Mock Data Organization
 - ✅ Updated plan with mocksdata/mocksdata_errors structure
+
+### 2025-12-12 - Plan Update (Modular Test Organization)
+- ✅ Reviewed all 192 test functions in cmd/ package
+- ✅ Analyzed existing pkg/testutil/ utilities (packages.go, config.go, capture.go, table.go)
+- ✅ Identified CLI command test coverage gaps (outdated + update use mocks only)
+- ✅ Added "Modular Test Organization Strategy" section
+- ✅ Designed IntegrationTestHelper and PMTestCase utilities
+- ✅ Planned test file organization to prevent large files (~500 lines max)
+- ✅ Added table-driven test approach to reduce duplication
+- ✅ Updated deliverables with new test utilities (~2,070 lines total)
 - ✅ Waiting for approval
 
 ---
