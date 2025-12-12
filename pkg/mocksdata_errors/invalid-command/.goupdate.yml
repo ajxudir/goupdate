@@ -1,0 +1,10 @@
+# Test case: Non-existent command for testing command execution failure
+# This config references a command that doesn't exist to test error handling
+extends: ["default"]
+
+rules:
+  npm:
+    outdated:
+      commands: |
+        nonexistent-command-xyz-12345 {{package}}
+      timeout_seconds: 10

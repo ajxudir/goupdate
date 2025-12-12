@@ -1,0 +1,14 @@
+# Test override: Use regex extraction for offline testing
+# The default config uses commands, but tests need to work without pipenv installed.
+extends: ["default"]
+
+rules:
+  pipfile:
+    lock_files:
+      - files: ["**/Pipfile.lock"]
+        format: raw
+        extraction:
+          # Parse Pipfile.lock nested JSON format:
+          # "default"/"develop" → "package" → {"version": "==x.y.z"}
+          # Match package name at indentation level (8 spaces) followed by version
+          pattern: '(?m)^\s{8}"(?P<n>[\w\-]+)":[^}]*"version":\s*"==(?P<version>[^"]+)"'

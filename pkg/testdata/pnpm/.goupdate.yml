@@ -1,0 +1,16 @@
+# Test override: Use regex extraction instead of pnpm commands for offline testing
+# The default config uses `pnpm ls --json` for maximum compatibility, but tests
+# need to work without pnpm installed. This override uses regex parsing.
+extends: ["default"]
+
+rules:
+  pnpm:
+    lock_files:
+      - files: ["**/pnpm-lock.yaml"]
+        format: raw
+        extraction:
+          # Parse pnpm-lock.yaml v9 importers format:
+          #   lodash:
+          #     specifier: ^4.17.21
+          #     version: 4.17.21
+          pattern: '(?m)^\s{6}(?P<n>[@\w\-\.\/]+):\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)'
