@@ -31,9 +31,9 @@ inputs:
     required: false
     default: 'false'
   node-version:
-    description: 'Node.js version'
+    description: 'Node.js version (use lts/* for latest LTS)'
     required: false
-    default: '20'
+    default: 'lts/*'
   php-version:
     description: 'PHP version'
     required: false
@@ -98,7 +98,14 @@ runs:
       shell: bash
       run: |
         corepack enable
-        corepack prepare yarn@stable --activate
+        # Use version from package.json packageManager field if present, otherwise use stable
+        if grep -q '"packageManager".*yarn@' package.json 2>/dev/null; then
+          echo "Using yarn version from package.json packageManager field"
+          corepack install
+        else
+          echo "No packageManager field found, installing yarn@stable"
+          corepack prepare yarn@stable --activate
+        fi
 
     - name: Verify yarn installation
       if: inputs.use-node == 'true' && contains(inputs.rules, 'yarn')
