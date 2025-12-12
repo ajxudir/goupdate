@@ -616,3 +616,49 @@ func TestIntegration_PNPM_LockfileV6(t *testing.T) {
 	assert.Equal(t, InstallStatusLockFound, statusLookup["lodash"])
 	assert.Equal(t, InstallStatusLockFound, statusLookup["express"])
 }
+
+// TestIntegration_Yarn_Berry tests yarn berry (v2+) lock format.
+//
+// Berry uses a different format than classic v1:
+//   - Keys include @npm: prefix: "lodash@npm:^4.17.21"
+//   - Version uses colon syntax: version: 4.17.21
+func TestIntegration_Yarn_Berry(t *testing.T) {
+	testdataDir, err := filepath.Abs("../testdata/yarn_berry")
+	require.NoError(t, err, "failed to get absolute path to testdata")
+
+	cfg, err := config.LoadConfig("", testdataDir)
+	require.NoError(t, err)
+
+	parser := packages.NewDynamicParser()
+	rule := cfg.Rules["yarn"]
+	result, err := parser.ParseFile(filepath.Join(testdataDir, "package.json"), &rule)
+	require.NoError(t, err)
+
+	for i := range result.Packages {
+		result.Packages[i].Rule = "yarn"
+	}
+
+	enriched, err := ApplyInstalledVersions(result.Packages, cfg, testdataDir)
+	require.NoError(t, err)
+
+	// Build lookup for easier assertions
+	lookup := make(map[string]string)
+	statusLookup := make(map[string]string)
+	for _, pkg := range enriched {
+		lookup[pkg.Name] = pkg.InstalledVersion
+		statusLookup[pkg.Name] = pkg.InstallStatus
+	}
+
+	// Verify all packages have installed versions from berry lock file
+	assert.Equal(t, "4.17.21", lookup["lodash"], "lodash should be version 4.17.21")
+	assert.Equal(t, "4.18.3", lookup["express"], "express should be version 4.18.3")
+	assert.Equal(t, "1.6.8", lookup["axios"], "axios should be version 1.6.8")
+	assert.Equal(t, "5.3.0", lookup["chalk"], "chalk should be version 5.3.0")
+	assert.Equal(t, "5.4.5", lookup["typescript"], "typescript should be version 5.4.5")
+	assert.Equal(t, "3.2.5", lookup["prettier"], "prettier should be version 3.2.5")
+
+	// Verify status is correct
+	assert.Equal(t, InstallStatusLockFound, statusLookup["lodash"])
+	assert.Equal(t, InstallStatusLockFound, statusLookup["express"])
+	assert.Equal(t, InstallStatusLockFound, statusLookup["chalk"])
+}
