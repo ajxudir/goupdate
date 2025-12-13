@@ -51,18 +51,23 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Run tests
-        id: test
+      - name: Run unit tests
+        id: unit-test
         run: |
-          echo "Running tests..."
-          # Run tests with output to both terminal and file
-          make test 2>&1 | tee test-output.txt
-          {
-            echo "test_output<<GOUPDATE_TEST_EOF_d4b2a6"
-            tail -20 test-output.txt
-            echo "GOUPDATE_TEST_EOF_d4b2a6"
-          } >> $GITHUB_OUTPUT
-          rm -f test-output.txt
+          echo "Running unit tests..."
+          make test-unit 2>&1 | tee unit-test-output.txt
+          UNIT_COUNT=$(grep -c "^--- PASS:" unit-test-output.txt || echo "0")
+          echo "unit_count=$UNIT_COUNT" >> $GITHUB_OUTPUT
+          rm -f unit-test-output.txt
+
+      - name: Run integration tests
+        id: integration-test
+        run: |
+          echo "Running integration tests..."
+          make test-integration 2>&1 | tee integration-test-output.txt
+          INTEGRATION_COUNT=$(grep -c "^--- PASS:" integration-test-output.txt || echo "0")
+          echo "integration_count=$INTEGRATION_COUNT" >> $GITHUB_OUTPUT
+          rm -f integration-test-output.txt
 
       - name: Generate test summary
         if: always()
@@ -70,10 +75,32 @@ jobs:
           echo "## 🧪 Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ "${{ steps.test.outcome }}" = "success" ]; then
+          UNIT_RESULT="${{ steps.unit-test.outcome }}"
+          INTEGRATION_RESULT="${{ steps.integration-test.outcome }}"
+          UNIT_COUNT="${{ steps.unit-test.outputs.unit_count }}"
+          INTEGRATION_COUNT="${{ steps.integration-test.outputs.integration_count }}"
+
+          echo "| Test Type | Status | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|-------|" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$UNIT_RESULT" = "success" ]; then
+            echo "| Unit Tests | ✅ passed | $UNIT_COUNT tests |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Unit Tests | ❌ failed | - |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "$INTEGRATION_RESULT" = "success" ]; then
+            echo "| Integration Tests | ✅ passed | $INTEGRATION_COUNT tests |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Integration Tests | ❌ failed | - |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$UNIT_RESULT" = "success" ] && [ "$INTEGRATION_RESULT" = "success" ]; then
             echo "✅ **All tests passed**" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ **Tests failed**" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Some tests failed**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "Check the job logs for detailed error messages." >> $GITHUB_STEP_SUMMARY
           fi
