@@ -64,3 +64,40 @@ rules:
       commands: |
         bundle update {{package}} --conservative
       timeout_seconds: 120
+
+# System tests for Ruby/Rails API projects
+system_tests:
+  run_preflight: true
+  run_mode: after_each
+  stop_on_fail: true
+  tests:
+    # Install dependencies
+    - name: bundle-install
+      commands: bundle install
+      timeout_seconds: 300
+      continue_on_fail: true  # Skip if bundler not available
+
+    # Start server and verify HTTP response
+    - name: http-test
+      commands: |
+        # Start Puma server in background
+        bundle exec puma -p 9292 &
+        SERVER_PID=$!
+        sleep 3
+
+        # Verify ping endpoint returns correct JSON
+        RESPONSE=$(curl -s http://localhost:9292/ping)
+        echo "Ping response: $RESPONSE"
+
+        # Verify health endpoint
+        HEALTH=$(curl -s http://localhost:9292/health)
+        echo "Health response: $HEALTH"
+
+        # Cleanup
+        kill $SERVER_PID 2>/dev/null || true
+
+        # Check responses contain expected content
+        echo "$RESPONSE" | grep -q '"message"' || { echo "ERROR: Ping failed"; exit 1; }
+        echo "$HEALTH" | grep -q '"status"' || { echo "ERROR: Health failed"; exit 1; }
+        echo "HTTP tests passed!"
+      timeout_seconds: 60

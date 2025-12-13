@@ -3,7 +3,7 @@
 **Agent:** Claude
 **Date:** 2025-12-13
 **Branch:** claude/organize-mock-data-01Y1vCHWXSvHwCvA6nU99JcH
-**Status:** Complete (All 20 Phases)
+**Status:** Complete (All 25 Phases)
 
 ## Objective
 
@@ -183,8 +183,44 @@ Update statuses:
 - [x] Verify * and "latest" constraints show ⛔ Floating status
 - [x] Verify floating packages have proper warning message
 
+### Phase 21: Example Projects - Scan & List ✅
+- [x] Enhance example system_tests with HTTP verification
+- [x] Test scan command on examples directory
+- [x] Test list command on all runnable examples (django-app, react-app, go-cli, laravel-app, ruby-api)
+- [x] Verify all package managers detected correctly
+- [x] Verify ignore patterns work in examples (black, @types/*, rubocop)
+
+### Phase 22: Example Projects - Config Validation ✅
+- [x] Validate all 7 example configs with `config --validate`
+- [x] django-app, react-app, go-cli, laravel-app, ruby-api, kpas-api, kpas-frontend all pass validation
+
+### Phase 23: Example Projects - System Tests Parsing ✅
+- [x] Verify system_tests configurations parse correctly via `config --show-effective`
+- [x] Confirm run_preflight, run_mode, stop_on_fail settings are respected
+- [x] Confirm test names, timeouts, continue_on_fail parsed correctly
+- [x] django-app: 3 tests (django-check, unit-tests, http-test)
+- [x] react-app: 4 tests (type-check, unit-tests, build, http-test)
+- [x] go-cli: 2 tests (build, cli-test)
+- [x] ruby-api: 2 tests (bundle-install, http-test)
+
+### Phase 24: Example Projects - Outdated Command ✅
+- [x] Test outdated command on go-cli (Go modules with go.sum)
+- [x] Test outdated command on django-app (Python requirements.txt)
+- [x] Verify UpToDate/Outdated statuses display correctly
+- [x] Verify --minor flag changes constraint display
+- [x] Verify ignored packages show 🚫 Ignored status
+
+### Phase 25: Example Projects - Update Dry-Run ✅
+- [x] Test update --dry-run --patch on go-cli
+- [x] Test update --dry-run with --skip-system-tests
+- [x] Verify Planned (🟡) status for packages with updates
+- [x] Verify UpToDate (🟢) status for current packages
+- [x] Verify Ignored (🚫) status displayed correctly in update output
+- [x] Test update --dry-run on django-app (requirements.txt)
+
 ## Files Modified
 
+### Core Bug Fixes (Phases 1-20)
 - `pkg/constants/statuses.go` - Added IconIgnored constant
 - `pkg/display/status.go` - Added Ignored status handling in FormatInstallStatus, FormatStatus, and statusIconMap
 - `pkg/config/default.yml` - Fixed go.mod extraction pattern for single-line require
@@ -192,6 +228,15 @@ Update statuses:
 - `docs/user/cli.md` - Added Ignored status to documentation
 - `cmd/outdated.go` - Skip ignored packages in outdated check loop
 - `pkg/update/planning.go` - Add handleIgnoredPackage function, add InstallStatusIgnored to IsNonUpdatableStatus
+
+### Example Projects Enhancement (Phases 21-25)
+- `examples/django-app/.goupdate.yml` - Added http-test with server startup and JSON validation
+- `examples/react-app/.goupdate.yml` - Added http-test with Vite preview and HTML validation
+- `examples/go-cli/.goupdate.yml` - Added system_tests with build and cli-test verification
+- `examples/laravel-app/.goupdate.yml` - Added system_tests with http-test for API endpoints
+- `examples/ruby-api/.goupdate.yml` - Added system_tests with http-test for Puma server
+- `examples/kpas-api/.goupdate.yml` - Updated with commented http-test example (config-only)
+- `examples/kpas-frontend/.goupdate.yml` - Updated with commented http-test example (config-only)
 
 ## Issues Found
 
@@ -247,7 +292,7 @@ All output values will be validated against:
 
 ## Summary
 
-Battle testing completed across 20 phases covering:
+Battle testing completed across 25 phases covering:
 - All 7 CLI commands (scan, list, outdated, update, config, version, help)
 - All 9 supported package managers (npm, pnpm, yarn, composer, requirements, pipfile, mod, msbuild, nuget)
 - All 4 output formats (table, json, csv, xml)
@@ -263,9 +308,12 @@ Battle testing completed across 20 phases covering:
 - Timeout handling
 - Verbose/debug output
 - Latest mapping for floating constraints
+- Example projects with HTTP verification system tests (Phases 21-25)
 
 **Results:**
 - 4 bugs found and fixed (including critical ignored packages bug)
 - 1 documentation update
+- 7 example projects enhanced with system tests and HTTP verification
 - All 21 test packages passing
+- All 7 example configs validated
 - CLI ready for release

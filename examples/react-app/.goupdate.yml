@@ -52,12 +52,22 @@ system_tests:
       commands: npm run build
       timeout_seconds: 300
 
-    # End-to-end tests (example with Playwright)
-    # - name: e2e-tests
-    #   commands: |
-    #     npm run preview &
-    #     sleep 3
-    #     npx playwright test
-    #   timeout_seconds: 600
-    #   env:
-    #     CI: "true"
+    # Start preview server and verify HTTP response
+    - name: http-test
+      commands: |
+        # Start Vite preview server in background
+        npm run preview -- --port 4173 &
+        SERVER_PID=$!
+        sleep 3
+
+        # Fetch the HTML page
+        RESPONSE=$(curl -s http://localhost:4173/)
+        echo "Response length: ${#RESPONSE} bytes"
+
+        # Cleanup
+        kill $SERVER_PID 2>/dev/null || true
+
+        # Verify response contains expected content
+        echo "$RESPONSE" | grep -q "React Dashboard" || { echo "ERROR: Missing React Dashboard title"; exit 1; }
+        echo "HTTP test passed!"
+      timeout_seconds: 60

@@ -37,7 +37,8 @@ rules:
         - playwright
         - "@playwright/test"
 
-# System test to verify no compile errors after updates
+# System tests to verify build after updates
+# Note: This is a config-only example - copy to your actual Vue/pnpm project
 system_tests:
   run_preflight: true
   run_mode: after_each
@@ -48,3 +49,16 @@ system_tests:
         pnpm install
         pnpm run build
       timeout_seconds: 300
+
+    # Start preview server and verify HTTP response (uncomment when using with actual project)
+    # - name: http-test
+    #   commands: |
+    #     # Start preview server in background
+    #     pnpm run preview -- --port 4174 &
+    #     SERVER_PID=$!
+    #     sleep 3
+    #     # Verify server responds
+    #     STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4174/)
+    #     kill $SERVER_PID 2>/dev/null || true
+    #     [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ] || exit 1
+    #   timeout_seconds: 60
