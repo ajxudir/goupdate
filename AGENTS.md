@@ -1,7 +1,15 @@
 # **AGENTS.md — Agentic Coding Guidelines**
 
+> **Note for Claude Code users**: Claude Code reads `CLAUDE.md` at startup, not this file.
+> See `/CLAUDE.md` for quick reference instructions that Claude loads automatically.
+> This file contains detailed procedures for all agentic coding agents.
+
 These rules apply to **all agentic coding agents** (Claude, Codex, Cursor, Copilot, etc.).
 If unsure, agents must **ask** instead of guessing.
+
+## Testing Checklist
+
+Use the reusable testing checklist at `docs/testing-checklist.md` for battle testing and validation.
 
 ## Agent Progress Tracking
 

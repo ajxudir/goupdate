@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(go test*)",
+      "Bash(go build*)",
+      "Bash(make *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(ls*)",
+      "Bash(mkdir*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(git reset --hard*)",
+      "Bash(git push --force*)",
+      "Bash(git clean*)"
+    ]
+  },
+  "env": {
+    "GO111MODULE": "on",
+    "CGO_ENABLED": "0"
+  }
+}
