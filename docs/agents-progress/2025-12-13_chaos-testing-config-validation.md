@@ -11,10 +11,18 @@ Create comprehensive chaos tests for configuration validation to ensure the conf
 - [x] Create chaos tests for version tag processing (`pkg/outdated/chaos_versioning_test.go`)
 - [x] Create chaos tests for config validation (`pkg/config/chaos_config_test.go`)
 - [x] Fix false positives in integration tests
+- [x] Fix test pollution from updateOutputFlag in cmd tests
+- [x] Fix test pollution in XML/CSV integration tests (updateRuleFlag persistence)
+- [x] Review coverage gaps in pkg/packages (94.2%) and pkg/update (92.9%)
 - [x] Commit and push all changes
 
 ## Files Modified
 - `pkg/config/chaos_config_test.go` (NEW - 841 lines)
+- `cmd/scan_test.go` (flag save/restore added)
+- `cmd/update_constraint_test.go` (flag save/restore added)
+- `cmd/update_sorting_test.go` (flag save/restore added)
+- `cmd/update_test.go` (flag save/restore added)
+- `cmd/output_format_integration_test.go` (flag save/restore for JSON, XML, CSV tests)
 
 ## Test Coverage
 
@@ -96,5 +104,48 @@ Create comprehensive chaos tests for configuration validation to ensure the conf
 - `pkg/config/load_test.go` - Additional config loading tests
 - `pkg/outdated/chaos_versioning_test.go` - Chaos tests for version parsing
 
+## Test Pollution Fixes
+
+Integration tests were polluting package-level flag variables, causing subsequent tests to fail:
+
+### Root Cause
+- Tests set flags like `updateOutputFlag`, `updateRuleFlag`, `scanOutputFlag` in `setupFunc()` but never restored them
+- When tests ran in alphabetical order, later tests would inherit unexpected flag values
+
+### Tests Fixed
+1. `TestRunScanNoMatches` - added `scanOutputFlag` save/restore
+2. `TestFloatingConstraintInGroupShowsFloating` - added `updateOutputFlag` save/restore
+3. `TestFloatingConstraintShowsUnsupported` - added `updateOutputFlag` save/restore
+4. `TestRunUpdateSortingComparators` - added `updateOutputFlag` save/restore
+5. `TestRunUpdateSortingDifferentPackageTypes` - added `updateOutputFlag` save/restore
+6. `TestRunUpdateSortingDifferentGroups` - added `updateOutputFlag` save/restore
+7. `TestRunUpdateNoPackages` - added `updateOutputFlag` save/restore
+8. `TestRunUpdateWithMockedVersions` - added `updateOutputFlag` save/restore
+9. `TestRunUpdateAfterAllValidationFailure` - added `updateOutputFlag` save/restore
+10. `TestIntegration_AllCommands_JSONFileOutput` - comprehensive flag save/restore
+11. `TestIntegration_AllCommands_XMLFileOutput` - comprehensive flag save/restore
+12. `TestIntegration_AllCommands_CSVFileOutput` - comprehensive flag save/restore
+
+## Coverage Analysis
+
+Final coverage after all fixes:
+| Package | Coverage |
+|---------|----------|
+| cmd | 96.2% |
+| pkg/packages | 94.2% |
+| pkg/update | 92.9% |
+| pkg/config | 98.3% |
+| All others | 97-100% |
+
+Remaining uncovered code in pkg/packages and pkg/update is primarily:
+- Error handling for crypto/rand failure (requires mocking internals)
+- os.Rename failure during atomic write (requires complex mock)
+- Permission-denied during file walks (system-dependent)
+- Edge cases in symlink handling during directory traversal
+
+These are acceptable coverage gaps as they would require complex test fixtures with diminishing returns.
+
 ## Commits
 - `38601b8` - Add comprehensive chaos tests for config validation
+- `10ea825` - Fix test pollution from updateOutputFlag in multiple test files
+- `349ba7b` - Fix test pollution in XML and CSV integration tests
