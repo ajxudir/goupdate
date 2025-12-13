@@ -319,7 +319,166 @@ Verify make targets match CI:
 
 ---
 
-## Phase 8: Help Output
+## Phase 8: Testdata Verification
+
+Verify all testdata directories are valid and parseable:
+
+### 8A: Package Manager Testdata (`pkg/testdata/`)
+
+| PM | Directory | scan | list | Files Present |
+|----|-----------|:----:|:----:|---------------|
+| npm | `pkg/testdata/npm/` | [ ] | [ ] | package.json, package-lock.json |
+| npm v1 | `pkg/testdata/npm_v1/` | [ ] | [ ] | lockfileVersion 1 |
+| npm v2 | `pkg/testdata/npm_v2/` | [ ] | [ ] | lockfileVersion 2 |
+| npm v3 | `pkg/testdata/npm_v3/` | [ ] | [ ] | lockfileVersion 3 |
+| pnpm | `pkg/testdata/pnpm/` | [ ] | [ ] | pnpm-lock.yaml |
+| pnpm v6-v9 | `pkg/testdata/pnpm_v6-v9/` | [ ] | [ ] | Multiple versions |
+| yarn | `pkg/testdata/yarn/` | [ ] | [ ] | yarn.lock (classic) |
+| yarn berry | `pkg/testdata/yarn_berry/` | [ ] | [ ] | yarn.lock (berry) |
+| composer | `pkg/testdata/composer/` | [ ] | [ ] | composer.json, composer.lock |
+| mod | `pkg/testdata/mod/` | [ ] | [ ] | go.mod, go.sum |
+| pipfile | `pkg/testdata/pipfile/` | [ ] | [ ] | Pipfile, Pipfile.lock |
+| requirements | `pkg/testdata/requirements/` | [ ] | [ ] | requirements.txt |
+| msbuild | `pkg/testdata/msbuild/` | [ ] | [ ] | .csproj |
+| nuget | `pkg/testdata/nuget/` | [ ] | [ ] | packages.config |
+
+```bash
+# Verify all testdata directories parse correctly (parallel)
+for dir in npm npm_v1 npm_v2 npm_v3 pnpm yarn composer mod pipfile requirements msbuild nuget; do
+    $GOUPDATE list -d pkg/testdata/$dir -o json 2>&1 | head -5 &
+done
+wait
+```
+
+### 8B: Special Testdata
+
+| Directory | Purpose | Status |
+|-----------|---------|--------|
+| `pkg/testdata/groups/` | Group filtering tests | [ ] |
+| `pkg/testdata/incremental/` | Incremental update tests | [ ] |
+| `pkg/testdata/ignored_packages/` | Package ignore tests | [ ] |
+
+---
+
+## Phase 9: Edge Cases Testing
+
+Test edge case scenarios from `_edge-cases/` directories:
+
+### 9A: No Lock File Scenarios
+
+| PM | Path | Expected Behavior | Status |
+|----|------|-------------------|--------|
+| npm | `npm/_edge-cases/no-lock/` | LockMissing status | [ ] |
+| composer | `composer/_edge-cases/no-lock/` | LockMissing status | [ ] |
+| mod | `mod/_edge-cases/no-lock/` | LockMissing status | [ ] |
+| pipfile | `pipfile/_edge-cases/no-lock/` | LockMissing status | [ ] |
+| msbuild | `msbuild/_edge-cases/no-lock/` | LockMissing status | [ ] |
+| nuget | `nuget/_edge-cases/no-lock/` | LockMissing status | [ ] |
+
+```bash
+# Test all no-lock scenarios (parallel)
+$GOUPDATE list -d pkg/testdata/npm/_edge-cases/no-lock -o json &
+$GOUPDATE list -d pkg/testdata/composer/_edge-cases/no-lock -o json &
+$GOUPDATE list -d pkg/testdata/mod/_edge-cases/no-lock -o json &
+wait
+```
+
+### 9B: Prerelease Version Scenarios
+
+| PM | Path | Expected Behavior | Status |
+|----|------|-------------------|--------|
+| npm | `npm/_edge-cases/prerelease/` | Prerelease versions detected | [ ] |
+
+### 9C: Edge Case Test Files
+
+| Test File | Purpose | Status |
+|-----------|---------|--------|
+| `cmd/edge_cases_test.go` | Security, network, output edge cases | [ ] |
+| `cmd/context_cancellation_test.go` | Context cancellation handling | [ ] |
+
+---
+
+## Phase 10: Examples Testing
+
+Test with real-world example projects from `examples/`:
+
+### 10A: Example Projects (Parallel)
+
+```bash
+# Test all example projects in parallel
+for project in go-cli react-app django-app laravel-app kpas-api kpas-frontend ruby-api; do
+    $GOUPDATE scan -d examples/$project &
+done
+wait
+```
+
+| Project | PM | scan | list | outdated | Status |
+|---------|----| :---:|:----:|:--------:|--------|
+| go-cli | mod | [ ] | [ ] | [ ] | Go CLI app |
+| react-app | npm | [ ] | [ ] | [ ] | React frontend |
+| django-app | pip | [ ] | [ ] | [ ] | Django backend |
+| laravel-app | composer | [ ] | [ ] | [ ] | Laravel app |
+| kpas-api | npm | [ ] | [ ] | [ ] | Node.js API |
+| kpas-frontend | npm | [ ] | [ ] | [ ] | Frontend SPA |
+| ruby-api | bundler | [ ] | [ ] | [ ] | Ruby API |
+| github-workflows | - | [ ] | - | - | CI examples |
+
+---
+
+## Phase 11: Chaos & Integration Tests
+
+Verify comprehensive test suites pass:
+
+### 11A: Chaos Tests
+
+| Test File | Lines | Purpose | Status |
+|-----------|-------|---------|--------|
+| `pkg/update/chaos_test.go` | 811 | Filesystem errors, rollback, concurrent access | [ ] |
+| `pkg/outdated/chaos_versioning_test.go` | 849 | Version parsing chaos | [ ] |
+| `pkg/config/chaos_config_test.go` | 841 | Config loading/validation chaos | [ ] |
+
+```bash
+# Run chaos tests
+go test -v ./pkg/update -run Chaos
+go test -v ./pkg/outdated -run Chaos
+go test -v ./pkg/config -run Chaos
+```
+
+### 11B: Integration Tests
+
+| Test File | Purpose | Requires | Status |
+|-----------|---------|----------|--------|
+| `cmd/update_integration_test.go` | Real PM execution | go, npm installed | [ ] |
+| `cmd/output_format_integration_test.go` | All format outputs | - | [ ] |
+
+```bash
+# Run integration tests (requires actual package managers)
+go test -v ./cmd -run Integration
+```
+
+### 11C: E2E Tests
+
+| Test File | Purpose | Status |
+|-----------|---------|--------|
+| `cmd/e2e_test.go` | Exit codes, GitHub Actions compat | [ ] |
+
+```bash
+# Run E2E tests
+go test -v ./cmd -run E2E
+```
+
+### 11D: Exit Code Verification
+
+| Scenario | Expected Code | Status |
+|----------|---------------|--------|
+| Success | 0 | [ ] |
+| Partial failure | 1 | [ ] |
+| Complete failure | 2 | [ ] |
+| Config error | 3 | [ ] |
+
+---
+
+## Phase 12: Help Output
 
 Verify all commands have accurate help:
 
@@ -334,7 +493,7 @@ Verify all commands have accurate help:
 
 ---
 
-## Phase 9: Final Verification
+## Phase 13: Final Verification
 
 - [ ] All tests pass: `go test ./... -count=1`
 - [ ] No race conditions: `go test -race ./...`
@@ -355,10 +514,15 @@ Verify all commands have accurate help:
 - Phase 2E: All config tests
 - Phase 3: JSON validation
 - Phase 5: PM tests (across different projects)
+- Phase 8: Testdata verification (all directories)
+- Phase 9: Edge cases testing
+- Phase 10: Examples testing (all projects)
+- Phase 11A: Chaos tests (independent test files)
 
 ### Must Run Sequentially
 - Phase 2D.2: Actual updates (per project: update → verify → rollback)
-- Phase 9: Final verification (after all other phases)
+- Phase 11B: Integration tests (may require PM installations)
+- Phase 13: Final verification (after all other phases)
 
 ### Collision Prevention
 - Use unique `$TEST_DIR` per session

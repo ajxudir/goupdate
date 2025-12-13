@@ -194,6 +194,18 @@ go vet ./... && make check
 | Linters | `make check` | [ ] |
 | Formatting | `gofmt -s -w .` | [ ] |
 
+### Chaos & Integration Tests
+
+Verify error handling and integration tests pass:
+
+| Test | Command | Status |
+|------|---------|--------|
+| Update chaos | `go test ./pkg/update -run Chaos` | [ ] |
+| Outdated chaos | `go test ./pkg/outdated -run Chaos` | [ ] |
+| Config chaos | `go test ./pkg/config -run Chaos` | [ ] |
+| Integration | `make test-integration` | [ ] |
+| Edge cases | `go test ./cmd -run EdgeCase` | [ ] |
+
 ---
 
 ## Phase 6: Behavior Verification

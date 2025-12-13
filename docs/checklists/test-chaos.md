@@ -5,6 +5,26 @@ Verify test coverage by deliberately breaking features.
 
 ---
 
+## Existing Chaos Test Files
+
+Run these to verify existing chaos coverage before adding new tests:
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `pkg/update/chaos_test.go` | 811 | Filesystem errors, rollback, concurrent access |
+| `pkg/outdated/chaos_versioning_test.go` | 849 | Version parsing, malformed versions |
+| `pkg/config/chaos_config_test.go` | 841 | Config loading, validation errors |
+
+```bash
+# Run all existing chaos tests (parallel)
+go test -v ./pkg/update -run Chaos &
+go test -v ./pkg/outdated -run Chaos &
+go test -v ./pkg/config -run Chaos &
+wait
+```
+
+---
+
 ## Quick Start
 
 ```bash

@@ -377,6 +377,62 @@ go tool cover -html=coverage.out
 | Edge case | Uses `_edge-cases/` | Boundary conditions |
 | E2E | `cmd/e2e_test.go` | Full CLI workflows |
 | Benchmark | `*_benchmark_test.go` | Performance testing |
+| Chaos | `*chaos*_test.go` | Deliberate failure injection |
+
+---
+
+## Existing Test Files Reference
+
+### Chaos Tests (Error Injection)
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `pkg/update/chaos_test.go` | 811 | Filesystem errors, rollback, concurrent |
+| `pkg/outdated/chaos_versioning_test.go` | 849 | Version parsing, edge cases |
+| `pkg/config/chaos_config_test.go` | 841 | Config loading/validation errors |
+
+### Edge Case Tests
+
+| File | Purpose |
+|------|---------|
+| `cmd/edge_cases_test.go` | Security, network, output edge cases |
+| `cmd/context_cancellation_test.go` | Context cancellation handling |
+
+### Integration Tests
+
+| File | Purpose | Requires |
+|------|---------|----------|
+| `cmd/update_integration_test.go` | Real PM execution | go, npm |
+| `cmd/output_format_integration_test.go` | All output formats | - |
+
+### Testdata Structure
+
+```
+pkg/testdata/
+├── npm/, npm_v1/, npm_v2/, npm_v3/    # NPM lockfile versions
+├── pnpm/, pnpm_v6-v9/                  # PNPM versions
+├── yarn/, yarn_berry/                   # Yarn versions
+├── composer/                            # PHP Composer
+├── mod/                                 # Go modules
+├── pipfile/, requirements/              # Python
+├── msbuild/, nuget/                     # .NET
+├── groups/, incremental/                # Special scenarios
+└── */_edge-cases/                       # Edge case subdirs
+    ├── no-lock/                         # Missing lock files
+    └── prerelease/                      # Prerelease versions
+```
+
+### Example Projects (`examples/`)
+
+| Project | PM | Use Case |
+|---------|-----|----------|
+| go-cli | mod | Go CLI application |
+| react-app | npm | React frontend |
+| django-app | pip | Django backend |
+| laravel-app | composer | Laravel PHP |
+| kpas-api | npm | Node.js API |
+| kpas-frontend | npm | Frontend SPA |
+| ruby-api | bundler | Ruby API |
 
 ---
 

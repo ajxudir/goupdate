@@ -191,6 +191,41 @@ func TestNewFeature(t *testing.T) {
 | Lock files included | [ ] |
 | All formats covered | [ ] |
 
+### 3E: Testdata Structure Reference
+
+Add testdata for new features in appropriate directory:
+
+```
+pkg/testdata/
+├── npm/, npm_v1/, npm_v2/, npm_v3/    # NPM lockfile versions
+├── pnpm/, pnpm_v6-v9/                  # PNPM versions
+├── yarn/, yarn_berry/                   # Yarn versions
+├── composer/                            # PHP Composer
+├── mod/                                 # Go modules
+├── pipfile/, requirements/              # Python
+├── msbuild/, nuget/                     # .NET
+├── groups/                              # Group filtering tests
+├── incremental/                         # Incremental update tests
+├── ignored_packages/                    # Package ignore tests
+└── */_edge-cases/                       # Edge case subdirs
+    ├── no-lock/                         # Missing lock files
+    └── prerelease/                      # Prerelease versions
+```
+
+### 3F: Example Projects (`examples/`)
+
+If feature affects CLI usage, verify with example projects:
+
+| Project | PM | Status |
+|---------|-----|--------|
+| go-cli | mod | [ ] |
+| react-app | npm | [ ] |
+| django-app | pip | [ ] |
+| laravel-app | composer | [ ] |
+| kpas-api | npm | [ ] |
+| kpas-frontend | npm | [ ] |
+| ruby-api | bundler | [ ] |
+
 ---
 
 ## Phase 4: Quality Checks (Parallel)

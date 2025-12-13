@@ -182,6 +182,17 @@ make test-integration
 | Integration | `make test-integration` | [ ] |
 | New test passes | `go test -v -run TestBugFix` | [ ] |
 
+### Chaos Tests (Error Handling Verification)
+
+If bug is error-related, verify chaos tests still pass:
+
+| Test | Command | Status |
+|------|---------|--------|
+| Update chaos | `go test -v ./pkg/update -run Chaos` | [ ] |
+| Outdated chaos | `go test -v ./pkg/outdated -run Chaos` | [ ] |
+| Config chaos | `go test -v ./pkg/config -run Chaos` | [ ] |
+| Edge cases | `go test -v ./cmd -run EdgeCase` | [ ] |
+
 ---
 
 ## Phase 5: Verification (Parallel)
