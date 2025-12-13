@@ -192,20 +192,42 @@ Docs must never drift out of sync.
 When asked to "battle test" or validate the CLI, follow these steps:
 
 ### Clone real-world projects for testing:
+**IMPORTANT**: Use separate temp directories for each test task to enable parallel testing.
+
 ```bash
-# JavaScript ecosystems
-git clone --depth 1 https://github.com/expressjs/express.git /tmp/express
-git clone --depth 1 https://github.com/nuxt/nuxt.git /tmp/nuxt
-git clone --depth 1 https://github.com/facebook/react.git /tmp/react
+# Create unique temp directories for isolation
+TEST_DIR=$(mktemp -d)
+
+# JavaScript ecosystems (run in parallel)
+git clone --depth 1 https://github.com/expressjs/express.git $TEST_DIR/express &
+git clone --depth 1 https://github.com/nuxt/nuxt.git $TEST_DIR/nuxt &
+git clone --depth 1 https://github.com/facebook/react.git $TEST_DIR/react &
 
 # Go projects
-git clone --depth 1 https://github.com/spf13/cobra.git /tmp/cobra
+git clone --depth 1 https://github.com/spf13/cobra.git $TEST_DIR/cobra &
 
 # PHP projects
-git clone --depth 1 https://github.com/laravel/laravel.git /tmp/laravel
+git clone --depth 1 https://github.com/laravel/laravel.git $TEST_DIR/laravel &
 
 # Python projects
-git clone --depth 1 https://github.com/django/django.git /tmp/django
+git clone --depth 1 https://github.com/django/django.git $TEST_DIR/django &
+
+wait  # Wait for all clones to complete
+```
+
+### Parallel testing strategy:
+Run tests in parallel when possible to speed up validation:
+```bash
+# Test multiple projects in parallel
+goupdate scan -d $TEST_DIR/express &
+goupdate scan -d $TEST_DIR/cobra &
+goupdate scan -d $TEST_DIR/laravel &
+wait
+
+# Test different commands in parallel on same project
+goupdate list -d $TEST_DIR/express --type prod &
+goupdate list -d $TEST_DIR/express --type dev &
+wait
 ```
 
 ### Test all commands systematically:
@@ -229,11 +251,16 @@ goupdate outdated -d /tmp/project --patch
 goupdate update -d /tmp/project --dry-run
 goupdate update -d /tmp/project --dry-run --patch
 
-# 5. Actual update (with rollback capability)
+# 5. REQUIRED: Actual update (with rollback capability)
+# CRITICAL: Dry-run is NOT sufficient! You MUST test actual updates.
 goupdate update -d /tmp/project --patch
 git -C /tmp/project diff  # Review changes
 git -C /tmp/project checkout .  # Rollback if needed
 ```
+
+**IMPORTANT**: Step 5 (actual update) is MANDATORY for battle testing.
+Testing with `--dry-run` only does NOT validate the update logic.
+Always perform actual updates on cloned test projects and verify changes.
 
 ### What to look for:
 - Invalid output formats or misaligned tables
@@ -241,6 +268,22 @@ git -C /tmp/project checkout .  # Rollback if needed
 - Missing or wrong version numbers
 - Errors that should be warnings (or vice versa)
 - Crashes or panics
+
+### REQUIRED: Test examples and workflow commands
+When battle testing, you MUST also verify:
+
+1. **Documentation examples work**: Test all examples in docs/*.md files
+2. **Workflow commands work**: Test common user workflows:
+   ```bash
+   # Full workflow: scan → list → outdated → update
+   goupdate scan -d /tmp/project
+   goupdate list -d /tmp/project
+   goupdate outdated -d /tmp/project
+   goupdate update -d /tmp/project --patch -y  # Actual update!
+   git -C /tmp/project diff                     # Verify changes
+   ```
+3. **All output formats work**: Test json, csv, xml for each command
+4. **Filter combinations work**: Test --type, --rule, -p flags together
 
 ---
 
