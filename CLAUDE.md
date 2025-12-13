@@ -3,6 +3,18 @@
 ## Project Overview
 GoUpdate is a CLI tool for scanning, listing, and updating package dependencies across multiple ecosystems (npm, Go mod, pip, composer, etc.).
 
+## Task-Specific Checklists
+
+**Select checklist based on task type:**
+
+| Task Type | Checklist |
+|-----------|-----------|
+| Adding new feature | `docs/checklists/feature-development.md` |
+| Fixing a bug | `docs/checklists/bug-fix.md` |
+| Refactoring code | `docs/checklists/refactoring.md` |
+| Improving tests | `docs/checklists/test-improvement.md` |
+| Validating CLI | `docs/testing-checklist.md` |
+
 ## Quick Reference
 
 ### Build & Test Commands
