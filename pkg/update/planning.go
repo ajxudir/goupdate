@@ -164,6 +164,13 @@ func BuildGroupedPlans(
 			OriginalVersion:   originalVersion,
 		}
 
+		// Handle ignored packages - skip version lookup and planning entirely
+		if p.InstallStatus == lock.InstallStatusIgnored {
+			planned := handleIgnoredPackage(p, originalVersion)
+			groupedPlans = append(groupedPlans, planned)
+			continue
+		}
+
 		updateCfg, cfgErr := plan.Cfg, plan.Err
 		if cfgErr != nil {
 			planned := handleConfigError(p, cfgErr, updateCtx, originalVersion, deriveReason)
@@ -295,6 +302,31 @@ func handleExactConstraint(p formats.Package, updateCfg *config.UpdateCfg, origi
 	return &PlannedUpdate{Cfg: updateCfg, Res: res, Original: originalVersion, GroupKey: groupKey}
 }
 
+// handleIgnoredPackage handles packages that are ignored by configuration.
+//
+// Creates a PlannedUpdate with Ignored status, skipping all version checks
+// and update planning. Ignored packages appear in output but are not updated.
+//
+// Parameters:
+//   - p: The package that is ignored by configuration
+//   - originalVersion: Original version of the package
+//
+// Returns:
+//   - *PlannedUpdate: Planned update with Ignored status and no target version
+func handleIgnoredPackage(p formats.Package, originalVersion string) *PlannedUpdate {
+	res := UpdateResult{
+		Pkg:               p,
+		Status:            lock.InstallStatusIgnored,
+		Group:             p.Group,
+		OriginalInstalled: p.InstalledVersion,
+		OriginalVersion:   originalVersion,
+		Major:             constants.PlaceholderNA,
+		Minor:             constants.PlaceholderNA,
+		Patch:             constants.PlaceholderNA,
+	}
+	return &PlannedUpdate{Res: res, Original: originalVersion}
+}
+
 // planVersionUpdate plans the version update for a package.
 // The ctx parameter allows cancellation of long-running version fetches.
 func planVersionUpdate(
@@ -406,6 +438,7 @@ func CountPendingUpdates(plans []*PlannedUpdate) int {
 func IsNonUpdatableStatus(status string) bool {
 	return status == lock.InstallStatusNotConfigured ||
 		status == lock.InstallStatusFloating ||
+		status == lock.InstallStatusIgnored ||
 		status == constants.StatusConfigError ||
 		status == constants.StatusFailed ||
 		status == constants.StatusSummarizeError

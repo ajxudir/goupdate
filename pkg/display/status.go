@@ -89,6 +89,8 @@ func FormatStatus(status string) string {
 		return fmt.Sprintf("%s %s", constants.IconError, constants.StatusConfigError)
 	case constants.StatusSummarizeError:
 		return fmt.Sprintf("%s %s", constants.IconError, constants.StatusSummarizeError)
+	case lock.InstallStatusIgnored:
+		return fmt.Sprintf("%s %s", constants.IconIgnored, lock.InstallStatusIgnored)
 	default:
 		return status
 	}

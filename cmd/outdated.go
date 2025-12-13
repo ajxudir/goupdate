@@ -188,6 +188,25 @@ func runOutdated(cmd *cobra.Command, args []string) error {
 	for _, p := range ordered {
 		ruleCfg := cfg.Rules[p.Rule]
 
+		// Skip outdated command for Ignored packages - they are excluded by config
+		if p.InstallStatus == lock.InstallStatusIgnored {
+			result := outdatedResult{
+				pkg:    p,
+				group:  p.Group,
+				major:  constants.PlaceholderNA,
+				minor:  constants.PlaceholderNA,
+				patch:  constants.PlaceholderNA,
+				status: lock.InstallStatusIgnored,
+			}
+			results = append(results, result)
+			if useStructuredOutput {
+				progress.Increment()
+			} else {
+				printOutdatedRowWithTable(result, table)
+			}
+			continue
+		}
+
 		// Skip outdated command for Floating packages - they cannot be processed automatically
 		// because their constraints (*, x, ranges) make version comparison meaningless
 		if p.InstallStatus == lock.InstallStatusFloating {
