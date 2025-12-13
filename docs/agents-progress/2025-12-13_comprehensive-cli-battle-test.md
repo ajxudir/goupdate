@@ -277,6 +277,25 @@ Update statuses:
 - **Severity**: Minor (works correctly, just no warning)
 - **Recommendation**: Consider adding a warning for unknown output formats
 
+### Observation: Multiline commands in system_tests run in separate shells
+- **Description**: Each line in system_tests `commands` runs in a separate shell invocation. Variables and background processes don't persist between lines.
+- **Workaround**: Use backslash `\` line continuation to keep commands in the same shell
+- **Example**:
+  ```yaml
+  # WRONG - each line is separate shell
+  commands: |
+    ./myapp &
+    sleep 2
+    curl localhost:8080  # Background process is lost!
+
+  # CORRECT - single shell with line continuation
+  commands: |
+    ./myapp & \
+    sleep 2 && \
+    curl localhost:8080
+  ```
+- **Impact**: All example configs updated to use proper line continuation for HTTP tests
+
 ## Notes
 
 ### Testing Guidelines for `update` Command

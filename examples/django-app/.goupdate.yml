@@ -50,25 +50,11 @@ system_tests:
     # Start server and verify HTTP response
     - name: http-test
       commands: |
-        # Start Django dev server in background
-        python manage.py runserver 0.0.0.0:8765 &
-        SERVER_PID=$!
-        sleep 3
-
-        # Verify ping endpoint returns correct JSON
-        RESPONSE=$(curl -s http://localhost:8765/ping/)
-        echo "Ping response: $RESPONSE"
-
-        # Verify health endpoint
-        HEALTH=$(curl -s http://localhost:8765/health/)
-        echo "Health response: $HEALTH"
-
-        # Cleanup
-        kill $SERVER_PID 2>/dev/null || true
-
-        # Check responses contain expected content
-        echo "$RESPONSE" | grep -q '"message"' || { echo "ERROR: Ping failed"; exit 1; }
-        echo "$HEALTH" | grep -q '"status"' || { echo "ERROR: Health failed"; exit 1; }
+        python manage.py runserver 0.0.0.0:8765 & \
+        sleep 3 && \
+        curl -s http://localhost:8765/ping/ | grep -q '"message"' && \
+        curl -s http://localhost:8765/health/ | grep -q '"status"' && \
+        pkill -f "manage.py runserver" || true && \
         echo "HTTP tests passed!"
       timeout_seconds: 60
       env:

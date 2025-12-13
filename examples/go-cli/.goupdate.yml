@@ -26,16 +26,7 @@ system_tests:
     # Verify CLI runs and responds correctly
     - name: cli-test
       commands: |
-        # Test default command
-        RESPONSE=$(./myapp)
-        echo "Default response: $RESPONSE"
-
-        # Test ping subcommand
-        PING=$(./myapp ping)
-        echo "Ping response: $PING"
-
-        # Verify responses
-        echo "$RESPONSE" | grep -q "Hello" || { echo "ERROR: Default command failed"; exit 1; }
-        echo "$PING" | grep -q "pong" || { echo "ERROR: Ping command failed"; exit 1; }
+        ./myapp 2>&1 | grep -q "Hello" && \
+        ./myapp ping 2>&1 | grep -q "pong" && \
         echo "CLI tests passed!"
       timeout_seconds: 30
