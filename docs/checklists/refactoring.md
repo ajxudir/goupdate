@@ -1,55 +1,128 @@
 # Refactoring Checklist
 
 Use this checklist when refactoring code in goupdate.
+**Parallel execution** - run independent verification tasks simultaneously.
+
+---
+
+## Quick Reference
+
+### Package Structure
+```
+goupdate/
+├── cmd/                    # CLI commands and flags
+│   ├── root.go             # Root command, persistent flags
+│   ├── scan.go             # Scan command
+│   ├── list.go             # List command
+│   ├── outdated.go         # Outdated command
+│   ├── update.go           # Update command
+│   └── config.go           # Config command
+├── pkg/
+│   ├── config/             # Configuration
+│   │   ├── model.go        # Config structs
+│   │   ├── loader.go       # Config loading
+│   │   ├── validation.go   # Config validation
+│   │   └── default.yml     # Default config
+│   ├── formats/            # File format parsers
+│   │   ├── json.go         # JSON parser
+│   │   ├── xml.go          # XML parser
+│   │   ├── raw.go          # Regex parser
+│   │   └── yaml.go         # YAML parser
+│   ├── lock/               # Lock file resolution
+│   ├── outdated/           # Version checking
+│   ├── update/             # Update execution
+│   ├── filtering/          # Package filtering
+│   ├── output/             # Output formatting
+│   └── packages/           # Package detection
+└── testdata/               # Test fixtures
+```
+
+### Refactoring Risk Levels
+| Type | Scope | Risk | Example |
+|------|-------|------|---------|
+| Rename | Single symbol | Low | Rename variable |
+| Extract function | Single file | Low | Split large function |
+| Extract interface | Package boundary | Medium | Add testability |
+| Move code | Multiple files | Medium | Reorganize package |
+| Interface change | Package API | High | Change public function |
+| Architecture | Multiple packages | High | Change data flow |
 
 ---
 
 ## Phase 1: Planning
 
 - [ ] Refactoring goal clearly defined
-- [ ] Scope limited (avoid mixing refactoring with features/fixes)
-- [ ] All existing tests pass before starting
-- [ ] Identify all affected files
+- [ ] Scope limited (no mixing with features/fixes)
+- [ ] All existing tests pass: `go test ./...`
+- [ ] Affected files identified
+- [ ] Risk level assessed
+- [ ] Rollback plan clear
 
-### Refactoring Types
-| Type | Scope | Risk |
-|------|-------|------|
-| Rename | Single symbol | Low |
-| Extract function | Single file | Low |
-| Move code | Multiple files | Medium |
-| Interface change | Package boundary | High |
-| Architecture change | Multiple packages | High |
+### Scope Checklist
+| Question | Answer |
+|----------|--------|
+| What exactly are we changing? | |
+| Why is this refactoring needed? | |
+| What files are affected? | |
+| What's the risk level? | |
+| Can we do this incrementally? | |
 
 ---
 
-## Phase 2: Safety Net
+## Phase 2: Safety Net (Parallel)
 
-Before refactoring, ensure tests are comprehensive:
+Before refactoring, verify test coverage:
 
-- [ ] Coverage checked: `make coverage-func`
-- [ ] Coverage >= 95% for affected code
-- [ ] Edge cases have tests
-- [ ] Integration tests exist for affected functionality
+```bash
+# Terminal 1: Coverage report
+make coverage-func
 
-### Add Missing Tests If Needed
-- [ ] Additional unit tests added
-- [ ] Behavior documented in tests (not just implementation)
+# Terminal 2: Run affected tests
+go test -v ./pkg/affected/...
+
+# Terminal 3: Check for flaky tests
+go test -count=10 ./pkg/affected/...
+```
+
+| Check | Status |
+|-------|--------|
+| Coverage ≥95% for affected code | [ ] |
+| All tests pass | [ ] |
+| No flaky tests | [ ] |
+| Edge cases covered | [ ] |
+| Integration tests exist | [ ] |
+
+### Add Missing Tests First
+If coverage is insufficient:
+- [ ] Add tests for uncovered paths
+- [ ] Document behavior in tests
+- [ ] Verify tests catch behavior changes
 
 ---
 
 ## Phase 3: Incremental Changes
 
-Refactor in small, testable steps:
+**Small steps, frequent commits:**
 
 ### Step Pattern
-1. [ ] Make one small change
-2. [ ] Run tests: `go test ./...`
-3. [ ] Commit if tests pass
-4. [ ] Repeat
+```
+1. Make ONE small change
+2. Run tests: go test ./...
+3. Commit if tests pass
+4. Repeat
+```
 
-### Commit Frequency
-- Commit after each successful step
-- Each commit should leave code in working state
+| Step | Change | Tests Pass | Committed |
+|------|--------|------------|-----------|
+| 1 | | [ ] | [ ] |
+| 2 | | [ ] | [ ] |
+| 3 | | [ ] | [ ] |
+| 4 | | [ ] | [ ] |
+| 5 | | [ ] | [ ] |
+
+### Commit Frequently
+- Each commit should leave code working
+- Commits should be logically atomic
 - Use descriptive commit messages
 
 ---
@@ -57,67 +130,132 @@ Refactor in small, testable steps:
 ## Phase 4: Code Quality
 
 ### Naming
-- [ ] Names are clear and descriptive
-- [ ] Consistent naming conventions
-- [ ] No abbreviations (except common ones like `cfg`, `ctx`)
+| Check | Status |
+|-------|--------|
+| Names are clear and descriptive | [ ] |
+| Consistent naming conventions | [ ] |
+| No unexplained abbreviations | [ ] |
+| Package names match directory | [ ] |
 
 ### Structure
-- [ ] Functions are focused (single responsibility)
-- [ ] No deep nesting (max 3 levels)
-- [ ] Error handling is consistent
+| Check | Status |
+|-------|--------|
+| Functions are focused (SRP) | [ ] |
+| No deep nesting (max 3 levels) | [ ] |
+| Error handling consistent | [ ] |
+| No duplicate code | [ ] |
+| Clear control flow | [ ] |
 
 ### Dependencies
-- [ ] No circular imports
-- [ ] Dependencies flow downward (cmd → pkg)
-- [ ] Interfaces used at package boundaries
+| Check | Status |
+|-------|--------|
+| No circular imports | [ ] |
+| Dependencies flow downward | [ ] |
+| Interfaces at boundaries | [ ] |
+| Minimal coupling | [ ] |
+
+### Package-Level Flags
+If refactoring commands:
+| Flag Variable | Save/Restore Required |
+|---------------|----------------------|
+| `outputFlag` | [ ] |
+| `dirFlag` | [ ] |
+| `ruleFlag` | [ ] |
+| `typeFlag` | [ ] |
+| `pmFlag` | [ ] |
+| `dryRunFlag` | [ ] |
 
 ---
 
-## Phase 5: Verification
+## Phase 5: Verification (Parallel)
 
-### All Tests Pass
-- [ ] `go test ./...` - All unit tests
-- [ ] `go test -race ./...` - No race conditions
-- [ ] `make test-integration` - Integration tests
+Run all simultaneously:
 
-### Static Analysis
-- [ ] `go vet ./...` - No issues
-- [ ] `gofmt -s -w .` - Code formatted
-- [ ] `make check` - All checks pass
+```bash
+# Terminal 1: Unit tests
+go test ./... -count=1
 
-### Coverage
-- [ ] Coverage not decreased
-- [ ] New code properly covered
+# Terminal 2: Race detection
+go test -race ./...
+
+# Terminal 3: Coverage
+make coverage-func
+
+# Terminal 4: Static analysis
+go vet ./... && make check
+```
+
+| Test | Command | Status |
+|------|---------|--------|
+| Unit tests | `go test ./...` | [ ] |
+| Race detection | `go test -race ./...` | [ ] |
+| Coverage not decreased | `make coverage-func` | [ ] |
+| Static analysis | `go vet ./...` | [ ] |
+| Linters | `make check` | [ ] |
+| Formatting | `gofmt -s -w .` | [ ] |
 
 ---
 
 ## Phase 6: Behavior Verification
 
-### Battle Testing
-Ensure refactoring didn't change behavior:
+### Before/After Comparison
 
 ```bash
-TEST_DIR=$(mktemp -d)
+export TEST_DIR=$(mktemp -d)
 git clone --depth 1 https://github.com/spf13/cobra.git $TEST_DIR/cobra
+
+# BEFORE refactoring (on main branch):
+git stash
+goupdate list -d $TEST_DIR/cobra > /tmp/before-list.txt
+goupdate list -d $TEST_DIR/cobra -o json > /tmp/before-json.txt
+goupdate outdated -d $TEST_DIR/cobra > /tmp/before-outdated.txt
+git stash pop
+
+# AFTER refactoring:
+goupdate list -d $TEST_DIR/cobra > /tmp/after-list.txt
+goupdate list -d $TEST_DIR/cobra -o json > /tmp/after-json.txt
+goupdate outdated -d $TEST_DIR/cobra > /tmp/after-outdated.txt
+
+# Compare:
+diff /tmp/before-list.txt /tmp/after-list.txt
+diff /tmp/before-json.txt /tmp/after-json.txt
+diff /tmp/before-outdated.txt /tmp/after-outdated.txt
 ```
 
-- [ ] `goupdate scan` - Same output as before
-- [ ] `goupdate list` - Same output as before
-- [ ] `goupdate outdated` - Same output as before
-- [ ] `goupdate update --dry-run` - Same plan as before
-- [ ] All output formats work (table, json, csv, xml)
+| Command | Before == After | Status |
+|---------|-----------------|--------|
+| `scan` | [ ] | |
+| `list` | [ ] | |
+| `list -o json` | [ ] | |
+| `outdated` | [ ] | |
+| `update --dry-run` | [ ] | |
 
-### Compare Before/After
+### All Commands Work
+
+| Command | Status |
+|---------|--------|
+| `scan -d $TEST_DIR/cobra` | [ ] |
+| `list -d $TEST_DIR/cobra` | [ ] |
+| `outdated -d $TEST_DIR/cobra` | [ ] |
+| `update --dry-run -d $TEST_DIR/cobra` | [ ] |
+| `config --show-defaults` | [ ] |
+
+### All Output Formats (Parallel)
+
 ```bash
-# Before refactoring, save outputs:
-goupdate list -d $TEST_DIR/cobra > /tmp/before.txt
-
-# After refactoring, compare:
-goupdate list -d $TEST_DIR/cobra > /tmp/after.txt
-diff /tmp/before.txt /tmp/after.txt
+goupdate list -d $TEST_DIR/cobra -o table &
+goupdate list -d $TEST_DIR/cobra -o json | jq . &
+goupdate list -d $TEST_DIR/cobra -o csv &
+goupdate list -d $TEST_DIR/cobra -o xml &
+wait
 ```
 
-- [ ] No unexpected output differences
+| Format | Works | Status |
+|--------|-------|--------|
+| table | [ ] | |
+| json | [ ] | |
+| csv | [ ] | |
+| xml | [ ] | |
 
 ---
 
@@ -125,26 +263,27 @@ diff /tmp/before.txt /tmp/after.txt
 
 - [ ] Code comments updated
 - [ ] Architecture docs updated if structure changed
-- [ ] README updated if public API changed
+- [ ] README updated if API changed
+- [ ] No stale TODOs left
 
 ---
 
 ## Phase 8: Final Verification
 
 - [ ] All tests pass: `go test ./... -count=1`
-- [ ] Race tests pass: `go test -race ./...`
+- [ ] No races: `go test -race ./...`
 - [ ] Coverage maintained: `make coverage-func`
 - [ ] Clean git status
 - [ ] Commits are logical and reviewable
-- [ ] Cleanup test directories
+- [ ] Cleanup: `rm -rf $TEST_DIR`
 
 ---
 
-## Common Refactoring Patterns
+## Refactoring Patterns
 
 ### Extract Function
 ```go
-// Before: Long function with multiple responsibilities
+// Before: Long function
 func process() {
     // validation...
     // transformation...
@@ -153,9 +292,9 @@ func process() {
 
 // After: Focused functions
 func process() {
-    validate()
-    transform()
-    output()
+    if err := validate(); err != nil { return err }
+    data := transform()
+    return output(data)
 }
 ```
 
@@ -168,29 +307,53 @@ type Service struct {
 
 // After: Interface dependency
 type Service struct {
-    db DatabaseReader
+    db DataReader
 }
 
-type DatabaseReader interface {
+type DataReader interface {
     Read(id string) (Data, error)
 }
 ```
 
 ### Move to Package
-When moving code between packages:
+When relocating code:
 1. [ ] Create new location
-2. [ ] Copy code (don't move yet)
+2. [ ] Copy code (don't delete yet)
 3. [ ] Update imports in new location
-4. [ ] Create forwarding functions in old location
+4. [ ] Create forwarding in old location (temporary)
 5. [ ] Update all callers
-6. [ ] Remove old code
+6. [ ] Remove old code and forwarding
+7. [ ] Tests pass at each step
+
+### Rename Symbol
+```bash
+# Use Go tools for safe renames:
+gorename -from 'pkg.OldName' -to 'NewName'
+```
 
 ---
 
 ## Anti-Patterns to Avoid
 
-- [ ] Don't mix refactoring with bug fixes
-- [ ] Don't mix refactoring with new features
-- [ ] Don't refactor without tests
-- [ ] Don't make large changes without commits
-- [ ] Don't change behavior (that's a feature/fix, not refactoring)
+| Don't | Why |
+|-------|-----|
+| Mix refactoring with features | Hard to review, risky |
+| Mix refactoring with bug fixes | Can't bisect issues |
+| Refactor without tests | Can't verify behavior preserved |
+| Make large changes without commits | Can't rollback safely |
+| Change behavior | That's a feature, not refactoring |
+| Skip battle testing | May break real usage |
+
+---
+
+## Parallel Execution Summary
+
+### Can Run in Parallel
+- Phase 2: All safety net checks
+- Phase 5: All verification tests
+- Phase 6: Output format testing
+- Before/after comparisons (different terminals)
+
+### Must Run Sequentially
+- Phase 3: Incremental changes (one at a time)
+- Phase 8: Final verification (after all other phases)

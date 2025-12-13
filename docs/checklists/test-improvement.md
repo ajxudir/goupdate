@@ -1,66 +1,162 @@
 # Test Improvement Checklist
 
 Use this checklist when adding or improving tests in goupdate.
+**Parallel execution** - run independent test suites simultaneously.
 
 ---
 
-## Phase 1: Assessment
-
-- [ ] Current coverage checked: `make coverage-func`
-- [ ] Gaps identified in coverage report
-- [ ] Missing test scenarios documented
-- [ ] Priority areas identified
+## Quick Reference
 
 ### Coverage Targets
-| Package | Minimum | Target |
-|---------|---------|--------|
-| cmd/ | 90% | 95%+ |
-| pkg/config/ | 95% | 98%+ |
-| pkg/formats/ | 90% | 95%+ |
-| pkg/update/ | 90% | 95%+ |
-| pkg/outdated/ | 90% | 95%+ |
-| Overall | 95% | 97%+ |
+| Package | Minimum | Target | Critical Functions |
+|---------|---------|--------|-------------------|
+| cmd/ | 90% | 95%+ | All command handlers |
+| pkg/config/ | 95% | 98%+ | Load, Validate, Merge |
+| pkg/formats/ | 90% | 95%+ | All parsers |
+| pkg/lock/ | 95% | 98%+ | Resolve, all lock formats |
+| pkg/outdated/ | 90% | 95%+ | Check, Compare |
+| pkg/update/ | 90% | 95%+ | Update, Write |
+| pkg/filtering/ | 95% | 98%+ | All filter functions |
+| pkg/output/ | 90% | 95%+ | All render functions |
+| **Overall** | 95% | 97%+ | |
+
+### Test File Locations
+| Component | Test File |
+|-----------|-----------|
+| scan command | `cmd/scan_test.go` |
+| list command | `cmd/list_test.go` |
+| outdated command | `cmd/outdated_test.go` |
+| update command | `cmd/update_test.go` |
+| config command | `cmd/config_test.go` |
+| Config loading | `pkg/config/loader_test.go` |
+| Config validation | `pkg/config/validation_test.go` |
+| JSON parsing | `pkg/formats/json_test.go` |
+| XML parsing | `pkg/formats/xml_test.go` |
+| Raw/Regex parsing | `pkg/formats/raw_test.go` |
+| Lock resolution | `pkg/lock/*_test.go` |
+| Version checking | `pkg/outdated/*_test.go` |
+| Update logic | `pkg/update/*_test.go` |
+| Filtering | `pkg/filtering/*_test.go` |
+| Output | `pkg/output/*_test.go` |
+
+---
+
+## Phase 1: Assessment (Parallel)
+
+Run simultaneously:
+
+```bash
+# Terminal 1: Current coverage
+make coverage-func
+
+# Terminal 2: Find uncovered code
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out  # Opens in browser
+
+# Terminal 3: List test files
+find . -name "*_test.go" | wc -l
+```
+
+| Assessment | Status |
+|------------|--------|
+| Current coverage checked | [ ] |
+| Gaps identified | [ ] |
+| Missing scenarios documented | [ ] |
+| Priority areas identified | [ ] |
+
+### Coverage Gap Analysis
+| Package | Current | Target | Gap | Priority |
+|---------|---------|--------|-----|----------|
+| cmd/ | % | 95% | % | |
+| pkg/config/ | % | 98% | % | |
+| pkg/formats/ | % | 95% | % | |
+| pkg/lock/ | % | 98% | % | |
+| pkg/outdated/ | % | 95% | % | |
+| pkg/update/ | % | 95% | % | |
 
 ---
 
 ## Phase 2: Test Types
 
 ### Unit Tests
-- [ ] Happy path covered
-- [ ] Error paths covered
-- [ ] Boundary conditions tested
-- [ ] Nil/empty inputs handled
+| Scenario | Status |
+|----------|--------|
+| Happy path covered | [ ] |
+| Error paths covered | [ ] |
+| Boundary conditions | [ ] |
+| Nil/empty inputs | [ ] |
+| Invalid inputs | [ ] |
 
 ### Integration Tests
-- [ ] Real testdata used (no mocks)
-- [ ] Test named `Test*Integration*`
-- [ ] File parsing verified
-- [ ] Lock resolution verified
-
-### Chaos Tests
-- [ ] Malformed input tested
-- [ ] Unicode/special characters tested
-- [ ] Large inputs tested
-- [ ] Empty/null values tested
+| Requirement | Status |
+|-------------|--------|
+| Real testdata used | [ ] |
+| Named `Test*Integration*` | [ ] |
+| File parsing verified | [ ] |
+| Lock resolution verified | [ ] |
+| All PMs covered | [ ] |
 
 ### Edge Case Tests
-- [ ] `pkg/testdata/*/_edge-cases/` used
-- [ ] No-lock scenarios tested
-- [ ] Prerelease versions tested
-- [ ] Platform-specific cases (if applicable)
+| Scenario | Status |
+|----------|--------|
+| Empty files | [ ] |
+| Malformed input | [ ] |
+| Unicode/special chars | [ ] |
+| Large inputs | [ ] |
+| Missing dependencies | [ ] |
+| Network failures | [ ] |
+
+### Package Manager Coverage
+| PM | scan | list | outdated | update | lock |
+|----|------|------|----------|--------|------|
+| npm | [ ] | [ ] | [ ] | [ ] | [ ] |
+| pnpm | [ ] | [ ] | [ ] | [ ] | [ ] |
+| yarn | [ ] | [ ] | [ ] | [ ] | [ ] |
+| composer | [ ] | [ ] | [ ] | [ ] | [ ] |
+| requirements | [ ] | [ ] | [ ] | [ ] | [ ] |
+| pipfile | [ ] | [ ] | [ ] | [ ] | [ ] |
+| mod | [ ] | [ ] | [ ] | [ ] | [ ] |
+| msbuild | [ ] | [ ] | [ ] | [ ] | [ ] |
+| nuget | [ ] | [ ] | [ ] | [ ] | [ ] |
+
+### Output Format Coverage
+| Command | table | json | csv | xml |
+|---------|-------|------|-----|-----|
+| scan | [ ] | [ ] | [ ] | [ ] |
+| list | [ ] | [ ] | [ ] | [ ] |
+| outdated | [ ] | [ ] | [ ] | [ ] |
+| update | [ ] | [ ] | [ ] | [ ] |
+
+### Filter Coverage
+| Filter | list | outdated | update |
+|--------|------|----------|--------|
+| `-t prod` | [ ] | [ ] | [ ] |
+| `-t dev` | [ ] | [ ] | [ ] |
+| `-p js` | [ ] | [ ] | [ ] |
+| `-p golang` | [ ] | [ ] | [ ] |
+| `-r npm` | [ ] | [ ] | [ ] |
+| `-n name` | [ ] | [ ] | [ ] |
+| `-g group` | [ ] | [ ] | [ ] |
+| combined | [ ] | [ ] | [ ] |
 
 ---
 
-## Phase 3: Test Quality
+## Phase 3: Test Structure
 
-### Test Structure
+### Standard Test Template
 ```go
 func TestFeatureName(t *testing.T) {
     // Arrange - setup
+    input := "test input"
+    expected := "expected output"
 
     // Act - execute
+    result := FunctionUnderTest(input)
 
     // Assert - verify
+    if result != expected {
+        t.Errorf("expected %q, got %q", expected, result)
+    }
 }
 ```
 
@@ -75,112 +171,286 @@ func TestFeature(t *testing.T) {
     }{
         {"valid input", "foo", "bar", false},
         {"empty input", "", "", true},
+        {"special chars", "foo@1.0", "bar@1.0", false},
     }
 
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            // test implementation
+            result, err := FunctionUnderTest(tt.input)
+            if (err != nil) != tt.wantErr {
+                t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
+                return
+            }
+            if result != tt.expected {
+                t.Errorf("got %q, want %q", result, tt.expected)
+            }
         })
     }
 }
 ```
 
-### Test Isolation
-- [ ] Tests don't depend on order
-- [ ] Package-level flags saved/restored with `t.Cleanup()`
-- [ ] Temp files cleaned up
-- [ ] No global state leakage
-
----
-
-## Phase 4: Testdata
-
-### Adding Testdata
-- [ ] Real package files (not fabricated)
-- [ ] Placed in `pkg/testdata/<ecosystem>/`
-- [ ] Lock files included
-- [ ] Edge cases in `_edge-cases/` subdirectory
-
-### Testdata Structure
-```
-pkg/testdata/
-├── npm/
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── .goupdate.yml
-│   └── _edge-cases/
-│       ├── no-lock/
-│       └── prerelease/
-├── mod/
-│   ├── go.mod
-│   ├── go.sum
-│   └── _edge-cases/
-└── README.md
+### Subtests for Organization
+```go
+func TestCommand(t *testing.T) {
+    t.Run("scan", func(t *testing.T) {
+        // scan tests
+    })
+    t.Run("list", func(t *testing.T) {
+        // list tests
+    })
+    t.Run("outdated", func(t *testing.T) {
+        // outdated tests
+    })
+}
 ```
 
 ---
 
-## Phase 5: Test Pollution Prevention
+## Phase 4: Test Isolation (CRITICAL)
 
 ### Flag Save/Restore Pattern
 ```go
-func TestSomething(t *testing.T) {
-    // Save original values
-    originalFlag := someFlag
-    originalOutput := outputFlag
+func TestCommand(t *testing.T) {
+    // Save ALL affected flags
+    origOutput := outputFlag
+    origDir := dirFlag
+    origRule := ruleFlag
+    origType := typeFlag
+    origPM := pmFlag
+    origDryRun := dryRunFlag
+
+    // Restore on cleanup (runs even if test fails)
+    t.Cleanup(func() {
+        outputFlag = origOutput
+        dirFlag = origDir
+        ruleFlag = origRule
+        typeFlag = origType
+        pmFlag = origPM
+        dryRunFlag = origDryRun
+    })
 
     // Set test values
-    someFlag = "test"
     outputFlag = "json"
-
-    // Restore on cleanup
-    t.Cleanup(func() {
-        someFlag = originalFlag
-        outputFlag = originalOutput
-    })
+    dirFlag = "/test/path"
 
     // Run test
 }
 ```
 
-### Common Flags to Save
-- [ ] `updateOutputFlag`
-- [ ] `updateRuleFlag`
-- [ ] `scanOutputFlag`
-- [ ] `updateDirFlag`
-- [ ] `updateDryRunFlag`
+### Flags to Save/Restore by Command
+| Command | Flags |
+|---------|-------|
+| scan | `scanOutputFlag`, `scanDirFlag`, `scanFileFlag` |
+| list | `listOutputFlag`, `listDirFlag`, `listTypeFlag`, `listPMFlag`, `listRuleFlag`, `listNameFlag`, `listGroupFlag` |
+| outdated | All list flags + `majorFlag`, `minorFlag`, `patchFlag`, `noTimeoutFlag`, `skipPreflightFlag` |
+| update | All outdated flags + `dryRunFlag`, `skipLockFlag`, `yesFlag`, `incrementalFlag` |
+| config | `configShowDefaults`, `configShowEffective`, `configInit`, `configValidate` |
+
+### Temp File Cleanup
+```go
+func TestWithTempFiles(t *testing.T) {
+    tmpDir, err := os.MkdirTemp("", "test-*")
+    if err != nil {
+        t.Fatal(err)
+    }
+    t.Cleanup(func() {
+        os.RemoveAll(tmpDir)
+    })
+
+    // Use tmpDir for test files
+}
+```
 
 ---
 
-## Phase 6: Verification
+## Phase 5: Testdata Management
 
-### Run Tests
-- [ ] `go test ./...` - All pass
-- [ ] `go test -race ./...` - No races
-- [ ] `go test -count=10 ./...` - Consistent (no flakes)
+### Structure
+```
+pkg/testdata/
+├── npm/
+│   ├── package.json          # Real package file
+│   ├── package-lock.json     # Real lock file
+│   └── _edge-cases/
+│       ├── no-lock/          # No lock file scenario
+│       ├── prerelease/       # Prerelease versions
+│       └── unicode/          # Unicode package names
+├── mod/
+│   ├── go.mod
+│   ├── go.sum
+│   └── _edge-cases/
+├── composer/
+│   ├── composer.json
+│   ├── composer.lock
+│   └── _edge-cases/
+└── README.md                  # Document testdata sources
+```
 
-### Coverage Check
-- [ ] `make coverage-func` - Coverage increased
-- [ ] New code covered
-- [ ] No coverage regression
+### Adding Testdata
+| Requirement | Status |
+|-------------|--------|
+| Real files (not fabricated) | [ ] |
+| From actual projects | [ ] |
+| Source documented | [ ] |
+| Lock files included | [ ] |
+| Edge cases in `_edge-cases/` | [ ] |
+| No node_modules/vendor | [ ] |
 
 ---
 
-## Phase 7: Documentation
+## Phase 6: Running Tests (Parallel)
 
-- [ ] Test purpose documented in function comment
-- [ ] Complex test logic explained
-- [ ] Testdata README updated if new files added
+Run all test types simultaneously:
+
+```bash
+# Terminal 1: Unit tests
+go test ./... -count=1
+
+# Terminal 2: Race detection
+go test -race ./...
+
+# Terminal 3: Coverage
+go test -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out
+
+# Terminal 4: Flaky test detection
+go test -count=10 ./...
+```
+
+| Test Type | Command | Status |
+|-----------|---------|--------|
+| Unit tests | `go test ./...` | [ ] |
+| Race detection | `go test -race ./...` | [ ] |
+| Coverage report | `make coverage-func` | [ ] |
+| Flaky detection | `go test -count=10 ./...` | [ ] |
+| Integration | `make test-integration` | [ ] |
+
+---
+
+## Phase 7: Verification
+
+### Coverage Verification
+```bash
+# Check coverage increased
+make coverage-func
+
+# Visual coverage report
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
+| Check | Status |
+|-------|--------|
+| Coverage increased | [ ] |
+| New code covered | [ ] |
+| No regression | [ ] |
+| Target met | [ ] |
+
+### Test Quality
+| Check | Status |
+|-------|--------|
+| Tests are deterministic | [ ] |
+| Tests are independent | [ ] |
+| Tests are fast (<1s each) | [ ] |
+| Tests document behavior | [ ] |
+| Test names are descriptive | [ ] |
+
+---
+
+## Phase 8: Documentation
+
+| Task | Status |
+|------|--------|
+| Test purpose in comments | [ ] |
+| Complex logic explained | [ ] |
+| Testdata README updated | [ ] |
+| Coverage targets updated | [ ] |
 
 ---
 
 ## Test Categories Reference
 
-| Category | Location | Purpose |
-|----------|----------|---------|
+| Category | File Pattern | Purpose |
+|----------|--------------|---------|
 | Unit | `*_test.go` | Test individual functions |
 | Integration | `*_integration_test.go` | Test with real files |
-| Chaos | `chaos_*_test.go` | Test malformed inputs |
-| Edge cases | Uses `_edge-cases/` testdata | Test boundary conditions |
-| E2E | `cmd/e2e_test.go` | Test full CLI workflows |
+| Edge case | Uses `_edge-cases/` | Boundary conditions |
+| E2E | `cmd/e2e_test.go` | Full CLI workflows |
 | Benchmark | `*_benchmark_test.go` | Performance testing |
+
+---
+
+## Parallel Execution Summary
+
+### Can Run in Parallel
+- Phase 1: All assessment tasks
+- Phase 6: Unit, race, coverage, flaky tests
+- Testing different packages
+- Testing different commands
+
+### Must Run Sequentially
+- Writing tests (one feature at a time)
+- Phase 7: Verification (after tests written)
+
+---
+
+## Common Test Patterns
+
+### Testing Error Paths
+```go
+func TestFunction_Error(t *testing.T) {
+    _, err := FunctionUnderTest(invalidInput)
+    if err == nil {
+        t.Error("expected error, got nil")
+    }
+    if !strings.Contains(err.Error(), "expected message") {
+        t.Errorf("unexpected error: %v", err)
+    }
+}
+```
+
+### Testing CLI Commands
+```go
+func TestScanCommand(t *testing.T) {
+    // Save flags
+    orig := scanDirFlag
+    t.Cleanup(func() { scanDirFlag = orig })
+
+    // Set test directory
+    scanDirFlag = "testdata/npm"
+
+    // Capture output
+    var buf bytes.Buffer
+    cmd := NewScanCmd()
+    cmd.SetOut(&buf)
+    cmd.SetArgs([]string{})
+
+    // Execute
+    err := cmd.Execute()
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+
+    // Verify output
+    output := buf.String()
+    if !strings.Contains(output, "package.json") {
+        t.Errorf("expected package.json in output: %s", output)
+    }
+}
+```
+
+### Testing JSON Output
+```go
+func TestListJSON(t *testing.T) {
+    output := runCommand(t, "list", "-d", "testdata/npm", "-o", "json")
+
+    var result ListResult
+    if err := json.Unmarshal([]byte(output), &result); err != nil {
+        t.Fatalf("invalid JSON: %v", err)
+    }
+
+    if len(result.Packages) == 0 {
+        t.Error("expected packages in result")
+    }
+}
+```
