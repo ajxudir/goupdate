@@ -1,0 +1,3 @@
+# Test case: Direct cyclic extends (A extends B, B extends A)
+# Expected: Part of cycle - loading a.yml should fail
+extends: ["a.yml"]

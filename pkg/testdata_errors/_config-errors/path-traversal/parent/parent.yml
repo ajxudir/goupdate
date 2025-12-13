@@ -1,0 +1,9 @@
+# Test case: Parent config for path traversal security tests
+# This config is extended by child/child.yml using ../parent.yml
+rules:
+  test:
+    manager: test
+    include: ["*.test"]
+    format: raw
+    fields:
+      packages: prod

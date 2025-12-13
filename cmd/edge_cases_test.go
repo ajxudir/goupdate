@@ -40,10 +40,15 @@ import (
 
 // TestConfigSecurity_PathTraversalAttempts tests various path traversal scenarios.
 //
+// This test uses dynamic inline configs because it needs to test varying security
+// configurations that would require many fixture files. For static testdata fixtures,
+// see TestConfigSecurity_PathTraversalFromTestdata below.
+//
 // It verifies:
-//   - Direct path traversal is blocked by default
-//   - Multiple .. sequences are detected
-//   - Encoded path traversal is handled
+//   - Direct path traversal (../) is blocked by default
+//   - Multiple path traversal sequences (../../) are blocked
+//   - Path traversal is allowed when security.allow_path_traversal: true is set
+//   - Appropriate error message "path traversal not allowed" is returned
 func TestConfigSecurity_PathTraversalAttempts(t *testing.T) {
 	tmpDir := t.TempDir()
 	subDir := filepath.Join(tmpDir, "sub")
@@ -120,6 +125,62 @@ func TestConfigSecurity_PathTraversalAttempts(t *testing.T) {
 	}
 }
 
+// TestConfigSecurity_PathTraversalFromTestdata tests path traversal using testdata fixtures.
+//
+// This test uses fixtures from pkg/testdata_errors/_config-errors/path-traversal/
+// to ensure testable scenarios are available for manual testing and reuse.
+//
+// It verifies:
+//   - blocked.yml (no security setting) returns "path traversal not allowed" error
+//   - allowed.yml (security.allow_path_traversal: true) loads successfully
+func TestConfigSecurity_PathTraversalFromTestdata(t *testing.T) {
+	t.Run("path traversal blocked by default from testdata", func(t *testing.T) {
+		configDir, err := filepath.Abs("../pkg/testdata_errors/_config-errors/path-traversal/child")
+		require.NoError(t, err, "failed to get absolute path to testdata")
+
+		oldConfig := scanConfigFlag
+		oldDir := scanDirFlag
+		defer func() {
+			scanConfigFlag = oldConfig
+			scanDirFlag = oldDir
+		}()
+
+		scanConfigFlag = filepath.Join(configDir, "blocked.yml")
+		scanDirFlag = configDir
+
+		err = runScan(nil, nil)
+		assert.Error(t, err, "path traversal should be blocked by default")
+		if err != nil {
+			assert.Contains(t, err.Error(), "path traversal not allowed",
+				"error should indicate path traversal is not allowed")
+		}
+	})
+
+	t.Run("path traversal allowed when explicitly enabled from testdata", func(t *testing.T) {
+		configDir, err := filepath.Abs("../pkg/testdata_errors/_config-errors/path-traversal/child")
+		require.NoError(t, err, "failed to get absolute path to testdata")
+
+		oldConfig := scanConfigFlag
+		oldDir := scanDirFlag
+		defer func() {
+			scanConfigFlag = oldConfig
+			scanDirFlag = oldDir
+		}()
+
+		scanConfigFlag = filepath.Join(configDir, "allowed.yml")
+		scanDirFlag = configDir
+
+		err = runScan(nil, nil)
+		// Should not error with "path traversal not allowed" - may have other errors
+		// like "no files found" since testdata doesn't have actual manifest files
+		if err != nil {
+			assert.NotContains(t, err.Error(), "path traversal not allowed",
+				"error should NOT be about path traversal when allowed")
+			t.Logf("path traversal allowed config result: %v", err)
+		}
+	})
+}
+
 // TestConfigSecurity_AbsolutePathHandling tests absolute path security.
 //
 // It verifies:
@@ -187,20 +248,18 @@ extends: ["` + absPath + `"]`
 
 // TestConfigSecurity_CircularDependency tests circular extends detection.
 //
+// This test uses fixtures from pkg/testdata_errors/_config-errors/cyclic-extends-*
+// to ensure testable scenarios are available for manual testing and reuse.
+//
 // It verifies:
-//   - Direct circular reference is detected
-//   - Indirect circular reference is detected
-//   - Self-reference is detected
+//   - Direct circular reference is detected (A extends B, B extends A)
+//   - Indirect circular reference is detected (A -> B -> C -> A)
+//   - Appropriate "cyclic extends" error message is returned
 func TestConfigSecurity_CircularDependency(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	t.Run("direct circular reference", func(t *testing.T) {
-		// A extends B, B extends A
-		aContent := `extends: ["b.yml"]`
-		bContent := `extends: ["a.yml"]`
-
-		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "a.yml"), []byte(aContent), 0644))
-		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "b.yml"), []byte(bContent), 0644))
+	// Use testdata fixtures instead of inline configs for reusability
+	t.Run("direct circular reference from testdata", func(t *testing.T) {
+		cyclicDir, err := filepath.Abs("../pkg/testdata_errors/_config-errors/cyclic-extends-direct")
+		require.NoError(t, err, "failed to get absolute path to testdata")
 
 		oldConfig := scanConfigFlag
 		oldDir := scanDirFlag
@@ -209,23 +268,19 @@ func TestConfigSecurity_CircularDependency(t *testing.T) {
 			scanDirFlag = oldDir
 		}()
 
-		scanConfigFlag = filepath.Join(tmpDir, "a.yml")
-		scanDirFlag = tmpDir
+		scanConfigFlag = filepath.Join(cyclicDir, "a.yml")
+		scanDirFlag = cyclicDir
 
-		err := runScan(nil, nil)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cyclic")
+		err = runScan(nil, nil)
+		assert.Error(t, err, "circular extends should return error")
+		if err != nil {
+			assert.Contains(t, err.Error(), "cyclic", "error should mention cyclic dependency")
+		}
 	})
 
-	t.Run("indirect circular reference", func(t *testing.T) {
-		// A extends B, B extends C, C extends A
-		aContent := `extends: ["b2.yml"]`
-		bContent := `extends: ["c2.yml"]`
-		cContent := `extends: ["indirect-a.yml"]`
-
-		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "indirect-a.yml"), []byte(aContent), 0644))
-		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "b2.yml"), []byte(bContent), 0644))
-		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "c2.yml"), []byte(cContent), 0644))
+	t.Run("indirect circular reference from testdata", func(t *testing.T) {
+		cyclicDir, err := filepath.Abs("../pkg/testdata_errors/_config-errors/cyclic-extends-indirect")
+		require.NoError(t, err, "failed to get absolute path to testdata")
 
 		oldConfig := scanConfigFlag
 		oldDir := scanDirFlag
@@ -234,11 +289,14 @@ func TestConfigSecurity_CircularDependency(t *testing.T) {
 			scanDirFlag = oldDir
 		}()
 
-		scanConfigFlag = filepath.Join(tmpDir, "indirect-a.yml")
-		scanDirFlag = tmpDir
+		scanConfigFlag = filepath.Join(cyclicDir, "a.yml")
+		scanDirFlag = cyclicDir
 
-		err := runScan(nil, nil)
-		assert.Error(t, err)
+		err = runScan(nil, nil)
+		assert.Error(t, err, "indirect circular extends should return error")
+		if err != nil {
+			assert.Contains(t, err.Error(), "cyclic", "error should mention cyclic dependency")
+		}
 	})
 }
 
@@ -248,17 +306,17 @@ func TestConfigSecurity_CircularDependency(t *testing.T) {
 
 // TestConfigStructure_EmptyValues tests handling of empty configuration values.
 //
+// This test uses fixtures from pkg/testdata_errors/_config-errors/empty-* directories
+// to ensure testable scenarios are available for manual testing and reuse.
+//
 // It verifies:
-//   - Empty rules map is handled
-//   - Empty groups are handled
-//   - Empty arrays are handled
+//   - Empty rules map is handled gracefully (no panic, config loads successfully)
+//   - Empty extends array is handled gracefully
+//   - Operations complete without crashing even with minimal config
 func TestConfigStructure_EmptyValues(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	t.Run("empty rules map", func(t *testing.T) {
-		configContent := `rules: {}`
-		configPath := filepath.Join(tmpDir, "empty-rules.yml")
-		require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0644))
+	t.Run("empty rules map from testdata", func(t *testing.T) {
+		configDir, err := filepath.Abs("../pkg/testdata_errors/_config-errors/empty-rules")
+		require.NoError(t, err, "failed to get absolute path to testdata")
 
 		oldConfig := scanConfigFlag
 		oldDir := scanDirFlag
@@ -267,26 +325,20 @@ func TestConfigStructure_EmptyValues(t *testing.T) {
 			scanDirFlag = oldDir
 		}()
 
-		scanConfigFlag = configPath
-		scanDirFlag = tmpDir
+		scanConfigFlag = filepath.Join(configDir, ".goupdate.yml")
+		scanDirFlag = configDir
 
 		// Should handle empty rules gracefully - shouldn't panic
-		err := runScan(nil, nil)
-		// May or may not error (no files found), but config load should succeed
-		_ = err
+		// Config with empty rules is valid; scan may return "no files" but should not crash
+		err = runScan(nil, nil)
+		// Empty rules config is valid - scan completes (may find nothing, but shouldn't panic)
+		// The test passes if we reach this point without panic
+		t.Logf("empty rules config result: %v", err)
 	})
 
-	t.Run("empty extends array", func(t *testing.T) {
-		configContent := `extends: []
-rules:
-  test:
-    manager: test
-    include: ["*.test"]
-    format: raw
-    fields:
-      packages: prod`
-		configPath := filepath.Join(tmpDir, "empty-extends.yml")
-		require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0644))
+	t.Run("empty extends array from testdata", func(t *testing.T) {
+		configDir, err := filepath.Abs("../pkg/testdata_errors/_config-errors/empty-extends")
+		require.NoError(t, err, "failed to get absolute path to testdata")
 
 		oldConfig := scanConfigFlag
 		oldDir := scanDirFlag
@@ -295,47 +347,53 @@ rules:
 			scanDirFlag = oldDir
 		}()
 
-		scanConfigFlag = configPath
-		scanDirFlag = tmpDir
+		scanConfigFlag = filepath.Join(configDir, ".goupdate.yml")
+		scanDirFlag = configDir
 
-		// Should handle empty extends - shouldn't panic
-		err := runScan(nil, nil)
-		// No manifest files found, but config should be valid
-		_ = err
+		// Should handle empty extends array gracefully - valid but no inherited rules
+		err = runScan(nil, nil)
+		// Empty extends array is valid syntax - scan completes without crash
+		t.Logf("empty extends config result: %v", err)
 	})
 }
 
-// TestConfigStructure_TypeMismatches tests handling of type mismatches.
+// TestConfigStructure_TypeMismatches tests handling of type mismatches in YAML config.
+//
+// This test uses fixtures from pkg/testdata_errors/_config-errors/type-mismatch-*
+// to ensure testable scenarios are available for manual testing and reuse.
 //
 // It verifies:
-//   - String where array expected is detected
-//   - Array where string expected is detected
-//   - Object where primitive expected is detected
+//   - String where object expected for rules field returns parse error
+//   - String where array expected for include field returns parse error
+//   - YAML unmarshal errors are properly propagated
 func TestConfigStructure_TypeMismatches(t *testing.T) {
-	tmpDir := t.TempDir()
-
 	testCases := []struct {
-		name    string
-		content string
+		name         string
+		fixtureDir   string
+		configFile   string
+		expectError  bool
+		errorContain string
 	}{
 		{
-			name:    "string where array expected for rules",
-			content: `rules: "should be object"`,
+			name:         "string where object expected for rules",
+			fixtureDir:   "type-mismatch-rules",
+			configFile:   ".goupdate.yml",
+			expectError:  true,
+			errorContain: "cannot unmarshal",
 		},
 		{
-			name: "string where array expected for include",
-			content: `rules:
-  test:
-    manager: test
-    include: "should be array"
-    format: raw`,
+			name:         "string where array expected for include",
+			fixtureDir:   "type-mismatch-include",
+			configFile:   ".goupdate.yml",
+			expectError:  true,
+			errorContain: "cannot unmarshal",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			configPath := filepath.Join(tmpDir, "type-mismatch.yml")
-			require.NoError(t, os.WriteFile(configPath, []byte(tc.content), 0644))
+			configDir, err := filepath.Abs("../pkg/testdata_errors/_config-errors/" + tc.fixtureDir)
+			require.NoError(t, err, "failed to get absolute path to testdata")
 
 			oldConfig := scanConfigFlag
 			oldDir := scanDirFlag
@@ -344,11 +402,17 @@ func TestConfigStructure_TypeMismatches(t *testing.T) {
 				scanDirFlag = oldDir
 			}()
 
-			scanConfigFlag = configPath
-			scanDirFlag = tmpDir
+			scanConfigFlag = filepath.Join(configDir, tc.configFile)
+			scanDirFlag = configDir
 
-			err := runScan(nil, nil)
-			assert.Error(t, err, "should error for type mismatch: %s", tc.name)
+			err = runScan(nil, nil)
+			if tc.expectError {
+				assert.Error(t, err, "should error for type mismatch: %s", tc.name)
+				if err != nil && tc.errorContain != "" {
+					assert.Contains(t, err.Error(), tc.errorContain,
+						"error message should indicate unmarshal issue for: %s", tc.name)
+				}
+			}
 		})
 	}
 }

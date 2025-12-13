@@ -1,0 +1,4 @@
+# Test case: Empty rules map
+# Expected: Config should load successfully (valid but empty)
+# This tests graceful handling of edge case, not an error per se
+rules: {}

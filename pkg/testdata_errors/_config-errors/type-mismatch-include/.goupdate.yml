@@ -1,0 +1,7 @@
+# Test case: Type mismatch - include should be an array, not a string
+# Expected: Loading should return type mismatch error
+rules:
+  test:
+    manager: test
+    include: "this should be an array"
+    format: raw
