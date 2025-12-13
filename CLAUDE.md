@@ -26,10 +26,26 @@ goupdate update -d <path>    # Update packages
 
 ## IMPORTANT: Task Workflow
 
-1. **Plan first** - For complex tasks, plan the approach before coding
-2. **Run tests** - Always run `make test` before committing
-3. **Check coverage** - Maintain 100% branch coverage on modified code
-4. **Battle test** - Test CLI on real projects (not just unit tests)
+### 1. Plan First (Complex Tasks)
+Before coding, identify:
+- What files need modification
+- Which tasks are independent (can run in parallel)
+- Which tasks have dependencies (must run sequentially)
+- Potential merge conflicts
+
+### 2. Parallel Execution Strategy
+Run independent operations simultaneously:
+```bash
+# Example: Run tests while cloning test projects
+go test ./... &
+git clone --depth 1 https://github.com/spf13/cobra.git /tmp/cobra &
+wait
+```
+
+### 3. Testing Sequence
+- `make test` before committing
+- Battle test on real projects (use `docs/testing-checklist.md`)
+- **CRITICAL**: Test actual updates, not just `--dry-run`
 
 ## Code Conventions
 
@@ -46,7 +62,8 @@ goupdate update -d <path>    # Update packages
 - Coverage must not decrease
 
 ### Battle Testing (MANDATORY for new features)
-1. Clone real project: `git clone --depth 1 <repo> /tmp/test`
+Use checklist: `docs/testing-checklist.md`
+1. Clone real project to isolated `/tmp/test-*` directory
 2. Test all commands: scan, list, outdated, update
 3. **CRITICAL**: Test actual updates (not just `--dry-run`)
 4. Verify changes with `git diff`
@@ -70,11 +87,17 @@ docs/          # Documentation
 
 - Log progress in `docs/agents-progress/YYYY-MM-DD_task-name.md`
 - Use the checklist at `docs/testing-checklist.md` for validation
+- See `AGENTS.md` for detailed procedures
 
 ## Parallel Work
 
-For independent tasks, use separate git worktrees:
+For independent tasks, use separate directories or git worktrees:
 ```bash
+# Separate temp directories for parallel battle testing
+TEST_DIR_1=$(mktemp -d)
+TEST_DIR_2=$(mktemp -d)
+
+# Or git worktrees for parallel feature development
 git worktree add ../goupdate-feature-a feature-a
 git worktree add ../goupdate-feature-b feature-b
 ```

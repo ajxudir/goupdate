@@ -3,112 +3,190 @@
 Use this checklist when battle testing or validating new features.
 Copy this template to your progress report and check off items as completed.
 
-## Pre-Testing Setup
+---
 
-- [ ] Build latest binary: `go build -o /tmp/goupdate .`
-- [ ] Create isolated test directory: `TEST_DIR=$(mktemp -d)`
-- [ ] Clone test projects (run in parallel):
-  ```bash
-  git clone --depth 1 https://github.com/spf13/cobra.git $TEST_DIR/cobra &
-  git clone --depth 1 https://github.com/expressjs/express.git $TEST_DIR/express &
-  wait
-  ```
+## Phase 1: Setup (Parallelizable)
 
-## Unit Tests
+Run these tasks simultaneously:
 
-- [ ] `go test ./...` - All packages pass
-- [ ] `go test -race ./...` - No data races detected
-- [ ] `make test-unit` - Unit tests with race flag
-- [ ] `make test-integration` - Integration tests pass
+```bash
+# Terminal 1: Build binary
+go build -o /tmp/goupdate .
 
-## Coverage
+# Terminal 2: Clone test projects (parallel)
+TEST_DIR=$(mktemp -d)
+git clone --depth 1 https://github.com/spf13/cobra.git $TEST_DIR/cobra &
+git clone --depth 1 https://github.com/expressjs/express.git $TEST_DIR/express &
+wait
+```
 
-- [ ] `make coverage-func` - Check coverage percentages
+- [ ] Binary built successfully
+- [ ] Test directory created: `$TEST_DIR`
+- [ ] cobra (Go) project cloned
+- [ ] express (JS) project cloned
+
+---
+
+## Phase 2: Automated Tests (Run in Parallel)
+
+These can run simultaneously in separate terminals:
+
+### Group A: Unit Tests
+```bash
+go test ./... -count=1
+```
+- [ ] All packages pass
+- [ ] No test pollution errors
+
+### Group B: Race Detection
+```bash
+go test -race ./...
+```
+- [ ] No data races detected
+
+### Group C: Coverage
+```bash
+make coverage-func
+```
 - [ ] Coverage >= 97% overall
-- [ ] No decrease in coverage for modified packages
+- [ ] No decrease in modified packages
 
-## Static Analysis
+### Group D: Static Analysis
+```bash
+go vet ./... && make check
+```
+- [ ] No vet issues
+- [ ] Linters pass
 
-- [ ] `go vet ./...` - No issues
-- [ ] `make check` - Linters pass
+---
 
-## CLI Battle Testing
+## Phase 3: CLI Battle Testing
 
-### Scan Command
-- [ ] `goupdate scan -d $TEST_DIR/cobra` - Go project detected
-- [ ] `goupdate scan -d $TEST_DIR/express` - JS project detected
-- [ ] `goupdate scan --output json` - JSON format works
-- [ ] `goupdate scan --output csv` - CSV format works
-- [ ] `goupdate scan --output xml` - XML format works
+### 3A: Scan Command (All Formats)
+| Test | Command | Status |
+|------|---------|--------|
+| Go project | `goupdate scan -d $TEST_DIR/cobra` | [ ] |
+| JS project | `goupdate scan -d $TEST_DIR/express` | [ ] |
+| JSON output | `goupdate scan -d $TEST_DIR/cobra --output json` | [ ] |
+| CSV output | `goupdate scan -d $TEST_DIR/cobra --output csv` | [ ] |
+| XML output | `goupdate scan -d $TEST_DIR/cobra --output xml` | [ ] |
 
-### List Command
-- [ ] `goupdate list -d $TEST_DIR/cobra` - Lists packages
-- [ ] `goupdate list --type prod` - Filter by type works
-- [ ] `goupdate list --type dev` - Filter by type works
-- [ ] `goupdate list -p golang` - Filter by PM works
-- [ ] `goupdate list --output json` - JSON format works
+### 3B: List Command
+| Test | Command | Status |
+|------|---------|--------|
+| Basic | `goupdate list -d $TEST_DIR/cobra` | [ ] |
+| Filter prod | `goupdate list -d $TEST_DIR/cobra --type prod` | [ ] |
+| Filter dev | `goupdate list -d $TEST_DIR/express --type dev` | [ ] |
+| Filter PM | `goupdate list -d $TEST_DIR/cobra -p golang` | [ ] |
+| JSON output | `goupdate list -d $TEST_DIR/cobra --output json` | [ ] |
 
-### Outdated Command
-- [ ] `goupdate outdated -d $TEST_DIR/cobra` - Shows outdated versions
-- [ ] `goupdate outdated --major` - Major filter works
-- [ ] `goupdate outdated --minor` - Minor filter works
-- [ ] `goupdate outdated --patch` - Patch filter works
-- [ ] `goupdate outdated --output json` - JSON format works
+### 3C: Outdated Command
+| Test | Command | Status |
+|------|---------|--------|
+| Basic | `goupdate outdated -d $TEST_DIR/cobra` | [ ] |
+| Major filter | `goupdate outdated -d $TEST_DIR/cobra --major` | [ ] |
+| Minor filter | `goupdate outdated -d $TEST_DIR/cobra --minor` | [ ] |
+| Patch filter | `goupdate outdated -d $TEST_DIR/cobra --patch` | [ ] |
+| JSON output | `goupdate outdated -d $TEST_DIR/cobra --output json` | [ ] |
 
-### Update Command (CRITICAL)
-- [ ] `goupdate update --dry-run` - Dry run shows plan
-- [ ] **ACTUAL UPDATE**: `goupdate update --patch -y` - Performs update
-- [ ] `git diff` - Verify manifest file modified correctly
-- [ ] `git checkout .` - Rollback successful
+### 3D: Update Command (CRITICAL - Sequential)
+**These MUST run in order:**
 
-## Output Format Verification
+1. [ ] Dry run: `goupdate update -d $TEST_DIR/cobra --dry-run`
+2. [ ] **ACTUAL UPDATE**: `goupdate update -d $TEST_DIR/cobra --patch -y`
+3. [ ] Verify changes: `git -C $TEST_DIR/cobra diff`
+4. [ ] Confirm manifest modified correctly
+5. [ ] Rollback: `git -C $TEST_DIR/cobra checkout .`
 
-| Format | scan | list | outdated | update |
-|--------|------|------|----------|--------|
-| table  | [ ]  | [ ]  | [ ]      | [ ]    |
-| json   | [ ]  | [ ]  | [ ]      | [ ]    |
-| csv    | [ ]  | [ ]  | [ ]      | [ ]    |
-| xml    | [ ]  | [ ]  | [ ]      | [ ]    |
+---
 
-## Error Handling
+## Phase 4: Error Handling
 
-- [ ] Invalid path returns clear error
-- [ ] No packages found shows informative message
-- [ ] Network timeout handled gracefully
-- [ ] Invalid config shows helpful error
+| Scenario | Expected | Status |
+|----------|----------|--------|
+| Invalid path | Clear error message | [ ] |
+| No packages found | Informative message | [ ] |
+| Invalid config | Helpful error | [ ] |
+| Network timeout | Graceful handling | [ ] |
 
-## Workflow Commands (GitHub Actions)
+---
 
-- [ ] `make test-unit` - Same as CI
-- [ ] `make test-integration` - Same as CI
-- [ ] `make coverage-func` - Same as CI
-- [ ] `go build ./...` - Build verification
+## Phase 5: Workflow Parity (CI Commands)
 
-## Documentation
+Verify these match GitHub Actions behavior:
 
-- [ ] Examples in docs/*.md still work
-- [ ] CLI --help output accurate
-- [ ] Progress report updated in docs/agents-progress/
+- [ ] `make test-unit` - Passes with -race flag
+- [ ] `make test-integration` - Integration tests pass
+- [ ] `make coverage-func` - Coverage report generated
+- [ ] `go build ./...` - Build succeeds
 
-## Final Verification
+---
+
+## Phase 6: Documentation
+
+- [ ] Examples in `docs/*.md` still work
+- [ ] CLI `--help` output accurate
+- [ ] Progress report updated
+
+---
+
+## Phase 7: Final Verification
 
 - [ ] All tests pass: `go test ./... -count=1`
 - [ ] Clean git status (no untracked test files)
 - [ ] Changes committed with descriptive message
 - [ ] Pushed to correct branch
+- [ ] Cleanup: `rm -rf $TEST_DIR`
+
+---
+
+## Output Format Matrix
+
+Quick verification grid for all commands and formats:
+
+| Format | scan | list | outdated | update |
+|--------|:----:|:----:|:--------:|:------:|
+| table  | [ ]  | [ ]  | [ ]      | [ ]    |
+| json   | [ ]  | [ ]  | [ ]      | [ ]    |
+| csv    | [ ]  | [ ]  | [ ]      | [ ]    |
+| xml    | [ ]  | [ ]  | [ ]      | [ ]    |
+
+---
 
 ## Issues Found
-
-Document any issues discovered during testing:
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
 |       |          |        |       |
 
+---
+
 ## Test Environment
 
-- **Date**: YYYY-MM-DD
-- **Go Version**:
-- **OS**:
-- **Test Projects**: cobra, express
-- **Tester**: Claude/Human
+| Field | Value |
+|-------|-------|
+| Date | YYYY-MM-DD |
+| Go Version | `go version` |
+| OS | `uname -a` |
+| Test Projects | cobra, express |
+| Tester | Claude / Human |
+| Branch | |
+| Commit | |
+
+---
+
+## Parallel Execution Summary
+
+**Can run in parallel:**
+- Phase 1: Setup tasks (build + clone)
+- Phase 2: All test groups (A, B, C, D)
+- Phase 3A-3C: Scan, List, Outdated testing
+
+**Must run sequentially:**
+- Phase 3D: Update command (dry-run → actual → verify → rollback)
+- Phase 7: Final verification (after all other phases)
+
+**Collision avoidance:**
+- Use separate `$TEST_DIR` for each parallel session
+- Never run actual updates on the same project simultaneously
+- Run `git status` before commits to catch untracked files
