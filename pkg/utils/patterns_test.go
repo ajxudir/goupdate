@@ -174,6 +174,61 @@ func TestSelectPatternsWithNames_FallbackToDefault(t *testing.T) {
 	}
 }
 
+func TestSelectPatternsWithNames_NilConfig(t *testing.T) {
+	result := SelectPatternsWithNames("content", nil)
+	if result != nil {
+		t.Errorf("expected nil, got %v", result)
+	}
+}
+
+func TestSelectPatternsWithNames_EmptyConfig(t *testing.T) {
+	cfg := &config.ExtractionCfg{}
+	result := SelectPatternsWithNames("content", cfg)
+	if result != nil {
+		t.Errorf("expected nil, got %v", result)
+	}
+}
+
+func TestSelectPatternsWithNames_EmptyPatternSkipped(t *testing.T) {
+	cfg := &config.ExtractionCfg{
+		Patterns: []config.PatternCfg{
+			{Name: "empty", Pattern: ""},
+			{Name: "valid", Pattern: `valid_pattern`},
+		},
+	}
+
+	result := SelectPatternsWithNames("content", cfg)
+	if len(result) != 1 {
+		t.Errorf("expected 1 pattern, got %d", len(result))
+	}
+	if result[0].Name != "valid" {
+		t.Errorf("expected 'valid', got %s", result[0].Name)
+	}
+}
+
+func TestSelectPatternsWithNames_FallbackWhenNoDetectMatches(t *testing.T) {
+	cfg := &config.ExtractionCfg{
+		Pattern: `fallback_pattern`,
+		Patterns: []config.PatternCfg{
+			{Name: "v9", Detect: `version:\s*9`, Pattern: `v9_pattern`},
+		},
+	}
+
+	// Content doesn't match detect pattern, so fallback should be used
+	content := `version: 6`
+	result := SelectPatternsWithNames(content, cfg)
+
+	if len(result) != 1 {
+		t.Errorf("expected 1 pattern, got %d", len(result))
+	}
+	if result[0].Name != "fallback" {
+		t.Errorf("expected 'fallback', got %s", result[0].Name)
+	}
+	if result[0].Pattern != "fallback_pattern" {
+		t.Errorf("expected 'fallback_pattern', got %s", result[0].Pattern)
+	}
+}
+
 func TestExtractWithPatterns(t *testing.T) {
 	cfg := &config.ExtractionCfg{
 		Patterns: []config.PatternCfg{
@@ -428,6 +483,123 @@ lodash@^4.17.21:
 		result := SelectPatterns(berryContent, cfg)
 		if len(result) != 1 || result[0] != "berry_pattern" {
 			t.Errorf("expected berry_pattern, got %v", result)
+		}
+	})
+}
+
+func TestExtractWithPatternsIndexed(t *testing.T) {
+	t.Run("extracts matches with positions", func(t *testing.T) {
+		cfg := &config.ExtractionCfg{
+			Pattern: `(?P<name>\w+)@(?P<version>[\d.]+)`,
+		}
+
+		content := `lodash@4.17.21 express@4.18.2`
+		result, err := ExtractWithPatternsIndexed(content, cfg)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(result) != 2 {
+			t.Errorf("expected 2 matches, got %d", len(result))
+		}
+		if result[0].Groups["name"] != "lodash" {
+			t.Errorf("expected lodash, got %s", result[0].Groups["name"])
+		}
+		if result[0].Groups["version"] != "4.17.21" {
+			t.Errorf("expected 4.17.21, got %s", result[0].Groups["version"])
+		}
+		// Verify position is captured
+		if result[0].Start < 0 {
+			t.Error("expected valid start index")
+		}
+	})
+
+	t.Run("handles nil config", func(t *testing.T) {
+		result, err := ExtractWithPatternsIndexed("content", nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != nil {
+			t.Errorf("expected nil, got %v", result)
+		}
+	})
+
+	t.Run("handles empty patterns", func(t *testing.T) {
+		cfg := &config.ExtractionCfg{}
+		result, err := ExtractWithPatternsIndexed("content", cfg)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != nil {
+			t.Errorf("expected nil, got %v", result)
+		}
+	})
+
+	t.Run("combines matches from multiple patterns", func(t *testing.T) {
+		cfg := &config.ExtractionCfg{
+			Patterns: []config.PatternCfg{
+				{Name: "format1", Pattern: `pkg:(?P<name>\w+):(?P<version>[\d.]+)`},
+				{Name: "format2", Pattern: `(?P<name>\w+)@(?P<version>[\d.]+)`},
+			},
+		}
+
+		content := `pkg:lodash:4.17.21 express@4.18.2`
+		result, err := ExtractWithPatternsIndexed(content, cfg)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(result) != 2 {
+			t.Errorf("expected 2 matches, got %d", len(result))
+		}
+	})
+
+	t.Run("returns error for invalid pattern", func(t *testing.T) {
+		cfg := &config.ExtractionCfg{
+			Pattern: `[invalid(regex`,
+		}
+
+		_, err := ExtractWithPatternsIndexed("content", cfg)
+		if err == nil {
+			t.Error("expected error for invalid regex")
+		}
+	})
+
+	t.Run("handles no matches", func(t *testing.T) {
+		cfg := &config.ExtractionCfg{
+			Pattern: `(?P<name>\w+)@(?P<version>[\d.]+)`,
+		}
+
+		content := `no packages here`
+		result, err := ExtractWithPatternsIndexed(content, cfg)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(result) != 0 {
+			t.Errorf("expected 0 matches, got %d", len(result))
+		}
+	})
+
+	t.Run("handles detect conditions", func(t *testing.T) {
+		cfg := &config.ExtractionCfg{
+			Patterns: []config.PatternCfg{
+				{Name: "v9", Detect: `v9`, Pattern: `(?P<name>\w+)@(?P<version>[\d.]+)`},
+				{Name: "v6", Detect: `v6`, Pattern: `(?P<name>\w+):(?P<version>[\d.]+)`},
+			},
+		}
+
+		content := `v9 lodash@4.17.21`
+		result, err := ExtractWithPatternsIndexed(content, cfg)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(result) != 1 {
+			t.Errorf("expected 1 match, got %d", len(result))
+		}
+		if result[0].Groups["name"] != "lodash" {
+			t.Errorf("expected lodash, got %s", result[0].Groups["name"])
 		}
 	})
 }
