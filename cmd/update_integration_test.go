@@ -120,12 +120,16 @@ func TestIntegration_UpdateNPM_RealExecution(t *testing.T) {
 	updatePMFlag = "all"
 	updatePatchFlag = true // Force patch update
 
-	// Run update
+	// Run update and capture any error
+	var cmdErr error
 	captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		// May have errors if no updates available, that's OK for this test
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log error for debugging (may have errors if no updates available, that's OK)
+	if cmdErr != nil {
+		t.Logf("runUpdate returned error (may be expected): %v", cmdErr)
+	}
 
 	// Verify that file was processed (even if no update was needed)
 	finalContent, err := os.ReadFile(filepath.Join(tmpDir, "package.json"))
@@ -228,11 +232,16 @@ func main() {}
 	updatePMFlag = "all"
 	updatePatchFlag = true
 
-	// Run update
+	// Run update and capture any error
+	var cmdErr error
 	captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (go.mod) returned error: %v", cmdErr)
+	}
 
 	// Read final go.mod content
 	finalContent, err := os.ReadFile(filepath.Join(tmpDir, "go.mod"))
@@ -321,11 +330,16 @@ flask==2.0.0
 	updatePMFlag = "all"
 	updatePatchFlag = true
 
-	// Run update
+	// Run update and capture any error
+	var cmdErr error
 	captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (requirements.txt) returned error: %v", cmdErr)
+	}
 
 	// Read final content
 	finalContent, err := os.ReadFile(filepath.Join(tmpDir, "requirements.txt"))
@@ -411,11 +425,16 @@ func TestIntegration_UpdatePNPM_RealExecution(t *testing.T) {
 	updateTypeFlag = "all"
 	updatePMFlag = "all"
 
-	// Run update
+	// Run update and capture any error
+	var cmdErr error
 	captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (pnpm) returned error: %v", cmdErr)
+	}
 
 	// Verify lock file still exists (wasn't deleted by failure)
 	assert.FileExists(t, lockPath)
@@ -498,11 +517,16 @@ func TestIntegration_UpdateYarn_RealExecution(t *testing.T) {
 	updateTypeFlag = "all"
 	updatePMFlag = "all"
 
-	// Run update
+	// Run update and capture any error
+	var cmdErr error
 	captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (yarn) returned error: %v", cmdErr)
+	}
 
 	// Verify package.json still exists
 	assert.FileExists(t, filepath.Join(tmpDir, "package.json"))
@@ -578,11 +602,16 @@ func TestIntegration_UpdateComposer_RealExecution(t *testing.T) {
 	updateTypeFlag = "all"
 	updatePMFlag = "all"
 
-	// Run update
+	// Run update and capture any error
+	var cmdErr error
 	captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (composer) returned error: %v", cmdErr)
+	}
 
 	// Verify composer.json still exists
 	assert.FileExists(t, filepath.Join(tmpDir, "composer.json"))
@@ -660,11 +689,16 @@ func TestIntegration_UpdateDotnet_RealExecution(t *testing.T) {
 	updateTypeFlag = "all"
 	updatePMFlag = "all"
 
-	// Run update
+	// Run update and capture any error
+	var cmdErr error
 	captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (msbuild) returned error: %v", cmdErr)
+	}
 
 	// Verify csproj still exists
 	assert.FileExists(t, filepath.Join(tmpDir, "test.csproj"))

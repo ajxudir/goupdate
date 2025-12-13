@@ -116,10 +116,15 @@ func TestParamCompat_Scan_InvalidDirectory_JSONOutput(t *testing.T) {
 	scanConfigFlag = ""
 	scanOutputFlag = "json"
 
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runScan(nil, nil)
-		_ = err
+		cmdErr = runScan(nil, nil)
 	})
+
+	// Log error for debugging (error is expected for invalid dir)
+	if cmdErr != nil {
+		t.Logf("runScan returned expected error: %v", cmdErr)
+	}
 
 	// Even on error, if output is captured, it should not contain invalid JSON
 	// The error should be returned, not printed as plain text mixed with JSON
@@ -243,11 +248,15 @@ func TestParamCompat_List_TypeFilter_Invalid(t *testing.T) {
 	listTypeFlag = "invalid_type"
 	listPMFlag = "all"
 
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runList(nil, nil)
-		// Should either error or return empty result
-		_ = err
+		cmdErr = runList(nil, nil)
 	})
+
+	// Log error for debugging (may error or return empty)
+	if cmdErr != nil {
+		t.Logf("runList returned error (may be expected): %v", cmdErr)
+	}
 
 	// Should return valid JSON
 	output = strings.TrimSpace(output)
@@ -391,10 +400,15 @@ func TestParamCompat_List_GroupFilter_NoGroupsDefined(t *testing.T) {
 	listPMFlag = "all"
 	listGroupFlag = "mygroup"
 
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runList(nil, nil)
-		_ = err
+		cmdErr = runList(nil, nil)
 	})
+
+	// Log error for debugging
+	if cmdErr != nil {
+		t.Logf("runList (with group filter) returned error: %v", cmdErr)
+	}
 
 	// Should return valid JSON (empty or error)
 	output = strings.TrimSpace(output)
@@ -450,10 +464,15 @@ func TestParamCompat_Outdated_MajorMinorPatch_All(t *testing.T) {
 	outdatedMinorFlag = true
 	outdatedPatchFlag = true
 
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runOutdated(nil, nil)
-		_ = err
+		cmdErr = runOutdated(nil, nil)
 	})
+
+	// Log error for debugging
+	if cmdErr != nil {
+		t.Logf("runOutdated (all version flags) returned error: %v", cmdErr)
+	}
 
 	// Should return valid JSON
 	output = strings.TrimSpace(output)
@@ -500,10 +519,15 @@ func TestParamCompat_Outdated_ContinueOnFail_JSONOutput(t *testing.T) {
 	outdatedPMFlag = "all"
 	outdatedContinueOnFail = true
 
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runOutdated(nil, nil)
-		_ = err // May have partial failures
+		cmdErr = runOutdated(nil, nil)
 	})
+
+	// Log error for debugging (partial failures expected with continue-on-fail)
+	if cmdErr != nil {
+		t.Logf("runOutdated (continue-on-fail) returned error: %v", cmdErr)
+	}
 
 	// Should return valid JSON even with partial failures
 	output = strings.TrimSpace(output)
@@ -807,10 +831,15 @@ func TestParamCompat_Update_ContinueOnFail_JSONOutput(t *testing.T) {
 	updateOutputFlag = "json"
 	updateContinueOnFail = true // CONTINUE ON FAIL
 
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (continue-on-fail) returned error: %v", cmdErr)
+	}
 
 	// Should produce valid JSON even with failures
 	output = strings.TrimSpace(output)
@@ -878,15 +907,20 @@ func TestParamCompat_ErrorHandling_JSON(t *testing.T) {
 			scanConfigFlag = ""
 			scanOutputFlag = "json"
 
+			var cmdErr error
 			output := captureStdout(t, func() {
-				err := runScan(nil, nil)
-				if tc.expectError {
-					// Error is expected - but output should still be valid
-					_ = err
-				} else {
-					assert.NoError(t, err)
-				}
+				cmdErr = runScan(nil, nil)
 			})
+
+			// Check error appropriately
+			if tc.expectError {
+				// Log expected error for debugging
+				if cmdErr != nil {
+					t.Logf("runScan returned expected error: %v", cmdErr)
+				}
+			} else {
+				assert.NoError(t, cmdErr)
+			}
 
 			// Output should be valid JSON or empty
 			output = strings.TrimSpace(output)
@@ -1013,10 +1047,15 @@ func TestParamCompat_Config_MultipleActions(t *testing.T) {
 	configPathFlag = ""
 
 	// Should handle gracefully (pick one or error)
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runConfig(nil, nil)
-		_ = err
+		cmdErr = runConfig(nil, nil)
 	})
+
+	// Log error for debugging
+	if cmdErr != nil {
+		t.Logf("runConfig (multiple actions) returned error: %v", cmdErr)
+	}
 
 	// Should not panic and should produce some output
 	assert.NotEmpty(t, output, "Config with multiple flags should produce output")
@@ -1222,10 +1261,15 @@ func TestChaos_SpecialCharsInParams(t *testing.T) {
 			listNameFlag = tc.value // Special character in name filter
 
 			// Should not crash
+			var cmdErr error
 			output := captureStdout(t, func() {
-				err := runList(nil, nil)
-				_ = err // May error but should not panic
+				cmdErr = runList(nil, nil)
 			})
+
+			// Log error for debugging (may error but should not panic)
+			if cmdErr != nil {
+				t.Logf("runList (special char '%s') returned error: %v", tc.value, cmdErr)
+			}
 
 			// Should return valid JSON (empty result is fine)
 			output = strings.TrimSpace(output)
@@ -1277,10 +1321,15 @@ func TestChaos_VeryLongParams(t *testing.T) {
 	listNameFlag = longString
 
 	// Should not crash or hang
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runList(nil, nil)
-		_ = err
+		cmdErr = runList(nil, nil)
 	})
+
+	// Log error for debugging
+	if cmdErr != nil {
+		t.Logf("runList (very long param) returned error: %v", cmdErr)
+	}
 
 	// Should return valid JSON
 	output = strings.TrimSpace(output)
@@ -1346,10 +1395,15 @@ func TestChaos_CommaSeparatedFilters(t *testing.T) {
 			listPMFlag = tc.pmVal
 			listNameFlag = tc.nameVal
 
+			var cmdErr error
 			output := captureStdout(t, func() {
-				err := runList(nil, nil)
-				_ = err
+				cmdErr = runList(nil, nil)
 			})
+
+			// Log error for debugging
+			if cmdErr != nil {
+				t.Logf("runList (comma-separated '%s') returned error: %v", tc.name, cmdErr)
+			}
 
 			// Should return valid JSON
 			output = strings.TrimSpace(output)
@@ -1455,11 +1509,15 @@ func TestChaos_InvalidOutputFormat(t *testing.T) {
 	scanConfigFlag = ""
 	scanOutputFlag = "invalid_format"
 
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runScan(nil, nil)
-		// Should either error or fall back to default
-		_ = err
+		cmdErr = runScan(nil, nil)
 	})
+
+	// Log error for debugging (may error or fall back to default)
+	if cmdErr != nil {
+		t.Logf("runScan (invalid format) returned error: %v", cmdErr)
+	}
 
 	// Should produce some output (default table format)
 	assert.NotEmpty(t, output, "Invalid format should fall back to default")
@@ -1514,10 +1572,15 @@ func TestPartialError_Update_ContinueOnFail(t *testing.T) {
 	updateOutputFlag = "json"
 	updateContinueOnFail = true
 
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (partial error) returned error: %v", cmdErr)
+	}
 
 	// Verify JSON is valid
 	output = strings.TrimSpace(output)
@@ -1567,10 +1630,15 @@ func TestPartialError_Outdated_ContinueOnFail(t *testing.T) {
 	outdatedPMFlag = "all"
 	outdatedContinueOnFail = true
 
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runOutdated(nil, nil)
-		_ = err
+		cmdErr = runOutdated(nil, nil)
 	})
+
+	// Log error for debugging
+	if cmdErr != nil {
+		t.Logf("runOutdated (partial error) returned error: %v", cmdErr)
+	}
 
 	// Verify JSON is valid
 	output = strings.TrimSpace(output)

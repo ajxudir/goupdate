@@ -93,11 +93,16 @@ func TestIntegration_Update_DryRun_JSON(t *testing.T) {
 	updatePMFlag = "all"
 	updateOutputFlag = "json" // JSON OUTPUT
 
-	// Capture output
+	// Capture output and command error
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log any command error for debugging (dry-run should generally succeed)
+	if cmdErr != nil {
+		t.Logf("runUpdate returned error: %v", cmdErr)
+	}
 
 	// Verify JSON is valid
 	output = strings.TrimSpace(output)
@@ -176,11 +181,16 @@ func TestIntegration_Update_NoDryRun_JSON(t *testing.T) {
 	updatePMFlag = "all"
 	updateOutputFlag = "json" // JSON OUTPUT
 
-	// Capture output
+	// Capture output and command error
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log any command error for debugging (non-dry-run may have expected failures)
+	if cmdErr != nil {
+		t.Logf("runUpdate returned error: %v", cmdErr)
+	}
 
 	// Verify JSON is valid
 	output = strings.TrimSpace(output)
@@ -467,11 +477,16 @@ func TestIntegration_Outdated_JSON(t *testing.T) {
 	outdatedTypeFlag = "all"
 	outdatedPMFlag = "all"
 
-	// Capture output
+	// Capture output and command error
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runOutdated(nil, nil)
-		_ = err // May error if can't fetch versions
+		cmdErr = runOutdated(nil, nil)
 	})
+
+	// Log any command error for debugging (may fail if can't fetch versions)
+	if cmdErr != nil {
+		t.Logf("runOutdated returned error (may be expected if no network): %v", cmdErr)
+	}
 
 	// Verify JSON is valid if there's output
 	output = strings.TrimSpace(output)
@@ -560,11 +575,16 @@ system_tests:
 	updatePMFlag = "all"
 	updateOutputFlag = "json" // JSON OUTPUT
 
-	// Capture output
+	// Capture output and command error
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log any command error for debugging (system tests may fail)
+	if cmdErr != nil {
+		t.Logf("runUpdate returned error: %v", cmdErr)
+	}
 
 	// Check for output corruption indicators
 	output = strings.TrimSpace(output)
@@ -1056,11 +1076,16 @@ func TestIntegration_WriteToJSONFile_Update_DryRun(t *testing.T) {
 	updatePMFlag = "all"
 	updateOutputFlag = "json"
 
-	// Capture output and write to file
+	// Capture output and command error, then write to file
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log any command error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (dry-run) returned error: %v", cmdErr)
+	}
 
 	// Write to actual file
 	err = os.WriteFile(outputFile, []byte(output), 0644)
@@ -1129,11 +1154,16 @@ func TestIntegration_WriteToJSONFile_Update_NoDryRun(t *testing.T) {
 	updatePMFlag = "all"
 	updateOutputFlag = "json"
 
-	// Capture output and write to file
+	// Capture output and command error, then write to file
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log any command error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (no dry-run) returned error: %v", cmdErr)
+	}
 
 	// Write to actual file
 	err = os.WriteFile(outputFile, []byte(output), 0644)
@@ -1202,11 +1232,16 @@ func TestIntegration_WriteToXMLFile_Update(t *testing.T) {
 	updatePMFlag = "all"
 	updateOutputFlag = "xml"
 
-	// Capture output and write to file
+	// Capture output and command error, then write to file
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log any command error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (XML output) returned error: %v", cmdErr)
+	}
 
 	// Write to actual file
 	err = os.WriteFile(outputFile, []byte(output), 0644)
@@ -1275,11 +1310,16 @@ func TestIntegration_WriteToCSVFile_Update(t *testing.T) {
 	updatePMFlag = "all"
 	updateOutputFlag = "csv"
 
-	// Capture output and write to file
+	// Capture output and command error, then write to file
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log any command error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (CSV output) returned error: %v", cmdErr)
+	}
 
 	// Write to actual file
 	err = os.WriteFile(outputFile, []byte(output), 0644)
@@ -1373,11 +1413,16 @@ system_tests:
 	updatePMFlag = "all"
 	updateOutputFlag = "json"
 
-	// Capture output and write to file
+	// Capture output and command error, then write to file
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log any command error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (with system tests) returned error: %v", cmdErr)
+	}
 
 	// Write to actual file
 	err = os.WriteFile(outputFile, []byte(output), 0644)
@@ -1465,11 +1510,16 @@ func TestIntegration_DetectOutputCorruption_InteractivePrompt(t *testing.T) {
 	updatePMFlag = "all"
 	updateOutputFlag = "json"
 
-	// Capture output
+	// Capture output and command error
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log any command error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate (interactive mode) returned error: %v", cmdErr)
+	}
 
 	// Write to file
 	err = os.WriteFile(outputFile, []byte(output), 0644)
@@ -1578,11 +1628,16 @@ func TestIntegration_AllCommands_JSONFileOutput(t *testing.T) {
 			// Output file
 			outputFile := filepath.Join(tmpDir, tc.name+"_output.json")
 
-			// Capture output
+			// Capture output and command error
+			var cmdErr error
 			output := captureStdout(t, func() {
-				err := tc.runCmd()
-				_ = err
+				cmdErr = tc.runCmd()
 			})
+
+			// Log any command error for debugging
+			if cmdErr != nil {
+				t.Logf("%s command returned error: %v", tc.name, cmdErr)
+			}
 
 			// Write to file
 			err := os.WriteFile(outputFile, []byte(output), 0644)
@@ -1664,11 +1719,16 @@ func TestIntegration_AllCommands_XMLFileOutput(t *testing.T) {
 			// Output file
 			outputFile := filepath.Join(tmpDir, tc.name+"_output.xml")
 
-			// Capture output
+			// Capture output and command error
+			var cmdErr error
 			output := captureStdout(t, func() {
-				err := tc.runCmd()
-				_ = err
+				cmdErr = tc.runCmd()
 			})
+
+			// Log any command error for debugging
+			if cmdErr != nil {
+				t.Logf("%s command returned error: %v", tc.name, cmdErr)
+			}
 
 			// Write to file
 			err := os.WriteFile(outputFile, []byte(output), 0644)
@@ -1750,11 +1810,16 @@ func TestIntegration_AllCommands_CSVFileOutput(t *testing.T) {
 			// Output file
 			outputFile := filepath.Join(tmpDir, tc.name+"_output.csv")
 
-			// Capture output
+			// Capture output and command error
+			var cmdErr error
 			output := captureStdout(t, func() {
-				err := tc.runCmd()
-				_ = err
+				cmdErr = tc.runCmd()
 			})
+
+			// Log any command error for debugging
+			if cmdErr != nil {
+				t.Logf("%s command returned error: %v", tc.name, cmdErr)
+			}
 
 			// Write to file
 			err := os.WriteFile(outputFile, []byte(output), 0644)
@@ -1995,11 +2060,16 @@ func TestIntegration_JSONOutputToFile(t *testing.T) {
 	updateSkipLockRun = true
 	updateOutputFlag = "json"
 
-	// Capture output
+	// Capture output and command error
+	var cmdErr error
 	output := captureStdout(t, func() {
-		err := runUpdate(nil, nil)
-		_ = err
+		cmdErr = runUpdate(nil, nil)
 	})
+
+	// Log any command error for debugging
+	if cmdErr != nil {
+		t.Logf("runUpdate returned error: %v", cmdErr)
+	}
 
 	// Simulate writing to file
 	outputFile := filepath.Join(tmpDir, "result.json")
