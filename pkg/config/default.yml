@@ -194,7 +194,10 @@ rules:
     fields:
       require: prod
     extraction:
-      pattern: '(?m)^\s*(?P<n>[\w\.\-\/]+)\s+(?P<version>v[\w\.\-\+]+)'
+      # Pattern matches both block format (indented) and single-line require statements
+      # Block:  "  github.com/pkg v1.0.0"
+      # Single: "require github.com/pkg v1.0.0"
+      pattern: '(?m)^(?:\s+|require\s+)(?P<n>[\w\.\-\/]+)\s+(?P<version>v[\w\.\-\+]+)'
     outdated:
       commands: |
         go list -m -json -versions {{package}}

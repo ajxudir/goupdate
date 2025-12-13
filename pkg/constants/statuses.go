@@ -68,6 +68,9 @@ const (
 	// IconPending indicates a pending or planned state (yellow circle).
 	IconPending = "🟡"
 
+	// IconIgnored indicates a package is excluded from processing (no entry).
+	IconIgnored = "🚫"
+
 	// IconCheckmark indicates a passed check (checkmark).
 	IconCheckmark = "✓"
 

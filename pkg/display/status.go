@@ -185,6 +185,8 @@ func FormatInstallStatus(status string) string {
 		return fmt.Sprintf("%s VersionMissing", constants.IconError)
 	case lock.InstallStatusSelfPinned:
 		return fmt.Sprintf("%s SelfPinned", constants.IconPinned)
+	case lock.InstallStatusIgnored:
+		return fmt.Sprintf("%s Ignored", constants.IconIgnored)
 	default:
 		return status
 	}
@@ -202,6 +204,7 @@ var statusIconMap = map[string]string{
 	strings.ToLower(lock.InstallStatusNotInLock):      constants.IconInfo,
 	strings.ToLower(lock.InstallStatusLockMissing):    constants.IconWarning,
 	strings.ToLower(lock.InstallStatusVersionMissing): constants.IconBlocked,
+	strings.ToLower(lock.InstallStatusIgnored):        constants.IconIgnored,
 	strings.ToLower(constants.StatusFailed):           constants.IconError,
 	strings.ToLower(constants.StatusPlanned):          constants.IconPending,
 }
