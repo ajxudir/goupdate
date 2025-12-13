@@ -3,7 +3,7 @@
 **Agent:** Claude
 **Date:** 2025-12-13
 **Branch:** claude/organize-mock-data-01Y1vCHWXSvHwCvA6nU99JcH
-**Status:** Complete (All 13 Phases)
+**Status:** Complete (All 20 Phases)
 
 ## Objective
 
@@ -148,13 +148,50 @@ Update statuses:
 - [x] Test composer (PHP)
 - [x] Test requirements.txt (Python)
 
+### Phase 14: System Tests Integration ✅
+- [x] Validate system_tests config structure
+- [x] Test run_preflight, run_mode, stop_on_fail options
+- [x] Verify system tests execute during update --dry-run
+- [x] **Bug Found**: Ignored packages not skipped in outdated/update commands
+
+### Phase 15: Config Inheritance (extends) ✅
+- [x] Test extends: [default] merging
+- [x] Verify groups merge correctly
+- [x] Verify package_overrides merge correctly
+- [x] Verify ignore patterns merge correctly
+
+### Phase 16: Exclude Patterns & Version Exclusions ✅
+- [x] Verify exclude_versions filters pre-release versions
+- [x] Test regex patterns (alpha, beta, rc, etc.)
+- [x] Verify no pre-release versions appear in outdated output
+
+### Phase 17: Incremental Updates ✅
+- [x] Test --incremental flag for step-by-step updates
+- [x] Test config-based incremental packages
+- [x] Verify target versions are next minor/patch, not latest
+
+### Phase 18: Timeout Handling ✅
+- [x] Test --no-timeout flag
+- [x] Verify verbose output shows timeout info
+
+### Phase 19: Verbose & Debug Output ✅
+- [x] Test --verbose flag shows debug info
+- [x] Verify "[DEBUG]" messages appear
+
+### Phase 20: Latest Mapping ✅
+- [x] Test latest_mapping configuration
+- [x] Verify * and "latest" constraints show ⛔ Floating status
+- [x] Verify floating packages have proper warning message
+
 ## Files Modified
 
 - `pkg/constants/statuses.go` - Added IconIgnored constant
-- `pkg/display/status.go` - Added Ignored status handling in FormatInstallStatus and statusIconMap
+- `pkg/display/status.go` - Added Ignored status handling in FormatInstallStatus, FormatStatus, and statusIconMap
 - `pkg/config/default.yml` - Fixed go.mod extraction pattern for single-line require
 - `pkg/testdata/ignored_packages/goupdate.yaml` - Fixed config validation error
 - `docs/user/cli.md` - Added Ignored status to documentation
+- `cmd/outdated.go` - Skip ignored packages in outdated check loop
+- `pkg/update/planning.go` - Add handleIgnoredPackage function, add InstallStatusIgnored to IsNonUpdatableStatus
 
 ## Issues Found
 
@@ -181,6 +218,16 @@ Update statuses:
 - **Description**: Added documentation for the new "Ignored" status with icon 🚫
 - **Files modified**: `docs/user/cli.md`
 
+### Bug 4: Ignored packages not skipped in outdated/update commands (FIXED)
+- **Location**: `cmd/outdated.go`, `pkg/update/planning.go`, `pkg/display/status.go`
+- **Description**: Packages with `InstallStatusIgnored` from ignore patterns or package_overrides were still being processed by outdated checks and update planning, causing unnecessary version lookups and confusing output
+- **Fix**:
+  - Added check in outdated command to skip ignored packages (return Ignored status with N/A versions)
+  - Added `handleIgnoredPackage` function in planning.go to skip planning for ignored packages
+  - Added `InstallStatusIgnored` to `IsNonUpdatableStatus` function
+  - Added case for Ignored in `FormatStatus` to show 🚫 icon
+- **Files modified**: `cmd/outdated.go`, `pkg/update/planning.go`, `pkg/display/status.go`
+
 ### Observation: Invalid output format falls back silently
 - **Description**: When `--output invalid_format` is passed, it silently falls back to table format
 - **Severity**: Minor (works correctly, just no warning)
@@ -200,7 +247,7 @@ All output values will be validated against:
 
 ## Summary
 
-Battle testing completed across 13 phases covering:
+Battle testing completed across 20 phases covering:
 - All 7 CLI commands (scan, list, outdated, update, config, version, help)
 - All 9 supported package managers (npm, pnpm, yarn, composer, requirements, pipfile, mod, msbuild, nuget)
 - All 4 output formats (table, json, csv, xml)
@@ -209,9 +256,16 @@ Battle testing completed across 13 phases covering:
 - Combined filters and complex queries
 - Workspace/monorepo scenarios
 - Edge cases and error handling
+- System tests integration
+- Config inheritance and merging
+- Exclude versions (pre-release filtering)
+- Incremental updates feature
+- Timeout handling
+- Verbose/debug output
+- Latest mapping for floating constraints
 
 **Results:**
-- 3 bugs found and fixed
+- 4 bugs found and fixed (including critical ignored packages bug)
 - 1 documentation update
 - All 21 test packages passing
 - CLI ready for release
