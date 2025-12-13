@@ -436,16 +436,21 @@ func TestNetworkResilience_TimeoutSimulation(t *testing.T) {
 
 		// Use a command that would take a long time but with a short timeout
 		cmd := exec.Command("sleep", "10")
-		done := make(chan error)
+		err := cmd.Start()
+		if err != nil {
+			t.Fatalf("failed to start command: %v", err)
+		}
 
+		done := make(chan error)
 		go func() {
-			done <- cmd.Run()
+			done <- cmd.Wait()
 		}()
 
 		// Kill after 100ms
 		select {
 		case <-time.After(100 * time.Millisecond):
 			cmd.Process.Kill()
+			<-done // Wait for goroutine to finish
 		case err := <-done:
 			t.Fatalf("command completed unexpectedly: %v", err)
 		}
