@@ -19,10 +19,11 @@ Create comprehensive chaos tests for configuration validation to ensure the conf
 ## Files Modified
 - `pkg/config/chaos_config_test.go` (NEW - 841 lines)
 - `cmd/scan_test.go` (flag save/restore added)
-- `cmd/update_constraint_test.go` (flag save/restore added)
+- `cmd/update_constraint_test.go` (flag save/restore added - updateRuleFlag)
 - `cmd/update_sorting_test.go` (flag save/restore added)
 - `cmd/update_test.go` (flag save/restore added)
 - `cmd/output_format_integration_test.go` (flag save/restore for JSON, XML, CSV tests)
+- `cmd/edge_cases_test.go` (race condition fix in timeout test)
 
 ## Test Coverage
 
@@ -114,8 +115,8 @@ Integration tests were polluting package-level flag variables, causing subsequen
 
 ### Tests Fixed
 1. `TestRunScanNoMatches` - added `scanOutputFlag` save/restore
-2. `TestFloatingConstraintInGroupShowsFloating` - added `updateOutputFlag` save/restore
-3. `TestFloatingConstraintShowsUnsupported` - added `updateOutputFlag` save/restore
+2. `TestFloatingConstraintInGroupShowsFloating` - added `updateOutputFlag` + `updateRuleFlag` save/restore
+3. `TestFloatingConstraintShowsUnsupported` - added `updateOutputFlag` + `updateRuleFlag` save/restore
 4. `TestRunUpdateSortingComparators` - added `updateOutputFlag` save/restore
 5. `TestRunUpdateSortingDifferentPackageTypes` - added `updateOutputFlag` save/restore
 6. `TestRunUpdateSortingDifferentGroups` - added `updateOutputFlag` save/restore
@@ -125,6 +126,9 @@ Integration tests were polluting package-level flag variables, causing subsequen
 10. `TestIntegration_AllCommands_JSONFileOutput` - comprehensive flag save/restore
 11. `TestIntegration_AllCommands_XMLFileOutput` - comprehensive flag save/restore
 12. `TestIntegration_AllCommands_CSVFileOutput` - comprehensive flag save/restore
+13. `TestRunUpdateFloatingConstraint` - added `updateOutputFlag` + `updateRuleFlag` save/restore
+14. `TestRunUpdateExactConstraint` - added `updateOutputFlag` + `updateRuleFlag` save/restore
+15. `TestNetworkResilience_TimeoutSimulation` - fixed race condition with cmd.Start()/Wait()
 
 ## Coverage Analysis
 
@@ -163,3 +167,12 @@ All commands working correctly:
 - `349ba7b` - Fix test pollution in XML and CSV integration tests
 - `1dd2093` - Update progress report with test pollution fixes and coverage analysis
 - `be3118b` - Enhance AGENTS.md battle testing guidelines
+- `adc44bb` - Fix test pollution and race condition in integration tests
+
+## Workflow Verification
+
+All GitHub workflow commands verified working:
+- `make test-unit` - All unit tests pass with -race flag
+- `make test-integration` - All integration tests pass
+- `make coverage-func` - Coverage at 97.4%
+- `go test ./...` - All 21 packages OK
