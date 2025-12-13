@@ -29,6 +29,7 @@ func TestRunUpdateSortingComparators(t *testing.T) {
 	originalDryRun := updateDryRunFlag
 	originalSkipPreflight := updateSkipPreflight
 	originalSkipLock := updateSkipLockRun
+	originalOutput := updateOutputFlag
 
 	loadConfigFunc = func(path, workDir string) (*config.Config, error) {
 		return &config.Config{
@@ -70,6 +71,7 @@ func TestRunUpdateSortingComparators(t *testing.T) {
 	updateDryRunFlag = true
 	updateSkipPreflight = true
 	updateSkipLockRun = true
+	updateOutputFlag = "" // Ensure table output (default)
 
 	t.Cleanup(func() {
 		loadConfigFunc = originalLoad
@@ -82,6 +84,7 @@ func TestRunUpdateSortingComparators(t *testing.T) {
 		updateDryRunFlag = originalDryRun
 		updateSkipPreflight = originalSkipPreflight
 		updateSkipLockRun = originalSkipLock
+		updateOutputFlag = originalOutput
 	})
 
 	out := captureStdout(t, func() {
@@ -114,6 +117,7 @@ func TestRunUpdateSortingDifferentPackageTypes(t *testing.T) {
 	oldSkipSys := updateSkipSystemTests
 	oldDry := updateDryRunFlag
 	oldYes := updateYesFlag
+	oldOutput := updateOutputFlag
 	defer func() {
 		loadConfigFunc = oldLoad
 		getPackagesFunc = oldGet
@@ -127,6 +131,7 @@ func TestRunUpdateSortingDifferentPackageTypes(t *testing.T) {
 		updateSkipSystemTests = oldSkipSys
 		updateDryRunFlag = oldDry
 		updateYesFlag = oldYes
+		updateOutputFlag = oldOutput
 	}()
 
 	loadConfigFunc = func(path, workDir string) (*config.Config, error) {
@@ -163,6 +168,7 @@ func TestRunUpdateSortingDifferentPackageTypes(t *testing.T) {
 	updateSkipSystemTests = true
 	updateDryRunFlag = true // Dry run to avoid actual updates
 	updateYesFlag = true
+	updateOutputFlag = "" // Ensure table output (default)
 
 	out := captureStdout(t, func() {
 		err := runUpdate(nil, nil)
@@ -192,6 +198,7 @@ func TestRunUpdateSortingDifferentGroups(t *testing.T) {
 	oldSkipSys := updateSkipSystemTests
 	oldDry := updateDryRunFlag
 	oldYes := updateYesFlag
+	oldOutput := updateOutputFlag
 	defer func() {
 		loadConfigFunc = oldLoad
 		getPackagesFunc = oldGet
@@ -205,6 +212,7 @@ func TestRunUpdateSortingDifferentGroups(t *testing.T) {
 		updateSkipSystemTests = oldSkipSys
 		updateDryRunFlag = oldDry
 		updateYesFlag = oldYes
+		updateOutputFlag = oldOutput
 	}()
 
 	loadConfigFunc = func(path, workDir string) (*config.Config, error) {
@@ -246,6 +254,7 @@ func TestRunUpdateSortingDifferentGroups(t *testing.T) {
 	updateSkipSystemTests = true
 	updateDryRunFlag = true
 	updateYesFlag = true
+	updateOutputFlag = "" // Ensure table output (default)
 
 	out := captureStdout(t, func() {
 		err := runUpdate(nil, nil)

@@ -31,6 +31,7 @@ func TestFloatingConstraintInGroupShowsFloating(t *testing.T) {
 	originalDryRun := updateDryRunFlag
 	originalSkipLock := updateSkipLockRun
 	originalSkipPreflight := updateSkipPreflight
+	originalOutput := updateOutputFlag
 
 	loadConfigFunc = func(path, workDir string) (*config.Config, error) {
 		return &config.Config{
@@ -74,6 +75,7 @@ func TestFloatingConstraintInGroupShowsFloating(t *testing.T) {
 	updateDryRunFlag = true
 	updateSkipLockRun = true
 	updateSkipPreflight = true
+	updateOutputFlag = "" // Ensure table output (default)
 
 	t.Cleanup(func() {
 		loadConfigFunc = originalLoad
@@ -87,6 +89,7 @@ func TestFloatingConstraintInGroupShowsFloating(t *testing.T) {
 		updateDryRunFlag = originalDryRun
 		updateSkipLockRun = originalSkipLock
 		updateSkipPreflight = originalSkipPreflight
+		updateOutputFlag = originalOutput
 	})
 
 	output := captureStdout(t, func() {
@@ -119,6 +122,7 @@ func TestFloatingConstraintShowsUnsupported(t *testing.T) {
 	originalDryRun := updateDryRunFlag
 	originalSkipLock := updateSkipLockRun
 	originalSkipPreflight := updateSkipPreflight
+	originalOutput := updateOutputFlag
 
 	loadConfigFunc = func(path, workDir string) (*config.Config, error) {
 		return &config.Config{
@@ -161,6 +165,7 @@ func TestFloatingConstraintShowsUnsupported(t *testing.T) {
 	updateDryRunFlag = true
 	updateSkipLockRun = true
 	updateSkipPreflight = true
+	updateOutputFlag = "" // Ensure table output (default)
 
 	t.Cleanup(func() {
 		loadConfigFunc = originalLoad
@@ -174,6 +179,7 @@ func TestFloatingConstraintShowsUnsupported(t *testing.T) {
 		updateDryRunFlag = originalDryRun
 		updateSkipLockRun = originalSkipLock
 		updateSkipPreflight = originalSkipPreflight
+		updateOutputFlag = originalOutput
 	})
 
 	output := captureStdout(t, func() {
