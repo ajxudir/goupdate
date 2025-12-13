@@ -509,13 +509,14 @@ func TestIntegration_Update_WithSystemTests_JSON(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create config with system tests
-	configYAML := `extends: default
+	configYAML := `extends:
+  - default
 system_tests:
   run_preflight: true
   run_mode: after_all
   tests:
     - name: "echo test"
-      command: "echo ok"
+      commands: "echo ok"
 `
 	err = os.WriteFile(filepath.Join(tmpDir, ".goupdate.yml"), []byte(configYAML), 0644)
 	require.NoError(t, err)
@@ -1319,13 +1320,14 @@ func TestIntegration_DetectOutputCorruption_WithSystemTests(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create config with system tests
-	configYAML := `extends: default
+	configYAML := `extends:
+  - default
 system_tests:
   run_preflight: true
   run_mode: after_all
   tests:
     - name: "echo test"
-      command: "echo ok"
+      commands: "echo ok"
 `
 	err = os.WriteFile(filepath.Join(tmpDir, ".goupdate.yml"), []byte(configYAML), 0644)
 	require.NoError(t, err)
