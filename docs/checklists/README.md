@@ -10,7 +10,8 @@ Task-specific checklists for goupdate development.
 | [Bug Fix](bug-fix.md) | Fixing bugs |
 | [Refactoring](refactoring.md) | Refactoring code |
 | [Test Improvement](test-improvement.md) | Adding/improving tests |
-| [Battle Testing](../testing-checklist.md) | CLI validation on real projects |
+| [Battle Testing](test-battle.md) | CLI validation on real projects |
+| [Chaos Testing](test-chaos.md) | Verify test coverage by breaking features |
 
 ## Quick Selection Guide
 
@@ -28,7 +29,10 @@ Is this improving test coverage?
   └─ Yes → test-improvement.md
 
 Is this validating the CLI works?
-  └─ Yes → ../testing-checklist.md
+  └─ Yes → test-battle.md
+
+Is this verifying test coverage catches bugs?
+  └─ Yes → test-chaos.md
 ```
 
 ## Common Across All Tasks
@@ -54,5 +58,6 @@ When starting a task, identify the type:
 - "Fix X bug" → Use bug-fix.md
 - "Refactor X" → Use refactoring.md
 - "Add tests for X" → Use test-improvement.md
-- "Battle test" → Use testing-checklist.md
+- "Battle test" → Use test-battle.md
+- "Chaos test" → Use test-chaos.md
 ```

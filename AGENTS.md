@@ -17,7 +17,8 @@ Select the appropriate checklist based on task type:
 | Fixing a bug | `docs/checklists/bug-fix.md` |
 | Refactoring code | `docs/checklists/refactoring.md` |
 | Improving tests | `docs/checklists/test-improvement.md` |
-| Battle testing CLI | `docs/testing-checklist.md` |
+| Battle testing CLI | `docs/checklists/test-battle.md` |
+| Chaos testing | `docs/checklists/test-chaos.md` |
 
 See `docs/checklists/README.md` for selection guide.
 
@@ -343,7 +344,9 @@ When breaking functions, remove unused imports to avoid build failures.
 |---------|---------|------|---------------|--------|
 | 1.1 | FunctionName | pkg/path/file.go | YES/NO | None/Added test |
 
-### Reference: [chaos-testing.md](docs/chaos-testing.md)
+### Reference
+- Detailed chaos plan: `docs/internal/chaos-testing.md`
+- Chaos checklist: `docs/checklists/test-chaos.md`
 
 ---
 

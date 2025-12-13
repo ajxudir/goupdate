@@ -13,7 +13,8 @@ GoUpdate is a CLI tool for scanning, listing, and updating package dependencies 
 | Fixing a bug | `docs/checklists/bug-fix.md` |
 | Refactoring code | `docs/checklists/refactoring.md` |
 | Improving tests | `docs/checklists/test-improvement.md` |
-| Validating CLI | `docs/testing-checklist.md` |
+| Battle testing CLI | `docs/checklists/test-battle.md` |
+| Chaos testing | `docs/checklists/test-chaos.md` |
 
 ## Quick Reference
 
@@ -56,7 +57,7 @@ wait
 
 ### 3. Testing Sequence
 - `make test` before committing
-- Battle test on real projects (use `docs/testing-checklist.md`)
+- Battle test on real projects (use `docs/checklists/test-battle.md`)
 - **CRITICAL**: Test actual updates, not just `--dry-run`
 
 ## Code Conventions
@@ -74,7 +75,7 @@ wait
 - Coverage must not decrease
 
 ### Battle Testing (MANDATORY for new features)
-Use checklist: `docs/testing-checklist.md`
+Use checklist: `docs/checklists/test-battle.md`
 1. Clone real project to isolated `/tmp/test-*` directory
 2. Test all commands: scan, list, outdated, update
 3. **CRITICAL**: Test actual updates (not just `--dry-run`)
@@ -98,7 +99,7 @@ docs/          # Documentation
 ## Progress Tracking
 
 - Log progress in `docs/agents-progress/YYYY-MM-DD_task-name.md`
-- Use the checklist at `docs/testing-checklist.md` for validation
+- Use checklists at `docs/checklists/` for validation
 - See `AGENTS.md` for detailed procedures
 
 ## Parallel Work
