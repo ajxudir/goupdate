@@ -1558,6 +1558,30 @@ func TestIntegration_AllCommands_JSONFileOutput(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
+	// Save all flags that will be modified
+	oldScanDir, oldScanConfig, oldScanOutput := scanDirFlag, scanConfigFlag, scanOutputFlag
+	oldListDir, oldListConfig, oldListOutput := listDirFlag, listConfigFlag, listOutputFlag
+	oldListType, oldListPM := listTypeFlag, listPMFlag
+	oldOutdatedDir, oldOutdatedConfig, oldOutdatedOutput := outdatedDirFlag, outdatedConfigFlag, outdatedOutputFlag
+	oldOutdatedType, oldOutdatedPM := outdatedTypeFlag, outdatedPMFlag
+	oldUpdateDir, oldUpdateConfig, oldUpdateOutput := updateDirFlag, updateConfigFlag, updateOutputFlag
+	oldUpdateDryRun, oldUpdateYes := updateDryRunFlag, updateYesFlag
+	oldUpdateSkipPreflight, oldUpdateSkipSystemTests := updateSkipPreflight, updateSkipSystemTests
+	oldUpdateSkipLock, oldUpdateRule := updateSkipLockRun, updateRuleFlag
+	oldUpdateType, oldUpdatePM := updateTypeFlag, updatePMFlag
+	defer func() {
+		scanDirFlag, scanConfigFlag, scanOutputFlag = oldScanDir, oldScanConfig, oldScanOutput
+		listDirFlag, listConfigFlag, listOutputFlag = oldListDir, oldListConfig, oldListOutput
+		listTypeFlag, listPMFlag = oldListType, oldListPM
+		outdatedDirFlag, outdatedConfigFlag, outdatedOutputFlag = oldOutdatedDir, oldOutdatedConfig, oldOutdatedOutput
+		outdatedTypeFlag, outdatedPMFlag = oldOutdatedType, oldOutdatedPM
+		updateDirFlag, updateConfigFlag, updateOutputFlag = oldUpdateDir, oldUpdateConfig, oldUpdateOutput
+		updateDryRunFlag, updateYesFlag = oldUpdateDryRun, oldUpdateYes
+		updateSkipPreflight, updateSkipSystemTests = oldUpdateSkipPreflight, oldUpdateSkipSystemTests
+		updateSkipLockRun, updateRuleFlag = oldUpdateSkipLock, oldUpdateRule
+		updateTypeFlag, updatePMFlag = oldUpdateType, oldUpdatePM
+	}()
+
 	tmpDir := t.TempDir()
 
 	// Create package.json
@@ -1660,6 +1684,26 @@ func TestIntegration_AllCommands_XMLFileOutput(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
+	// Save all flags that will be modified
+	oldScanDir, oldScanConfig, oldScanOutput := scanDirFlag, scanConfigFlag, scanOutputFlag
+	oldListDir, oldListConfig, oldListOutput := listDirFlag, listConfigFlag, listOutputFlag
+	oldListType, oldListPM := listTypeFlag, listPMFlag
+	oldUpdateDir, oldUpdateConfig, oldUpdateOutput := updateDirFlag, updateConfigFlag, updateOutputFlag
+	oldUpdateDryRun, oldUpdateYes := updateDryRunFlag, updateYesFlag
+	oldUpdateSkipPreflight, oldUpdateSkipSystemTests := updateSkipPreflight, updateSkipSystemTests
+	oldUpdateSkipLock, oldUpdateRule := updateSkipLockRun, updateRuleFlag
+	oldUpdateType, oldUpdatePM := updateTypeFlag, updatePMFlag
+	defer func() {
+		scanDirFlag, scanConfigFlag, scanOutputFlag = oldScanDir, oldScanConfig, oldScanOutput
+		listDirFlag, listConfigFlag, listOutputFlag = oldListDir, oldListConfig, oldListOutput
+		listTypeFlag, listPMFlag = oldListType, oldListPM
+		updateDirFlag, updateConfigFlag, updateOutputFlag = oldUpdateDir, oldUpdateConfig, oldUpdateOutput
+		updateDryRunFlag, updateYesFlag = oldUpdateDryRun, oldUpdateYes
+		updateSkipPreflight, updateSkipSystemTests = oldUpdateSkipPreflight, oldUpdateSkipSystemTests
+		updateSkipLockRun, updateRuleFlag = oldUpdateSkipLock, oldUpdateRule
+		updateTypeFlag, updatePMFlag = oldUpdateType, oldUpdatePM
+	}()
+
 	tmpDir := t.TempDir()
 
 	// Create package.json
@@ -1750,6 +1794,26 @@ func TestIntegration_AllCommands_CSVFileOutput(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
+
+	// Save all flags that will be modified
+	oldScanDir, oldScanConfig, oldScanOutput := scanDirFlag, scanConfigFlag, scanOutputFlag
+	oldListDir, oldListConfig, oldListOutput := listDirFlag, listConfigFlag, listOutputFlag
+	oldListType, oldListPM := listTypeFlag, listPMFlag
+	oldUpdateDir, oldUpdateConfig, oldUpdateOutput := updateDirFlag, updateConfigFlag, updateOutputFlag
+	oldUpdateDryRun, oldUpdateYes := updateDryRunFlag, updateYesFlag
+	oldUpdateSkipPreflight, oldUpdateSkipSystemTests := updateSkipPreflight, updateSkipSystemTests
+	oldUpdateSkipLock, oldUpdateRule := updateSkipLockRun, updateRuleFlag
+	oldUpdateType, oldUpdatePM := updateTypeFlag, updatePMFlag
+	defer func() {
+		scanDirFlag, scanConfigFlag, scanOutputFlag = oldScanDir, oldScanConfig, oldScanOutput
+		listDirFlag, listConfigFlag, listOutputFlag = oldListDir, oldListConfig, oldListOutput
+		listTypeFlag, listPMFlag = oldListType, oldListPM
+		updateDirFlag, updateConfigFlag, updateOutputFlag = oldUpdateDir, oldUpdateConfig, oldUpdateOutput
+		updateDryRunFlag, updateYesFlag = oldUpdateDryRun, oldUpdateYes
+		updateSkipPreflight, updateSkipSystemTests = oldUpdateSkipPreflight, oldUpdateSkipSystemTests
+		updateSkipLockRun, updateRuleFlag = oldUpdateSkipLock, oldUpdateRule
+		updateTypeFlag, updatePMFlag = oldUpdateType, oldUpdatePM
+	}()
 
 	tmpDir := t.TempDir()
 
