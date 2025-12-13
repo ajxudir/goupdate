@@ -145,7 +145,21 @@ Remaining uncovered code in pkg/packages and pkg/update is primarily:
 
 These are acceptable coverage gaps as they would require complex test fixtures with diminishing returns.
 
+## Battle Testing Results
+
+Battle tested CLI on real-world projects per AGENTS.md:
+- **express** (npm/js) - scan, list, outdated with all output formats
+- **cobra** (golang/mod) - scan, list, outdated, **actual update** (go.mod modified)
+
+All commands working correctly:
+- Table, JSON, CSV, XML output formats
+- Filter flags (--type, --rule, -p)
+- Actual updates modify manifest files correctly
+- Error handling for invalid paths, no-match filters
+
 ## Commits
 - `38601b8` - Add comprehensive chaos tests for config validation
 - `10ea825` - Fix test pollution from updateOutputFlag in multiple test files
 - `349ba7b` - Fix test pollution in XML and CSV integration tests
+- `1dd2093` - Update progress report with test pollution fixes and coverage analysis
+- `be3118b` - Enhance AGENTS.md battle testing guidelines
