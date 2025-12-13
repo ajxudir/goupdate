@@ -18,6 +18,7 @@ import "github.com/ajxudir/goupdate/pkg/config"
 //   - InstalledVersion: The currently installed version (if known)
 //   - InstallStatus: The installation status (e.g., "installed", "missing")
 //   - Group: Optional dependency group or category
+//   - IgnoreReason: If InstallStatus is "Ignored", explains why (e.g., "matches ignore pattern 'foo*'")
 type Package struct {
 	Name             string `json:"name"`
 	Version          string `json:"version"`
@@ -29,6 +30,7 @@ type Package struct {
 	InstalledVersion string `json:"installed_version"`
 	InstallStatus    string `json:"install_status"`
 	Group            string `json:"group,omitempty"`
+	IgnoreReason     string `json:"ignore_reason,omitempty"`
 }
 
 // GetName returns the package name and implements the config.PackageRef interface.

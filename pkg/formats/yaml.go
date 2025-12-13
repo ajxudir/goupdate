@@ -71,12 +71,15 @@ func (p *YAMLParser) Parse(content []byte, cfg *config.PackageManagerCfg) ([]Pac
 					versionStr, resolvedName = parseImageFromMap(normalized, resolvedName, versionStr, cfg)
 				}
 
-				if shouldIgnorePackage(resolvedName, cfg) {
-					continue
+				vInfo := processVersion(versionStr, resolvedName, cfg)
+				pkg := newPackage(resolvedName, vInfo, pkgType, cfg)
+
+				// Check if package should be ignored and set reason
+				if reason := getIgnoreReason(resolvedName, cfg); reason != "" {
+					pkg.IgnoreReason = reason
 				}
 
-				vInfo := processVersion(versionStr, resolvedName, cfg)
-				packages = append(packages, newPackage(resolvedName, vInfo, pkgType, cfg))
+				packages = append(packages, pkg)
 			}
 
 		case []interface{}:
@@ -93,12 +96,15 @@ func (p *YAMLParser) Parse(content []byte, cfg *config.PackageManagerCfg) ([]Pac
 					continue
 				}
 
-				if shouldIgnorePackage(name, cfg) {
-					continue
+				vInfo := processVersion(version, name, cfg)
+				pkg := newPackage(name, vInfo, pkgType, cfg)
+
+				// Check if package should be ignored and set reason
+				if reason := getIgnoreReason(name, cfg); reason != "" {
+					pkg.IgnoreReason = reason
 				}
 
-				vInfo := processVersion(version, name, cfg)
-				packages = append(packages, newPackage(name, vInfo, pkgType, cfg))
+				packages = append(packages, pkg)
 			}
 		}
 	}

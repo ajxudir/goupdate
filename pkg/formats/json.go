@@ -49,12 +49,15 @@ func (p *JSONParser) Parse(content []byte, cfg *config.PackageManagerCfg) ([]Pac
 				continue
 			}
 
-			if shouldIgnorePackage(name, cfg) {
-				continue
+			vInfo := processVersion(versionStr, name, cfg)
+			pkg := newPackage(name, vInfo, pkgType, cfg)
+
+			// Check if package should be ignored and set reason
+			if reason := getIgnoreReason(name, cfg); reason != "" {
+				pkg.IgnoreReason = reason
 			}
 
-			vInfo := processVersion(versionStr, name, cfg)
-			packages = append(packages, newPackage(name, vInfo, pkgType, cfg))
+			packages = append(packages, pkg)
 		}
 	}
 

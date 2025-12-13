@@ -1,5 +1,5 @@
 # Laravel App - goupdate configuration
-# Demonstrates: groups for PHP/Composer
+# Demonstrates: groups for PHP/Composer, system tests with HTTP verification
 
 extends: [default]
 
@@ -14,3 +14,26 @@ rules:
 
     # Note: Pre-release filtering inherits from default config
     # Default patterns exclude: alpha, beta, rc, dev, canary, snapshot, nightly, preview, next
+
+# System tests for Laravel projects
+system_tests:
+  run_preflight: true
+  run_mode: after_each
+  stop_on_fail: true
+  tests:
+    # Install dependencies
+    - name: composer-install
+      commands: composer install --no-interaction --prefer-dist
+      timeout_seconds: 300
+      continue_on_fail: true  # Skip if composer not available
+
+    # Start server and verify HTTP response
+    - name: http-test
+      commands: |
+        php artisan serve --port=8765 & \
+        sleep 3 && \
+        curl -s http://localhost:8765/api/ping | grep -q '"message"' && \
+        curl -s http://localhost:8765/api/health | grep -q '"status"' && \
+        pkill -f "artisan serve" || true && \
+        echo "HTTP tests passed!"
+      timeout_seconds: 60

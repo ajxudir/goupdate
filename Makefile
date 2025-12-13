@@ -1,4 +1,4 @@
-.PHONY: init build test test-ci test-unit test-e2e coverage coverage-func coverage-html vet fmt lint check clean install
+.PHONY: init build test test-ci test-unit test-integration test-e2e coverage coverage-func coverage-html vet fmt lint check clean install
 
 # Version information (can be overridden: make build VERSION=1.0.0)
 # Use exact git tag if current commit is tagged, otherwise "dev"
@@ -40,13 +40,16 @@ test:
 test-ci:
 	go test -race ./...
 
-# Run unit tests only
+# Run unit tests only (excludes integration tests)
 test-unit:
-	go test -race -v ./cmd ./pkg
+	go test -race -v ./... -skip 'Integration'
 
-# Run e2e tests only
-test-e2e:
-	go test -race -v ./... -run EndToEnd
+# Run integration tests only (tests real file parsing with testdata)
+test-integration:
+	go test -race -v ./... -run 'Integration'
+
+# Run e2e tests only (alias for integration tests)
+test-e2e: test-integration
 
 # Generate coverage profile
 #

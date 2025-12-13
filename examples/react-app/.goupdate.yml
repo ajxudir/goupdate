@@ -52,12 +52,12 @@ system_tests:
       commands: npm run build
       timeout_seconds: 300
 
-    # End-to-end tests (example with Playwright)
-    # - name: e2e-tests
-    #   commands: |
-    #     npm run preview &
-    #     sleep 3
-    #     npx playwright test
-    #   timeout_seconds: 600
-    #   env:
-    #     CI: "true"
+    # Start preview server and verify HTTP response
+    - name: http-test
+      commands: |
+        npm run preview -- --port 4173 & \
+        sleep 3 && \
+        curl -s http://localhost:4173/ | grep -q "React Dashboard" && \
+        pkill -f "vite preview" || true && \
+        echo "HTTP test passed!"
+      timeout_seconds: 60

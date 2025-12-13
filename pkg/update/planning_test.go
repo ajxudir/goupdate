@@ -597,3 +597,44 @@ func TestPlanVersionUpdateInternal(t *testing.T) {
 		assert.True(t, result.Incremental)
 	})
 }
+
+func TestHandleIgnoredPackage(t *testing.T) {
+	t.Run("creates plan with ignored status", func(t *testing.T) {
+		pkg := testutil.NewPackage("react").WithRule("npm").WithVersion("1.0.0").WithInstalledVersion("1.0.0").Build()
+
+		result := handleIgnoredPackage(pkg, "1.0.0")
+
+		assert.NotNil(t, result)
+		assert.Equal(t, lock.InstallStatusIgnored, result.Res.Status)
+		assert.Equal(t, "1.0.0", result.Original)
+		assert.Equal(t, constants.PlaceholderNA, result.Res.Major)
+		assert.Equal(t, constants.PlaceholderNA, result.Res.Minor)
+		assert.Equal(t, constants.PlaceholderNA, result.Res.Patch)
+	})
+
+	t.Run("preserves package information", func(t *testing.T) {
+		pkg := testutil.NewPackage("lodash").
+			WithRule("npm").
+			WithVersion("4.17.0").
+			WithInstalledVersion("4.17.0").
+			WithGroup("utils").
+			Build()
+
+		result := handleIgnoredPackage(pkg, "4.17.0")
+
+		assert.Equal(t, "lodash", result.Res.Pkg.Name)
+		assert.Equal(t, "npm", result.Res.Pkg.Rule)
+		assert.Equal(t, "utils", result.Res.Group)
+		assert.Equal(t, "4.17.0", result.Res.OriginalVersion)
+		assert.Equal(t, "4.17.0", result.Res.OriginalInstalled)
+	})
+
+	t.Run("handles empty version", func(t *testing.T) {
+		pkg := testutil.NewPackage("test-pkg").WithRule("npm").Build()
+
+		result := handleIgnoredPackage(pkg, "")
+
+		assert.Equal(t, lock.InstallStatusIgnored, result.Res.Status)
+		assert.Equal(t, "", result.Original)
+	})
+}

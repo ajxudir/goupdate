@@ -23,21 +23,37 @@ import (
 // Returns:
 //   - bool: Returns true if the package should be ignored; false otherwise
 func shouldIgnorePackage(name string, cfg *config.PackageManagerCfg) bool {
+	return getIgnoreReason(name, cfg) != ""
+}
+
+// getIgnoreReason returns the reason a package should be ignored, or empty string if not ignored.
+//
+// It performs the following checks:
+//   - Matches the package name against ignore patterns using regex
+//   - Checks if the package has an ignore flag in package-specific overrides
+//
+// Parameters:
+//   - name: The package name to check
+//   - cfg: The package manager configuration containing ignore patterns and overrides
+//
+// Returns:
+//   - string: The reason for ignoring (e.g., "matches ignore pattern 'foo*'"); empty if not ignored
+func getIgnoreReason(name string, cfg *config.PackageManagerCfg) string {
 	if cfg == nil {
-		return false
+		return ""
 	}
 
-	for _, ignored := range cfg.Ignore {
-		if matched, _ := regexp.MatchString(ignored, name); matched {
-			return true
+	for _, pattern := range cfg.Ignore {
+		if matched, _ := regexp.MatchString(pattern, name); matched {
+			return fmt.Sprintf("matches ignore pattern '%s'", pattern)
 		}
 	}
 
 	if override, exists := cfg.PackageOverrides[name]; exists && override.Ignore {
-		return true
+		return "package_overrides.ignore = true"
 	}
 
-	return false
+	return ""
 }
 
 // GetNestedField retrieves a value from a nested map using dot notation (e.g., "foo.bar.baz").

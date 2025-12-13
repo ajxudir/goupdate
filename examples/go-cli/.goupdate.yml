@@ -1,5 +1,5 @@
 # Go CLI - goupdate configuration
-# Demonstrates: groups for Go modules
+# Demonstrates: groups for Go modules, system tests with CLI verification
 
 extends: [default]
 
@@ -11,3 +11,22 @@ rules:
         - github.com/spf13/viper
       logging:
         - go.uber.org/zap
+
+# System tests for Go CLI projects
+system_tests:
+  run_preflight: true
+  run_mode: after_each
+  stop_on_fail: true
+  tests:
+    # Build the binary
+    - name: build
+      commands: go build -o myapp .
+      timeout_seconds: 120
+
+    # Verify CLI runs and responds correctly
+    - name: cli-test
+      commands: |
+        ./myapp 2>&1 | grep -q "Hello" && \
+        ./myapp ping 2>&1 | grep -q "pong" && \
+        echo "CLI tests passed!"
+      timeout_seconds: 30

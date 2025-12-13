@@ -22,6 +22,7 @@ rules:
         - "@vitejs/plugin-vue"
 
 # System tests to verify build after updates
+# Note: This is a config-only example - copy to your actual Laravel project
 system_tests:
   run_preflight: true
   run_mode: after_each
@@ -39,3 +40,16 @@ system_tests:
         npm install
         npm run build
       timeout_seconds: 300
+
+    # Start server and verify HTTP response (uncomment when using with actual project)
+    # - name: http-test
+    #   commands: |
+    #     # Start Laravel dev server in background
+    #     php artisan serve --port=8766 &
+    #     SERVER_PID=$!
+    #     sleep 3
+    #     # Verify API endpoint
+    #     RESPONSE=$(curl -s http://localhost:8766/api/health)
+    #     kill $SERVER_PID 2>/dev/null || true
+    #     echo "$RESPONSE" | grep -q '"status"' || exit 1
+    #   timeout_seconds: 60

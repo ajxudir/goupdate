@@ -275,10 +275,35 @@ type PackageOverrideCfg struct {
 	Update     *UpdateOverrideCfg   `yaml:"update,omitempty"`
 }
 
+// PatternCfg defines a conditional pattern for extraction or exclusion.
+// Used for multi-pattern extraction where different patterns apply to different
+// file formats or versions (e.g., pnpm-lock.yaml v6 vs v9).
+type PatternCfg struct {
+	// Name is an optional identifier for the pattern (e.g., "v9", "classic").
+	Name string `yaml:"name,omitempty"`
+
+	// Detect is a regex pattern to check if this pattern should apply.
+	// If empty, the pattern always applies (default = true).
+	// If set, the pattern only applies when Detect matches the file content.
+	Detect string `yaml:"detect,omitempty"`
+
+	// Pattern is the extraction regex with named groups (e.g., "n" or "name", "version").
+	Pattern string `yaml:"pattern"`
+}
+
 // ExtractionCfg holds configuration for version extraction from files.
 type ExtractionCfg struct {
-	Pattern        string `yaml:"pattern,omitempty"`
-	Path           string `yaml:"path,omitempty"`
+	// Pattern is a single extraction regex (for simple cases).
+	// Use Patterns for multi-pattern extraction with conditional detection.
+	Pattern string `yaml:"pattern,omitempty"`
+
+	// Patterns is a list of conditional patterns for multi-format extraction.
+	// ALL matching patterns are applied (additive, not exclusive).
+	// If a pattern has no Detect, it always applies.
+	// If a pattern has Detect, it only applies when Detect matches the content.
+	Patterns []PatternCfg `yaml:"patterns,omitempty"`
+
+	Path string `yaml:"path,omitempty"`
 	NameAttr       string `yaml:"name_attr,omitempty"`
 	VersionAttr    string `yaml:"version_attr,omitempty"`
 	NameElement    string `yaml:"name_element,omitempty"`

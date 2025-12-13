@@ -1,0 +1,10 @@
+# Test case: Command timeout for testing timeout handling
+# This config uses a sleep command with a short timeout to test timeout error handling
+extends: ["default"]
+
+rules:
+  npm:
+    outdated:
+      commands: |
+        sleep 60
+      timeout_seconds: 2

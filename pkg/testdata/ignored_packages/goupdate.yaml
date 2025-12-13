@@ -1,0 +1,19 @@
+# Test configuration with ignored packages
+rules:
+  npm:
+    manager: js
+    include: ["**/package.json"]
+    exclude: ["**/node_modules/**"]
+    format: json
+    fields:
+      dependencies: prod
+      devDependencies: dev
+    # Ignore patterns for this test
+    ignore:
+      - "skip-me"
+      - "@internal/.*"
+    lock_files:
+      - files: ["**/package-lock.json"]
+        format: json
+        extraction:
+          pattern: '(?m)"node_modules/(?P<n>[^"]+)":\s*\{\s*"version":\s*"(?P<version>[^"]+)"'

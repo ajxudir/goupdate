@@ -64,3 +64,26 @@ rules:
       commands: |
         bundle update {{package}} --conservative
       timeout_seconds: 120
+
+# System tests for Ruby/Rails API projects
+system_tests:
+  run_preflight: true
+  run_mode: after_each
+  stop_on_fail: true
+  tests:
+    # Install dependencies
+    - name: bundle-install
+      commands: bundle install
+      timeout_seconds: 300
+      continue_on_fail: true  # Skip if bundler not available
+
+    # Start server and verify HTTP response
+    - name: http-test
+      commands: |
+        bundle exec puma -p 9292 & \
+        sleep 3 && \
+        curl -s http://localhost:9292/ping | grep -q '"message"' && \
+        curl -s http://localhost:9292/health | grep -q '"status"' && \
+        pkill -f puma || true && \
+        echo "HTTP tests passed!"
+      timeout_seconds: 60

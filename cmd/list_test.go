@@ -239,7 +239,7 @@ func TestListCommandStatusOutput(t *testing.T) {
 		},
 		{
 			name:     "package missing from lock",
-			dir:      filepath.Join(rootDir, "pkg", "testdata_errors", "package-not-found", "npm"),
+			dir:      filepath.Join(rootDir, "pkg", "mocksdata_errors", "package-not-found", "npm"),
 			expected: []string{"missing-package", lock.InstallStatusNotInLock},
 		},
 	}

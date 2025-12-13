@@ -44,7 +44,8 @@ rules:
         timeout_seconds: 60
 
   # pnpm packages (extends npm rule)
-  # Uses pnpm ls for maximum compatibility across pnpm-lock.yaml versions
+  # Uses file-based extraction from pnpm-lock.yaml for fast lock resolution without node_modules
+  # Supports multiple pnpm-lock.yaml versions (v6, v7, v8, v9) with conditional pattern detection
   pnpm:
     <<: *js_rule
     update:
@@ -53,12 +54,30 @@ rules:
       timeout_seconds: 300
     lock_files:
       - files: ["**/pnpm-lock.yaml"]
-        commands: |
-          pnpm ls --json --depth=0 2>/dev/null || exit 0
-        timeout_seconds: 60
+        format: raw
+        extraction:
+          # Multi-pattern extraction for different pnpm-lock.yaml versions
+          # Pattern selection: detect regex matches against file content, then pattern is applied
+          patterns:
+            # pnpm v9 (lockfileVersion: '9.0') uses importers with 6-space indentation:
+            #   '@babel/core':          or          lodash:
+            #     specifier: ^7.26.9                  specifier: ^4.17.21
+            #     version: 7.26.9                     version: 4.17.21
+            - name: "v9"
+              detect: "lockfileVersion:\\s*'9"
+              pattern: '(?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)'
+            # pnpm v6/v7/v8 (lockfileVersion: '6.0'/'7.0'/'8.0') uses packages section:
+            #   /lodash@4.17.21:
+            #     resolution: {integrity: sha512-...}
+            #   /@babel/core@7.26.9:
+            #     resolution: {integrity: sha512-...}
+            - name: "v6_v7_v8"
+              detect: "lockfileVersion:\\s*'[678]"
+              pattern: '(?m)^\s*/(?P<n>@?[\w\-\.\/]+)@(?P<version>[\d\.]+):'
 
   # Yarn packages (extends npm rule)
-  # Uses yarn list for maximum compatibility across yarn versions (classic and berry)
+  # Uses file-based extraction from yarn.lock for fast lock resolution without node_modules
+  # Supports both classic (v1) and berry (v2+) formats with conditional pattern detection
   yarn:
     <<: *js_rule
     update:
@@ -67,9 +86,22 @@ rules:
       timeout_seconds: 300
     lock_files:
       - files: ["**/yarn.lock"]
-        commands: |
-          yarn list --json --depth=0 2>/dev/null || exit 0
-        timeout_seconds: 60
+        format: raw
+        extraction:
+          # Multi-pattern extraction for different yarn.lock versions
+          patterns:
+            # Yarn classic (v1) format - starts with "# yarn lockfile v1":
+            #   lodash@^4.17.21:
+            #     version "4.17.21"
+            - name: "classic"
+              detect: "#\\s*yarn lockfile v1"
+              pattern: '(?m)^"?(?P<n>@?[\w\-\.\/]+)@[^:\n"]+:\s*\n\s+version\s+"(?P<version>[^"]+)"'
+            # Yarn berry (v2+) format - has __metadata section:
+            #   "lodash@npm:^4.17.21":
+            #     version: 4.17.21
+            - name: "berry"
+              detect: "__metadata:\\s*\\n\\s+version:"
+              pattern: '(?m)^"(?P<n>@?[\w\-\.\/]+)@(?:npm:)?[^"]+\":\s*\n\s+version:\s*(?P<version>[^\s\n]+)'
 
   # Composer/PHP packages
   composer:
@@ -162,7 +194,10 @@ rules:
     fields:
       require: prod
     extraction:
-      pattern: '(?m)^\s*(?P<n>[\w\.\-\/]+)\s+(?P<version>v[\w\.\-\+]+)'
+      # Pattern matches both block format (indented) and single-line require statements
+      # Block:  "  github.com/pkg v1.0.0"
+      # Single: "require github.com/pkg v1.0.0"
+      pattern: '(?m)^(?:\s+|require\s+)(?P<n>[\w\.\-\/]+)\s+(?P<version>v[\w\.\-\+]+)'
     outdated:
       commands: |
         go list -m -json -versions {{package}}
