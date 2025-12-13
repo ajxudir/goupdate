@@ -3,7 +3,7 @@
 **Agent:** Claude
 **Date:** 2025-12-13
 **Branch:** claude/organize-mock-data-01Y1vCHWXSvHwCvA6nU99JcH
-**Status:** Complete (All 25 Phases)
+**Status:** Complete (All 30 Phases)
 
 ## Objective
 
@@ -217,6 +217,35 @@ Update statuses:
 - [x] Verify Ignored (🚫) status displayed correctly in update output
 - [x] Test update on django-app (requirements.txt, in temp directory)
 
+### Phase 26: Actual Updates on Go CLI ✅
+- [x] Copy go-cli to temp directory
+- [x] Run actual `update --patch --yes` (not dry-run)
+- [x] Verify 7 packages updated successfully
+- [x] Verify system tests run after each update
+- [x] Discovered: multiline commands run in separate shells (fixed with line continuation)
+
+### Phase 27: Update on Django App ✅
+- [x] Copy django-app to temp directory
+- [x] Run update --patch --yes --skip-system-tests
+- [x] Verify NotConfigured status for requirements.txt packages (expected - no lock file)
+
+### Phase 28: Group Updates ✅
+- [x] Test --group cli filter (cobra + viper only)
+- [x] Test --group logging filter (zap only)
+- [x] Verify only packages in specified group are updated
+- [x] System tests run correctly after group update
+
+### Phase 29: System Tests Rollback ✅
+- [x] Create intentionally failing system test
+- [x] Run update that triggers test failure
+- [x] Verify update was rolled back (go.mod unchanged)
+- [x] Confirmed: Failed updates show ❌ status with error details
+
+### Phase 30: Update Filters ✅
+- [x] Test --name filter with multiple packages
+- [x] Verify only specified packages are updated
+- [x] Test --type filter (prod/dev)
+
 ## Files Modified
 
 ### Core Bug Fixes (Phases 1-20)
@@ -328,7 +357,7 @@ All output values will be validated against:
 
 ## Summary
 
-Battle testing completed across 25 phases covering:
+Battle testing completed across 30 phases covering:
 - All 7 CLI commands (scan, list, outdated, update, config, version, help)
 - All 9 supported package managers (npm, pnpm, yarn, composer, requirements, pipfile, mod, msbuild, nuget)
 - All 4 output formats (table, json, csv, xml)
@@ -345,10 +374,15 @@ Battle testing completed across 25 phases covering:
 - Verbose/debug output
 - Latest mapping for floating constraints
 - Example projects with HTTP verification system tests (Phases 21-25)
+- Actual update execution in temp directories (Phase 26-27)
+- Group-based updates with --group filter (Phase 28)
+- System tests rollback verification on failure (Phase 29)
+- Update filters with --name and --type (Phase 30)
 
 **Results:**
 - 4 bugs found and fixed (including critical ignored packages bug)
-- 1 documentation update
+- 1 documentation update (testing guidelines for update command)
+- 1 multiline command behavior documented (shell isolation)
 - 7 example projects enhanced with system tests and HTTP verification
 - All 21 test packages passing
 - All 7 example configs validated
