@@ -94,6 +94,7 @@ type ListPackage struct {
 	Status           string `json:"status" xml:"status"`
 	Group            string `json:"group,omitempty" xml:"group,omitempty"`
 	Name             string `json:"name" xml:"name"`
+	IgnoreReason     string `json:"ignore_reason,omitempty" xml:"ignoreReason,omitempty"`
 }
 
 // OutdatedResult represents the output data for the outdated command.

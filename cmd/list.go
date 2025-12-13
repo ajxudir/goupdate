@@ -169,6 +169,7 @@ func printListStructured(pkgs []formats.Package, warnings []string, format outpu
 			Status:           p.InstallStatus,
 			Group:            p.Group,
 			Name:             p.Name,
+			IgnoreReason:     p.IgnoreReason,
 		})
 	}
 
