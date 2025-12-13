@@ -210,13 +210,12 @@ Update statuses:
 - [x] Verify --minor flag changes constraint display
 - [x] Verify ignored packages show 🚫 Ignored status
 
-### Phase 25: Example Projects - Update Dry-Run ✅
-- [x] Test update --dry-run --patch on go-cli
-- [x] Test update --dry-run with --skip-system-tests
+### Phase 25: Example Projects - Update Command ✅
+- [x] Test update --patch on go-cli (in temp directory)
 - [x] Verify Planned (🟡) status for packages with updates
 - [x] Verify UpToDate (🟢) status for current packages
 - [x] Verify Ignored (🚫) status displayed correctly in update output
-- [x] Test update --dry-run on django-app (requirements.txt)
+- [x] Test update on django-app (requirements.txt, in temp directory)
 
 ## Files Modified
 
@@ -279,6 +278,24 @@ Update statuses:
 - **Recommendation**: Consider adding a warning for unknown output formats
 
 ## Notes
+
+### Testing Guidelines for `update` Command
+
+**IMPORTANT**: Do NOT use `--dry-run` for testing the update command. The `--dry-run` flag does not execute the full update flow and will miss real issues.
+
+**Correct approach for testing updates:**
+1. Copy the project to a temporary directory: `cp -r examples/go-cli /tmp/test-update/`
+2. Run the actual update command in the temp directory: `goupdate update --yes --directory /tmp/test-update/`
+3. Verify the files were modified correctly
+4. Clean up: `rm -rf /tmp/test-update/`
+
+This ensures the full update flow is tested including:
+- File modifications
+- Lock file regeneration
+- System tests execution
+- Rollback behavior on failure
+
+### Test Data Sources
 
 Testing will use:
 - Internal testdata from `pkg/testdata/`
