@@ -7,9 +7,19 @@
 These rules apply to **all agentic coding agents** (Claude, Codex, Cursor, Copilot, etc.).
 If unsure, agents must **ask** instead of guessing.
 
-## Testing Checklist
+## Task-Specific Checklists
 
-Use the reusable testing checklist at `docs/testing-checklist.md` for battle testing and validation.
+Select the appropriate checklist based on task type:
+
+| Task Type | Checklist |
+|-----------|-----------|
+| Adding new feature | `docs/checklists/feature-development.md` |
+| Fixing a bug | `docs/checklists/bug-fix.md` |
+| Refactoring code | `docs/checklists/refactoring.md` |
+| Improving tests | `docs/checklists/test-improvement.md` |
+| Battle testing CLI | `docs/testing-checklist.md` |
+
+See `docs/checklists/README.md` for selection guide.
 
 ## Agent Progress Tracking
 

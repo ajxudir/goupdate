@@ -3,6 +3,9 @@ goupdate
 coverage.out
 coverage.html
 .DS_Store
+
+# Claude Code local settings (personal/machine-specific)
+.claude/settings.local.json
 node_modules/
 package-lock.json
 !**/testdata/**/package-lock.json
