@@ -13,4 +13,8 @@ const (
 	// that cannot be updated automatically. Users must either remove the floating constraint
 	// or handle updates manually.
 	InstallStatusFloating = "Floating"
+	// InstallStatusIgnored indicates the package is excluded from processing based on
+	// configuration (ignore patterns or package_overrides.ignore = true).
+	// The package is still reported for visibility, but no updates will be performed.
+	InstallStatusIgnored = "Ignored"
 )

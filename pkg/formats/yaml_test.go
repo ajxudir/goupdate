@@ -136,9 +136,19 @@ func TestYAMLParserEdgeCases(t *testing.T) {
 		content := []byte("dependencies:\n  redis: ^1.0.0\n  skipme: ^2.0.0")
 		packages, err := parser.Parse(content, cfg)
 		require.NoError(t, err)
-		require.Len(t, packages, 1)
-		assert.Equal(t, "~", packages[0].Constraint)
-		assert.Equal(t, "redis", packages[0].Name)
+		require.Len(t, packages, 2)
+
+		pkgMap := make(map[string]Package)
+		for _, pkg := range packages {
+			pkgMap[pkg.Name] = pkg
+		}
+
+		// redis: constraint mapped, not ignored
+		assert.Equal(t, "~", pkgMap["redis"].Constraint)
+		assert.Equal(t, "", pkgMap["redis"].IgnoreReason)
+
+		// skipme: marked as ignored (but still included for visibility)
+		assert.Equal(t, "matches ignore pattern 'skipme'", pkgMap["skipme"].IgnoreReason)
 	})
 
 	t.Run("map with interface keys is normalized", func(t *testing.T) {
@@ -173,9 +183,20 @@ func TestYAMLParserEdgeCases(t *testing.T) {
 
 		packages, err := parser.Parse(content, cfg)
 		require.NoError(t, err)
-		require.Len(t, packages, 1)
-		assert.Equal(t, "valid", packages[0].Name)
-		assert.Equal(t, "2.0.0", packages[0].Version)
+		require.Len(t, packages, 2) // empty name is skipped, skipme and valid are included
+
+		pkgMap := make(map[string]Package)
+		for _, pkg := range packages {
+			pkgMap[pkg.Name] = pkg
+		}
+
+		// valid: not ignored
+		assert.Equal(t, "valid", pkgMap["valid"].Name)
+		assert.Equal(t, "2.0.0", pkgMap["valid"].Version)
+		assert.Equal(t, "", pkgMap["valid"].IgnoreReason)
+
+		// skipme: marked as ignored (but still included for visibility)
+		assert.Equal(t, "matches ignore pattern 'skipme'", pkgMap["skipme"].IgnoreReason)
 	})
 }
 

@@ -45,6 +45,7 @@ rules:
 
   # pnpm packages (extends npm rule)
   # Uses file-based extraction from pnpm-lock.yaml for fast lock resolution without node_modules
+  # Supports multiple pnpm-lock.yaml versions (v6, v7, v8, v9) with conditional pattern detection
   pnpm:
     <<: *js_rule
     update:
@@ -55,14 +56,28 @@ rules:
       - files: ["**/pnpm-lock.yaml"]
         format: raw
         extraction:
-          # Parse pnpm-lock.yaml v9 importers format (handles both quoted and unquoted scoped packages):
-          #   '@babel/core':          or          lodash:
-          #     specifier: ^7.26.9                  specifier: ^4.17.21
-          #     version: 7.26.9                     version: 4.17.21
-          pattern: '(?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)'
+          # Multi-pattern extraction for different pnpm-lock.yaml versions
+          # Pattern selection: detect regex matches against file content, then pattern is applied
+          patterns:
+            # pnpm v9 (lockfileVersion: '9.0') uses importers with 6-space indentation:
+            #   '@babel/core':          or          lodash:
+            #     specifier: ^7.26.9                  specifier: ^4.17.21
+            #     version: 7.26.9                     version: 4.17.21
+            - name: "v9"
+              detect: "lockfileVersion:\\s*'9"
+              pattern: '(?m)^\s{6}''?(?P<n>[@\w\-\.\/]+)''?:\s*\n\s+specifier:[^\n]+\n\s+version:\s*(?P<version>[\d\.]+)'
+            # pnpm v6/v7/v8 (lockfileVersion: '6.0'/'7.0'/'8.0') uses packages section:
+            #   /lodash@4.17.21:
+            #     resolution: {integrity: sha512-...}
+            #   /@babel/core@7.26.9:
+            #     resolution: {integrity: sha512-...}
+            - name: "v6_v7_v8"
+              detect: "lockfileVersion:\\s*'[678]"
+              pattern: '(?m)^\s*/(?P<n>@?[\w\-\.\/]+)@(?P<version>[\d\.]+):'
 
   # Yarn packages (extends npm rule)
   # Uses file-based extraction from yarn.lock for fast lock resolution without node_modules
+  # Supports both classic (v1) and berry (v2+) formats with conditional pattern detection
   yarn:
     <<: *js_rule
     update:
@@ -73,11 +88,20 @@ rules:
       - files: ["**/yarn.lock"]
         format: raw
         extraction:
-          # Parse yarn.lock for both classic v1 and berry (v2+) formats:
-          # Classic v1:  lodash@^4.17.21:          Berry:  "lodash@npm:^4.17.21":
-          #                version "4.17.21"                  version: 4.17.21
-          # Pattern handles: optional quotes, optional @npm: prefix, version with quotes or colon
-          pattern: '(?m)^"?(?P<n>@?[\w\-\.\/]+)@(?:npm:)?[^:\n"]+[":]+\s*\n\s+version(?::\s*|\s+")(?P<version>[^"\s\n]+)'
+          # Multi-pattern extraction for different yarn.lock versions
+          patterns:
+            # Yarn classic (v1) format - starts with "# yarn lockfile v1":
+            #   lodash@^4.17.21:
+            #     version "4.17.21"
+            - name: "classic"
+              detect: "#\\s*yarn lockfile v1"
+              pattern: '(?m)^"?(?P<n>@?[\w\-\.\/]+)@[^:\n"]+:\s*\n\s+version\s+"(?P<version>[^"]+)"'
+            # Yarn berry (v2+) format - has __metadata section:
+            #   "lodash@npm:^4.17.21":
+            #     version: 4.17.21
+            - name: "berry"
+              detect: "__metadata:\\s*\\n\\s+version:"
+              pattern: '(?m)^"(?P<n>@?[\w\-\.\/]+)@(?:npm:)?[^"]+\":\s*\n\s+version:\s*(?P<version>[^\s\n]+)'
 
   # Composer/PHP packages
   composer:

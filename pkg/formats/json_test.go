@@ -176,9 +176,10 @@ func TestJSONParserWithOverrides(t *testing.T) {
 	assert.Equal(t, "0.27.2", pkgMap["axios"].Version)
 	assert.Equal(t, "~", pkgMap["axios"].Constraint)
 
-	// lodash: ignored
-	_, exists := pkgMap["lodash"]
-	assert.False(t, exists)
+	// lodash: marked as ignored (but still included for visibility)
+	lodash, exists := pkgMap["lodash"]
+	assert.True(t, exists)
+	assert.Equal(t, "package_overrides.ignore = true", lodash.IgnoreReason)
 
 	// express: no override, original values
 	assert.Equal(t, "4.18.2", pkgMap["express"].Version)

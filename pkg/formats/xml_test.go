@@ -155,8 +155,8 @@ func TestXMLParserWithExtractionAttributes(t *testing.T) {
 // TestXMLParserIgnoresPackages tests package ignore functionality.
 //
 // It verifies:
-//   - Packages matching ignore patterns are filtered out
-//   - Non-ignored packages are included
+//   - Packages matching ignore patterns are marked with IgnoreReason
+//   - Non-ignored packages have no IgnoreReason
 func TestXMLParserIgnoresPackages(t *testing.T) {
 	parser := &XMLParser{}
 	cfg := &config.PackageManagerCfg{
@@ -177,8 +177,18 @@ func TestXMLParserIgnoresPackages(t *testing.T) {
 
 	packages, err := parser.Parse(content, cfg)
 	require.NoError(t, err)
-	require.Len(t, packages, 1)
-	assert.Equal(t, "keepme", packages[0].Name)
+	require.Len(t, packages, 2)
+
+	pkgMap := make(map[string]Package)
+	for _, pkg := range packages {
+		pkgMap[pkg.Name] = pkg
+	}
+
+	// keepme: not ignored
+	assert.Equal(t, "", pkgMap["keepme"].IgnoreReason)
+
+	// skipme: marked as ignored (but still included for visibility)
+	assert.Equal(t, "matches ignore pattern 'skipme'", pkgMap["skipme"].IgnoreReason)
 }
 
 // TestXMLParserWithOverrides tests package overrides in XMLParser.

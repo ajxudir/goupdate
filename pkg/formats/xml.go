@@ -67,10 +67,6 @@ func (p *XMLParser) Parse(content []byte, cfg *config.PackageManagerCfg) ([]Pack
 				continue
 			}
 
-			if shouldIgnorePackage(name, cfg) {
-				continue
-			}
-
 			vInfo := utils.ParseVersion(version)
 
 			// Apply package-specific overrides
@@ -84,13 +80,20 @@ func (p *XMLParser) Parse(content []byte, cfg *config.PackageManagerCfg) ([]Pack
 				finalType = "dev"
 			}
 
-			packages = append(packages, Package{
+			pkg := Package{
 				Name:        name,
 				Version:     vInfo.Version,
 				Constraint:  vInfo.Constraint,
 				Type:        finalType,
 				PackageType: cfg.Manager,
-			})
+			}
+
+			// Check if package should be ignored and set reason
+			if reason := getIgnoreReason(name, cfg); reason != "" {
+				pkg.IgnoreReason = reason
+			}
+
+			packages = append(packages, pkg)
 		}
 	}
 
@@ -100,28 +103,37 @@ func (p *XMLParser) Parse(content []byte, cfg *config.PackageManagerCfg) ([]Pack
 			name := utils.GetXMLAttr(ref, "Include")
 			version := utils.GetXMLAttr(ref, "Version")
 
-			if name != "" && version != "" && !shouldIgnorePackage(name, cfg) {
-				vInfo := utils.ParseVersion(version)
-
-				// Apply package-specific overrides
-				vInfo = utils.ApplyPackageOverride(name, vInfo, cfg)
-
-				vInfo = utils.NormalizeDeclaredVersion(name, vInfo, cfg)
-
-				// Determine package type - check for dev dependency markers
-				pkgType := "prod"
-				if cfg.Extraction != nil && isDevDependency(ref, cfg.Extraction) {
-					pkgType = "dev"
-				}
-
-				packages = append(packages, Package{
-					Name:        name,
-					Version:     vInfo.Version,
-					Constraint:  vInfo.Constraint,
-					Type:        pkgType,
-					PackageType: cfg.Manager,
-				})
+			if name == "" || version == "" {
+				continue
 			}
+
+			vInfo := utils.ParseVersion(version)
+
+			// Apply package-specific overrides
+			vInfo = utils.ApplyPackageOverride(name, vInfo, cfg)
+
+			vInfo = utils.NormalizeDeclaredVersion(name, vInfo, cfg)
+
+			// Determine package type - check for dev dependency markers
+			pkgType := "prod"
+			if cfg.Extraction != nil && isDevDependency(ref, cfg.Extraction) {
+				pkgType = "dev"
+			}
+
+			pkg := Package{
+				Name:        name,
+				Version:     vInfo.Version,
+				Constraint:  vInfo.Constraint,
+				Type:        pkgType,
+				PackageType: cfg.Manager,
+			}
+
+			// Check if package should be ignored and set reason
+			if reason := getIgnoreReason(name, cfg); reason != "" {
+				pkg.IgnoreReason = reason
+			}
+
+			packages = append(packages, pkg)
 		}
 	}
 

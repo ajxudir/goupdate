@@ -250,8 +250,8 @@ func TestRawParserWithOverrides(t *testing.T) {
 // TestRawParserIgnoresPackages tests package ignore functionality.
 //
 // It verifies:
-//   - Packages matching ignore patterns are filtered out
-//   - Non-ignored packages are included
+//   - Packages matching ignore patterns are marked with IgnoreReason
+//   - Non-ignored packages have no IgnoreReason
 func TestRawParserIgnoresPackages(t *testing.T) {
 	parser := &RawParser{}
 	cfg := &config.PackageManagerCfg{
@@ -265,8 +265,18 @@ func TestRawParserIgnoresPackages(t *testing.T) {
 
 	packages, err := parser.Parse(content, cfg)
 	require.NoError(t, err)
-	require.Len(t, packages, 1)
-	assert.Equal(t, "keepme", packages[0].Name)
+	require.Len(t, packages, 2)
+
+	pkgMap := make(map[string]Package)
+	for _, pkg := range packages {
+		pkgMap[pkg.Name] = pkg
+	}
+
+	// skipme: marked as ignored (but still included for visibility)
+	assert.Equal(t, "matches ignore pattern 'skipme'", pkgMap["skipme"].IgnoreReason)
+
+	// keepme: not ignored
+	assert.Equal(t, "", pkgMap["keepme"].IgnoreReason)
 }
 
 // TestRawParserConstraintMapping tests constraint mapping in RawParser.

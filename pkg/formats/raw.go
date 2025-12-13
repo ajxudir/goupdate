@@ -70,7 +70,7 @@ func (p *RawParser) Parse(content []byte, cfg *config.PackageManagerCfg) ([]Pack
 				version = match["version_alt"]
 			}
 
-			if name == "" || shouldIgnorePackage(name, cfg) {
+			if name == "" {
 				continue
 			}
 
@@ -88,13 +88,20 @@ func (p *RawParser) Parse(content []byte, cfg *config.PackageManagerCfg) ([]Pack
 
 			vInfo = utils.NormalizeDeclaredVersion(name, vInfo, cfg)
 
-			packages = append(packages, Package{
+			pkg := Package{
 				Name:        name,
 				Version:     vInfo.Version,
 				Constraint:  vInfo.Constraint,
 				Type:        pkgType,
 				PackageType: cfg.Manager,
-			})
+			}
+
+			// Check if package should be ignored and set reason
+			if reason := getIgnoreReason(name, cfg); reason != "" {
+				pkg.IgnoreReason = reason
+			}
+
+			packages = append(packages, pkg)
 		}
 	}
 

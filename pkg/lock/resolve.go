@@ -169,6 +169,14 @@ func ApplyInstalledVersions(packages []formats.Package, cfg *config.Config, base
 		}
 	}
 
+	// Mark packages with IgnoreReason as Ignored
+	// This takes precedence over other statuses as ignored packages should not be updated
+	for idx := range packages {
+		if packages[idx].IgnoreReason != "" {
+			packages[idx].InstallStatus = InstallStatusIgnored
+		}
+	}
+
 	return packages, nil
 }
 
@@ -294,11 +302,13 @@ func extractVersionsFromLock(path string, cfg *config.LockFileCfg) (map[string]s
 		return nil, err
 	}
 
-	if cfg == nil || cfg.Extraction == nil || cfg.Extraction.Pattern == "" {
+	// Validate extraction configuration - must have either Pattern or Patterns
+	if cfg.Extraction == nil || (cfg.Extraction.Pattern == "" && len(cfg.Extraction.Patterns) == 0) {
 		return nil, fmt.Errorf("lock file extraction pattern missing for %s", path)
 	}
 
-	matches, err := utils.ExtractAllMatches(cfg.Extraction.Pattern, string(content))
+	// Use multi-pattern extraction for maximum flexibility across lock file versions
+	matches, err := utils.ExtractWithPatterns(string(content), cfg.Extraction)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse lock file %s: %w", filepath.Base(path), err)
 	}

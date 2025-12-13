@@ -662,3 +662,228 @@ func TestIntegration_Yarn_Berry(t *testing.T) {
 	assert.Equal(t, InstallStatusLockFound, statusLookup["express"])
 	assert.Equal(t, InstallStatusLockFound, statusLookup["chalk"])
 }
+
+// TestIntegration_NPM_LockfileV3 tests npm package-lock.json v3 format.
+//
+// NPM v3 uses the packages section with node_modules/ prefixed keys:
+//
+//	"node_modules/lodash": { "version": "4.17.21" }
+func TestIntegration_NPM_LockfileV3(t *testing.T) {
+	testdataDir, err := filepath.Abs("../testdata/npm_v3")
+	require.NoError(t, err, "failed to get absolute path to testdata")
+
+	cfg, err := config.LoadConfig("", testdataDir)
+	require.NoError(t, err)
+
+	parser := packages.NewDynamicParser()
+	rule := cfg.Rules["npm"]
+	result, err := parser.ParseFile(filepath.Join(testdataDir, "package.json"), &rule)
+	require.NoError(t, err)
+
+	for i := range result.Packages {
+		result.Packages[i].Rule = "npm"
+	}
+
+	enriched, err := ApplyInstalledVersions(result.Packages, cfg, testdataDir)
+	require.NoError(t, err)
+
+	// Build lookup for easier assertions
+	lookup := make(map[string]string)
+	statusLookup := make(map[string]string)
+	for _, pkg := range enriched {
+		lookup[pkg.Name] = pkg.InstalledVersion
+		statusLookup[pkg.Name] = pkg.InstallStatus
+	}
+
+	// Verify all packages have installed versions from v3 lock file
+	assert.Equal(t, "4.17.21", lookup["lodash"], "lodash should be version 4.17.21")
+	assert.Equal(t, "4.18.3", lookup["express"], "express should be version 4.18.3")
+	assert.Equal(t, "5.4.5", lookup["typescript"], "typescript should be version 5.4.5")
+
+	// Verify status is correct
+	assert.Equal(t, InstallStatusLockFound, statusLookup["lodash"])
+	assert.Equal(t, InstallStatusLockFound, statusLookup["express"])
+}
+
+// TestIntegration_PNPM_LockfileV7 tests pnpm-lock.yaml v7 format.
+//
+// v7 uses the packages section with /package@version format.
+func TestIntegration_PNPM_LockfileV7(t *testing.T) {
+	testdataDir, err := filepath.Abs("../testdata/pnpm_v7")
+	require.NoError(t, err, "failed to get absolute path to testdata")
+
+	cfg, err := config.LoadConfig("", testdataDir)
+	require.NoError(t, err)
+
+	parser := packages.NewDynamicParser()
+	rule := cfg.Rules["pnpm"]
+	result, err := parser.ParseFile(filepath.Join(testdataDir, "package.json"), &rule)
+	require.NoError(t, err)
+
+	for i := range result.Packages {
+		result.Packages[i].Rule = "pnpm"
+	}
+
+	enriched, err := ApplyInstalledVersions(result.Packages, cfg, testdataDir)
+	require.NoError(t, err)
+
+	// Build lookup for easier assertions
+	lookup := make(map[string]string)
+	statusLookup := make(map[string]string)
+	for _, pkg := range enriched {
+		lookup[pkg.Name] = pkg.InstalledVersion
+		statusLookup[pkg.Name] = pkg.InstallStatus
+	}
+
+	// Verify all packages have installed versions from v7 lock file
+	assert.Equal(t, "4.17.21", lookup["lodash"], "lodash should be version 4.17.21")
+	assert.Equal(t, "4.18.3", lookup["express"], "express should be version 4.18.3")
+	assert.Equal(t, "5.4.5", lookup["typescript"], "typescript should be version 5.4.5")
+
+	// Verify status is correct
+	assert.Equal(t, InstallStatusLockFound, statusLookup["lodash"])
+	assert.Equal(t, InstallStatusLockFound, statusLookup["express"])
+}
+
+// TestIntegration_PNPM_LockfileV8 tests pnpm-lock.yaml v8 format.
+//
+// v8 uses the packages section with /package@version format.
+func TestIntegration_PNPM_LockfileV8(t *testing.T) {
+	testdataDir, err := filepath.Abs("../testdata/pnpm_v8")
+	require.NoError(t, err, "failed to get absolute path to testdata")
+
+	cfg, err := config.LoadConfig("", testdataDir)
+	require.NoError(t, err)
+
+	parser := packages.NewDynamicParser()
+	rule := cfg.Rules["pnpm"]
+	result, err := parser.ParseFile(filepath.Join(testdataDir, "package.json"), &rule)
+	require.NoError(t, err)
+
+	for i := range result.Packages {
+		result.Packages[i].Rule = "pnpm"
+	}
+
+	enriched, err := ApplyInstalledVersions(result.Packages, cfg, testdataDir)
+	require.NoError(t, err)
+
+	// Build lookup for easier assertions
+	lookup := make(map[string]string)
+	statusLookup := make(map[string]string)
+	for _, pkg := range enriched {
+		lookup[pkg.Name] = pkg.InstalledVersion
+		statusLookup[pkg.Name] = pkg.InstallStatus
+	}
+
+	// Verify all packages have installed versions from v8 lock file
+	assert.Equal(t, "4.17.21", lookup["lodash"], "lodash should be version 4.17.21")
+	assert.Equal(t, "4.18.3", lookup["express"], "express should be version 4.18.3")
+	assert.Equal(t, "5.4.5", lookup["typescript"], "typescript should be version 5.4.5")
+
+	// Verify status is correct
+	assert.Equal(t, InstallStatusLockFound, statusLookup["lodash"])
+	assert.Equal(t, InstallStatusLockFound, statusLookup["express"])
+}
+
+// TestIntegration_PNPM_LockfileV9 tests pnpm-lock.yaml v9 format.
+//
+// v9 uses the importers section with 6-space indentation:
+//
+//	lodash:
+//	  specifier: ^4.17.21
+//	  version: 4.17.21
+func TestIntegration_PNPM_LockfileV9(t *testing.T) {
+	testdataDir, err := filepath.Abs("../testdata/pnpm_v9")
+	require.NoError(t, err, "failed to get absolute path to testdata")
+
+	cfg, err := config.LoadConfig("", testdataDir)
+	require.NoError(t, err)
+
+	parser := packages.NewDynamicParser()
+	rule := cfg.Rules["pnpm"]
+	result, err := parser.ParseFile(filepath.Join(testdataDir, "package.json"), &rule)
+	require.NoError(t, err)
+
+	for i := range result.Packages {
+		result.Packages[i].Rule = "pnpm"
+	}
+
+	enriched, err := ApplyInstalledVersions(result.Packages, cfg, testdataDir)
+	require.NoError(t, err)
+
+	// Build lookup for easier assertions
+	lookup := make(map[string]string)
+	statusLookup := make(map[string]string)
+	for _, pkg := range enriched {
+		lookup[pkg.Name] = pkg.InstalledVersion
+		statusLookup[pkg.Name] = pkg.InstallStatus
+	}
+
+	// Verify all packages have installed versions from v9 lock file
+	assert.Equal(t, "4.17.21", lookup["lodash"], "lodash should be version 4.17.21")
+	assert.Equal(t, "4.18.3", lookup["express"], "express should be version 4.18.3")
+	assert.Equal(t, "5.4.5", lookup["typescript"], "typescript should be version 5.4.5")
+
+	// Verify status is correct
+	assert.Equal(t, InstallStatusLockFound, statusLookup["lodash"])
+	assert.Equal(t, InstallStatusLockFound, statusLookup["express"])
+}
+
+// TestIntegration_IgnoredPackages tests that ignored packages are marked with
+// InstallStatusIgnored and include the IgnoreReason field.
+//
+// This test verifies:
+//   - Packages matching ignore patterns are still included in results
+//   - They have InstallStatus = "Ignored"
+//   - They have IgnoreReason explaining why they were ignored
+//   - Non-ignored packages function normally
+func TestIntegration_IgnoredPackages(t *testing.T) {
+	testdataDir, err := filepath.Abs("../testdata/ignored_packages")
+	require.NoError(t, err, "failed to get absolute path to testdata")
+
+	// Load the custom config that defines ignore patterns
+	cfg, err := config.LoadConfig(filepath.Join(testdataDir, "goupdate.yaml"), testdataDir)
+	require.NoError(t, err)
+
+	parser := packages.NewDynamicParser()
+	rule := cfg.Rules["npm"]
+	result, err := parser.ParseFile(filepath.Join(testdataDir, "package.json"), &rule)
+	require.NoError(t, err)
+
+	for i := range result.Packages {
+		result.Packages[i].Rule = "npm"
+	}
+
+	enriched, err := ApplyInstalledVersions(result.Packages, cfg, testdataDir)
+	require.NoError(t, err)
+
+	// Build lookup for easier assertions
+	type pkgInfo struct {
+		installedVersion string
+		installStatus    string
+		ignoreReason     string
+	}
+	lookup := make(map[string]pkgInfo)
+	for _, pkg := range enriched {
+		lookup[pkg.Name] = pkgInfo{
+			installedVersion: pkg.InstalledVersion,
+			installStatus:    pkg.InstallStatus,
+			ignoreReason:     pkg.IgnoreReason,
+		}
+	}
+
+	// Verify non-ignored packages work normally
+	assert.Equal(t, InstallStatusLockFound, lookup["lodash"].installStatus, "lodash should be LockFound")
+	assert.Equal(t, "", lookup["lodash"].ignoreReason, "lodash should have no IgnoreReason")
+	assert.Equal(t, "4.17.21", lookup["lodash"].installedVersion, "lodash should have correct version")
+
+	assert.Equal(t, InstallStatusLockFound, lookup["express"].installStatus, "express should be LockFound")
+	assert.Equal(t, "", lookup["express"].ignoreReason, "express should have no IgnoreReason")
+
+	// Verify ignored packages are marked as Ignored with reason
+	assert.Equal(t, InstallStatusIgnored, lookup["skip-me"].installStatus, "skip-me should be Ignored")
+	assert.Contains(t, lookup["skip-me"].ignoreReason, "skip-me", "skip-me should have IgnoreReason mentioning pattern")
+
+	assert.Equal(t, InstallStatusIgnored, lookup["@internal/package"].installStatus, "@internal/package should be Ignored")
+	assert.Contains(t, lookup["@internal/package"].ignoreReason, "@internal/", "@internal/package should have IgnoreReason mentioning pattern")
+}
