@@ -9,11 +9,11 @@ rules:
   pnpm:
     # Only group packages with actual version coupling (peer dependencies)
     groups:
-      # Vue core - vuex/vue-router have peer deps on vue
+      # Vue core - vuex has peer dep on vue
       vue:
         - vue
         - vuex
-        - vue-router
+        # Add vue-router here if your project uses it
 
       # React - must have matching versions
       react:
@@ -36,6 +36,9 @@ rules:
       playwright:
         - playwright
         - "@playwright/test"
+
+    # Note: Pre-release filtering inherits from default config
+    # Default patterns exclude: alpha, beta, rc, dev, canary, snapshot, nightly, preview, next
 
 # System tests to verify build after updates
 # Note: This is a config-only example - copy to your actual Vue/pnpm project
