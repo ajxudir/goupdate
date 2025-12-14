@@ -410,6 +410,12 @@ func updateDeclaredVersion(p formats.Package, target string, cfg *config.Config,
 		return fmt.Errorf("rule configuration missing for %s", p.Rule)
 	}
 
+	// Capture file modification time before read for drift detection
+	var readModTime int64
+	if info, statErr := statFileFunc(p.Source); statErr == nil {
+		readModTime = info.ModTime().UnixNano()
+	}
+
 	content, err := readFileFunc(p.Source)
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", p.Source, err)
@@ -435,6 +441,16 @@ func updateDeclaredVersion(p formats.Package, target string, cfg *config.Config,
 
 	if dryRun {
 		return nil
+	}
+
+	// Check for file drift - another process may have modified the file
+	if readModTime > 0 {
+		if info, statErr := statFileFunc(p.Source); statErr == nil {
+			if info.ModTime().UnixNano() != readModTime {
+				warnings.Warnf("Warning: %s was modified by another process during update\n", p.Source)
+				// Continue anyway - the atomic write will still work, but warn the user
+			}
+		}
 	}
 
 	if writeErr := writeFileFunc(p.Source, updated, 0o644); writeErr != nil {

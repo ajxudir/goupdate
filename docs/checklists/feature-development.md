@@ -212,7 +212,47 @@ pkg/testdata/
     └── prerelease/                      # Prerelease versions
 ```
 
-### 3F: Example Projects (`examples/`)
+### 3F: File Operation Tests (if writing files)
+
+| Requirement | Status |
+|-------------|--------|
+| Permissions preserved after write | [ ] |
+| Use `os.Chmod()` after `os.WriteFile()` in tests | [ ] |
+| Ownership preserved (uid/gid on Unix) | [ ] |
+| Backup captures permissions, not just content | [ ] |
+| Restore uses BACKUP permissions, not current | [ ] |
+| Skip permission tests when running as root | [ ] |
+
+**File Permissions Test Template:**
+```go
+func TestFileOperationPreservesPermissions(t *testing.T) {
+    if os.Getuid() == 0 {
+        t.Skip("Test requires non-root user")
+    }
+
+    tmpFile := filepath.Join(t.TempDir(), "test.txt")
+    originalMode := os.FileMode(0o640)
+
+    // Create with explicit mode (umask-safe)
+    if err := os.WriteFile(tmpFile, []byte("content"), 0o644); err != nil {
+        t.Fatal(err)
+    }
+    if err := os.Chmod(tmpFile, originalMode); err != nil {  // Always chmod after WriteFile!
+        t.Fatal(err)
+    }
+
+    // Perform file operation being tested
+    performFileOperation(tmpFile)
+
+    // Verify permissions preserved
+    info, _ := os.Stat(tmpFile)
+    if info.Mode().Perm() != originalMode {
+        t.Errorf("expected %o, got %o", originalMode, info.Mode().Perm())
+    }
+}
+```
+
+### 3G: Example Projects (`examples/`)
 
 If feature affects CLI usage, verify with example projects:
 

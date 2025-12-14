@@ -16,6 +16,8 @@ Use this checklist when fixing bugs in goupdate.
 | Config error | `pkg/config/` | Validation missing, merge logic |
 | Lock resolution | `pkg/lock/` | Lock file format changes |
 | Update failure | `pkg/update/` | Constraint format, file write |
+| Permissions bug | `pkg/update/` | Umask issues, backup mode restore |
+| Ownership bug | `pkg/update/` | Unix uid/gid preservation |
 | Filter bug | `pkg/filtering/` | Case sensitivity, empty values |
 | Output bug | `pkg/output/` | Format rendering, escaping |
 
@@ -309,6 +311,29 @@ Closes #XXX (if applicable)
 | XML | Namespaces, attributes | XPath correctness |
 | YAML | Indentation, lists | Parser settings |
 | Raw | Regex edge cases | Pattern matching |
+
+### File Operations (Permissions/Ownership)
+| Issue | Symptoms | Solution |
+|-------|----------|----------|
+| Umask affects WriteFile | Permissions differ from expected | Use `os.Chmod()` after `os.WriteFile()` |
+| Backup restores current perms | File permissions change unexpectedly | Use explicit mode in restore: `writeFileWithBackupMode()` |
+| Ownership lost on update | uid/gid changes to running user | Capture ownership before write, chown after |
+| Tests pass but production fails | Root user bypasses permission checks | Skip tests when running as root |
+
+**File Operation Debug Commands:**
+```bash
+# Check file permissions
+stat -c "%a %n" file.json
+
+# Check file ownership
+ls -ln file.json
+
+# Get current umask
+umask
+
+# Test with specific umask
+umask 027 && go test ./pkg/update -run Permissions
+```
 
 ---
 
