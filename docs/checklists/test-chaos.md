@@ -25,6 +25,41 @@ wait
 
 ---
 
+## Error Testdata Directories
+
+Use these directories for testing error handling with real malformed files:
+
+### `pkg/testdata_errors/`
+
+| Directory | Purpose | Use Case |
+|-----------|---------|----------|
+| `_config-errors/` | Config validation | Test YAML/config parsing errors |
+| `_invalid-syntax/` | Syntax errors | Test malformed manifest files |
+| `_malformed/` | Structure errors | Test valid syntax but invalid structure |
+| `_lock-errors/` | Lock parsing | Test broken lock files |
+| `_lock-missing/` | Missing locks | Test missing lock file handling |
+| `_lock-not-found/` | Lock not found | Test lock file discovery |
+| `_lock-scenarios/` | Multi-lock | Test complex lock configurations |
+| `malformed-json/` | JSON errors | Test JSON parse failures |
+| `malformed-xml/` | XML errors | Test XML parse failures |
+
+### `pkg/mocksdata_errors/`
+
+| Directory | Purpose | Requires Mock |
+|-----------|---------|---------------|
+| `command-timeout/` | Timeout handling | Yes |
+| `invalid-command/` | Command execution | Yes |
+| `package-not-found/` | Registry errors | Yes |
+
+```bash
+# Test error handling (no mocks needed)
+$GOUPDATE list -d pkg/testdata_errors/malformed-json
+$GOUPDATE list -d pkg/testdata_errors/_invalid-syntax/npm
+$GOUPDATE config -d pkg/testdata_errors/_config-errors/invalid-yaml --validate
+```
+
+---
+
 ## Quick Start
 
 ```bash

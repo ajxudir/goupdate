@@ -408,7 +408,7 @@ go tool cover -html=coverage.out
 ### Testdata Structure
 
 ```
-pkg/testdata/
+pkg/testdata/                           # Valid test fixtures
 ├── npm/, npm_v1/, npm_v2/, npm_v3/    # NPM lockfile versions
 ├── pnpm/, pnpm_v6-v9/                  # PNPM versions
 ├── yarn/, yarn_berry/                   # Yarn versions
@@ -420,6 +420,28 @@ pkg/testdata/
 └── */_edge-cases/                       # Edge case subdirs
     ├── no-lock/                         # Missing lock files
     └── prerelease/                      # Prerelease versions
+
+pkg/testdata_errors/                     # Error test fixtures
+├── _config-errors/                      # Config validation errors
+│   ├── invalid-yaml/                    # Malformed YAML
+│   ├── cyclic-extends-*/                # Circular extends
+│   ├── duplicate-groups/                # Duplicate definitions
+│   ├── empty-extends/, empty-rules/     # Empty values
+│   ├── unknown-extends/                 # Invalid references
+│   ├── type-mismatch-*/                 # Type errors
+│   └── path-traversal/                  # Security test
+├── _invalid-syntax/                     # Malformed manifest files
+├── _malformed/                          # Structural errors
+├── _lock-errors/                        # Lock file parse errors
+├── _lock-missing/, _lock-not-found/     # Missing lock files
+├── _lock-scenarios/                     # Multi-lock configs
+├── malformed-json/                      # JSON parse errors
+└── malformed-xml/                       # XML parse errors
+
+pkg/mocksdata_errors/                    # Mock-dependent errors
+├── command-timeout/                     # Timeout scenarios
+├── invalid-command/                     # Bad command execution
+└── package-not-found/                   # Missing packages
 ```
 
 ### Example Projects (`examples/`)

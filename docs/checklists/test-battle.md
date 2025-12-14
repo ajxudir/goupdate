@@ -478,7 +478,150 @@ go test -v ./cmd -run E2E
 
 ---
 
-## Phase 12: Help Output
+## Phase 12: Error Testdata (`testdata_errors/`)
+
+Test error handling with intentionally malformed files:
+
+### 12A: Config Errors (`_config-errors/`)
+
+| Scenario | Path | Expected | Status |
+|----------|------|----------|--------|
+| Invalid YAML | `_config-errors/invalid-yaml/` | Parse error | [ ] |
+| Cyclic extends (direct) | `_config-errors/cyclic-extends-direct/` | Cycle error | [ ] |
+| Cyclic extends (indirect) | `_config-errors/cyclic-extends-indirect/` | Cycle error | [ ] |
+| Duplicate groups | `_config-errors/duplicate-groups/` | Validation error | [ ] |
+| Empty extends | `_config-errors/empty-extends/` | Validation error | [ ] |
+| Empty rules | `_config-errors/empty-rules/` | Validation error | [ ] |
+| Unknown extends | `_config-errors/unknown-extends/` | Not found error | [ ] |
+| Type mismatch (include) | `_config-errors/type-mismatch-include/` | Type error | [ ] |
+| Type mismatch (rules) | `_config-errors/type-mismatch-rules/` | Type error | [ ] |
+| Path traversal | `_config-errors/path-traversal/` | Security error | [ ] |
+
+### 12B: Invalid Syntax (`_invalid-syntax/`)
+
+| PM | Path | Expected | Status |
+|----|------|----------|--------|
+| npm | `_invalid-syntax/npm/` | JSON parse error | [ ] |
+| pnpm | `_invalid-syntax/pnpm/` | YAML parse error | [ ] |
+| yarn | `_invalid-syntax/yarn/` | Parse error | [ ] |
+| composer | `_invalid-syntax/composer/` | JSON parse error | [ ] |
+| mod | `_invalid-syntax/mod/` | go.mod parse error | [ ] |
+| requirements | `_invalid-syntax/requirements/` | Parse error | [ ] |
+| pipfile | `_invalid-syntax/pipfile/` | TOML parse error | [ ] |
+| msbuild | `_invalid-syntax/msbuild/` | XML parse error | [ ] |
+| nuget | `_invalid-syntax/nuget/` | XML parse error | [ ] |
+
+### 12C: Lock File Errors
+
+| Scenario | Path | Expected | Status |
+|----------|------|----------|--------|
+| Lock errors | `_lock-errors/` | Parse error | [ ] |
+| Lock missing | `_lock-missing/` | LockMissing status | [ ] |
+| Lock not found | `_lock-not-found/` | Not found error | [ ] |
+| Lock scenarios | `_lock-scenarios/` | Multi-lock handling | [ ] |
+
+### 12D: Malformed Files
+
+| Type | Path | Expected | Status |
+|------|------|----------|--------|
+| Malformed JSON | `malformed-json/` | JSON parse error | [ ] |
+| Malformed XML | `malformed-xml/` | XML parse error | [ ] |
+| Malformed structure | `_malformed/` | Structure error | [ ] |
+
+```bash
+# Test error handling (parallel across categories)
+$GOUPDATE list -d pkg/testdata_errors/malformed-json 2>&1 | grep -i error &
+$GOUPDATE list -d pkg/testdata_errors/_invalid-syntax/npm 2>&1 | grep -i error &
+$GOUPDATE config -d pkg/testdata_errors/_config-errors/invalid-yaml --validate 2>&1 &
+wait
+```
+
+---
+
+## Phase 13: Mock Error Scenarios (`mocksdata_errors/`)
+
+Test mock-dependent error scenarios:
+
+| Scenario | Path | Expected | Status |
+|----------|------|----------|--------|
+| Command timeout | `mocksdata_errors/command-timeout/` | Timeout error | [ ] |
+| Invalid command | `mocksdata_errors/invalid-command/` | Command error | [ ] |
+| Package not found | `mocksdata_errors/package-not-found/` | Not found error | [ ] |
+
+---
+
+## Phase 14: Config File Validation
+
+Test `.goupdate.yml` files in examples and root:
+
+### 14A: Root Config
+
+| Test | Command | Status |
+|------|---------|--------|
+| Validate root config | `config -d . --validate` | [ ] |
+| Show effective config | `config -d . --show-effective` | [ ] |
+| Init new config | `config --init` (in temp dir) | [ ] |
+
+### 14B: Example Configs
+
+| Project | Command | Status |
+|---------|---------|--------|
+| go-cli | `config -d examples/go-cli --validate` | [ ] |
+| react-app | `config -d examples/react-app --validate` | [ ] |
+| django-app | `config -d examples/django-app --validate` | [ ] |
+| laravel-app | `config -d examples/laravel-app --validate` | [ ] |
+| kpas-api | `config -d examples/kpas-api --validate` | [ ] |
+| kpas-frontend | `config -d examples/kpas-frontend --validate` | [ ] |
+| ruby-api | `config -d examples/ruby-api --validate` | [ ] |
+
+```bash
+# Validate all example configs (parallel)
+for project in go-cli react-app django-app laravel-app kpas-api kpas-frontend ruby-api; do
+    $GOUPDATE config -d examples/$project --validate &
+done
+wait
+```
+
+---
+
+## Phase 15: GitHub Actions Compatibility
+
+Verify commands work as used in GitHub Actions:
+
+### 15A: Action Commands (from `.github/actions/`)
+
+| Action | Command Pattern | Status |
+|--------|-----------------|--------|
+| goupdate-check | `goupdate outdated -o json` | [ ] |
+| goupdate-check | `goupdate outdated -o json --verbose` | [ ] |
+| goupdate-update | `goupdate update --minor --continue-on-fail -y` | [ ] |
+| goupdate-update | `goupdate update --patch --continue-on-fail -y` | [ ] |
+| goupdate-update | `goupdate update --major --continue-on-fail -y` | [ ] |
+| goupdate-update | `goupdate update --verbose --continue-on-fail -y --dry-run` | [ ] |
+
+### 15B: Makefile Targets
+
+| Target | Command | Status |
+|--------|---------|--------|
+| init | `make init` | [ ] |
+| build | `make build` | [ ] |
+| build-dev | `make build-dev` | [ ] |
+| test | `make test` | [ ] |
+| test-ci | `make test-ci` | [ ] |
+| test-unit | `make test-unit` | [ ] |
+| test-integration | `make test-integration` | [ ] |
+| test-e2e | `make test-e2e` | [ ] |
+| coverage | `make coverage` | [ ] |
+| coverage-func | `make coverage-func` | [ ] |
+| coverage-html | `make coverage-html` | [ ] |
+| vet | `make vet` | [ ] |
+| fmt | `make fmt` | [ ] |
+| check | `make check` | [ ] |
+| clean | `make clean` | [ ] |
+
+---
+
+## Phase 16: Help Output
 
 Verify all commands have accurate help:
 
@@ -493,7 +636,7 @@ Verify all commands have accurate help:
 
 ---
 
-## Phase 13: Final Verification
+## Phase 17: Final Verification
 
 - [ ] All tests pass: `go test ./... -count=1`
 - [ ] No race conditions: `go test -race ./...`
@@ -518,11 +661,15 @@ Verify all commands have accurate help:
 - Phase 9: Edge cases testing
 - Phase 10: Examples testing (all projects)
 - Phase 11A: Chaos tests (independent test files)
+- Phase 12: Error testdata testing (all categories)
+- Phase 14: Config file validation (all example projects)
+- Phase 15A: GitHub Action commands
 
 ### Must Run Sequentially
 - Phase 2D.2: Actual updates (per project: update → verify → rollback)
 - Phase 11B: Integration tests (may require PM installations)
-- Phase 13: Final verification (after all other phases)
+- Phase 15B: Makefile targets (some modify files)
+- Phase 17: Final verification (after all other phases)
 
 ### Collision Prevention
 - Use unique `$TEST_DIR` per session
