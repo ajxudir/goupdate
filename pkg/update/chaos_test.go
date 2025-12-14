@@ -54,7 +54,7 @@ func TestChaos_UpdatePackage_ReadOnlyManifest(t *testing.T) {
 	// Make file read-only
 	err = os.Chmod(manifestPath, 0444)
 	require.NoError(t, err)
-	defer os.Chmod(manifestPath, 0644) // Restore for cleanup
+	t.Cleanup(func() { _ = os.Chmod(manifestPath, 0644) })
 
 	pkg := formats.Package{
 		Name:    "test",
@@ -436,7 +436,7 @@ func TestChaos_UpdatePackage_SpecialCharactersInVersion(t *testing.T) {
 			require.NoError(t, err)
 
 			// Should not panic and should not execute shell commands
-			err = UpdatePackage(pkg, tc.version, cfg, tmpDir, false, true)
+			_ = UpdatePackage(pkg, tc.version, cfg, tmpDir, false, true)
 
 			// Verify file wasn't corrupted - should still be valid JSON or original content
 			afterContent, readErr := os.ReadFile(manifestPath)
@@ -739,7 +739,7 @@ func TestChaos_WriteFilePreservingPermissions_PermissionDenied(t *testing.T) {
 	// Make directory read-only
 	err := os.Chmod(tmpDir, 0555)
 	require.NoError(t, err)
-	defer os.Chmod(tmpDir, 0755) // Restore for cleanup
+	t.Cleanup(func() { _ = os.Chmod(tmpDir, 0755) })
 
 	targetPath := filepath.Join(tmpDir, "test.json")
 	content := []byte(`{"test": true}`)

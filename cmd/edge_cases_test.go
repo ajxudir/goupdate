@@ -449,7 +449,7 @@ func TestNetworkResilience_TimeoutSimulation(t *testing.T) {
 		// Kill after 100ms
 		select {
 		case <-time.After(100 * time.Millisecond):
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 			<-done // Wait for goroutine to finish
 		case err := <-done:
 			t.Fatalf("command completed unexpectedly: %v", err)

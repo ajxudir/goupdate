@@ -29,17 +29,22 @@ var (
 type filePermissions struct {
 	mode os.FileMode
 	path string
+	uid  int
+	gid  int
 }
 
-// getFilePermissions retrieves the current permissions of a file
+// getFilePermissions retrieves the current permissions and ownership of a file
 func getFilePermissions(path string) (*filePermissions, error) {
 	info, err := statFileFunc(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat file %s: %w", path, err)
 	}
+	uid, gid := getFileOwnership(info)
 	return &filePermissions{
 		mode: info.Mode(),
 		path: path,
+		uid:  uid,
+		gid:  gid,
 	}, nil
 }
 
@@ -79,12 +84,12 @@ func writeFileAtomic(path string, content []byte, mode os.FileMode) error {
 	return nil
 }
 
-// writeFilePreservingPermissions writes content to a file while preserving its original permissions.
-// If the file exists, its permissions are preserved. If it doesn't exist, defaultMode is used.
+// writeFilePreservingPermissions writes content to a file while preserving its original permissions and ownership.
+// If the file exists, its permissions and ownership are preserved. If it doesn't exist, defaultMode is used.
 // Uses atomic write (temp file + rename) to prevent corruption on interruption.
-// Warns the user if permissions change unexpectedly after the write operation.
+// Warns the user if permissions or ownership change unexpectedly after the write operation.
 func writeFilePreservingPermissions(path string, content []byte, defaultMode os.FileMode) error {
-	// Get original permissions if file exists
+	// Get original permissions and ownership if file exists
 	origPerms, err := getFilePermissions(path)
 	mode := defaultMode
 
@@ -95,6 +100,14 @@ func writeFilePreservingPermissions(path string, content []byte, defaultMode os.
 	// Use atomic write for safety
 	if writeErr := writeFileAtomic(path, content, mode); writeErr != nil {
 		return writeErr
+	}
+
+	// Restore ownership if we had the original info
+	if origPerms != nil && origPerms.uid >= 0 && origPerms.gid >= 0 {
+		if chownErr := chownFile(path, origPerms.uid, origPerms.gid); chownErr != nil {
+			// Only warn, don't fail - chown may fail if not running as root
+			verbose.Printf("Unable to preserve file ownership for %s: %v\n", path, chownErr)
+		}
 	}
 
 	// Verify permissions after write
@@ -108,6 +121,14 @@ func writeFilePreservingPermissions(path string, content []byte, defaultMode os.
 	if origPerms != nil && newPerms.mode.Perm() != origPerms.mode.Perm() {
 		warnings.Warnf("Warning: file permissions changed for %s: %v -> %v\n",
 			path, origPerms.mode.Perm(), newPerms.mode.Perm())
+	}
+
+	// Check if ownership changed unexpectedly (only warn if we had valid original ownership)
+	if origPerms != nil && origPerms.uid >= 0 && origPerms.gid >= 0 {
+		if newPerms.uid != origPerms.uid || newPerms.gid != origPerms.gid {
+			warnings.Warnf("Warning: file ownership changed for %s: %d:%d -> %d:%d\n",
+				path, origPerms.uid, origPerms.gid, newPerms.uid, newPerms.gid)
+		}
 	}
 
 	return nil
