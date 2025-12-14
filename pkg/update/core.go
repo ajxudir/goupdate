@@ -193,11 +193,34 @@ func backupFiles(paths []string) ([]fileBackup, error) {
 	return backups, nil
 }
 
+// writeFileWithBackupMode writes content to a file and forcefully sets the specified mode.
+// Unlike writeFilePreservingPermissions, this function uses the provided mode instead of
+// preserving the current file's permissions. Used for restore operations where we want
+// to restore the original backed-up permissions.
+func writeFileWithBackupMode(path string, content []byte, mode os.FileMode) error {
+	// Get original ownership if file exists (to restore it after write)
+	origPerms, _ := getFilePermissions(path)
+
+	// Use atomic write
+	if writeErr := writeFileAtomic(path, content, mode); writeErr != nil {
+		return writeErr
+	}
+
+	// Restore ownership if we had the original info
+	if origPerms != nil && origPerms.uid >= 0 && origPerms.gid >= 0 {
+		if chownErr := chownFile(path, origPerms.uid, origPerms.gid); chownErr != nil {
+			verbose.Printf("Unable to preserve file ownership for %s: %v\n", path, chownErr)
+		}
+	}
+
+	return nil
+}
+
 // restoreBackups restores files from their backups after a failed update operation.
 //
 // It performs the following operations:
 //   - Step 1: Iterate through all backups
-//   - Step 2: Write each backup's content back to its original path
+//   - Step 2: Write each backup's content back to its original path with backed-up permissions
 //   - Step 3: Collect any errors that occur during restoration
 //   - Step 4: Log successful restorations
 //
@@ -209,7 +232,8 @@ func backupFiles(paths []string) ([]fileBackup, error) {
 func restoreBackups(backups []fileBackup) []error {
 	var errs []error
 	for _, backup := range backups {
-		if err := writeFileFunc(backup.path, backup.content, backup.mode); err != nil {
+		// Use writeFileWithBackupMode to forcefully restore the backed-up permissions
+		if err := writeFileWithBackupMode(backup.path, backup.content, backup.mode); err != nil {
 			errs = append(errs, fmt.Errorf("failed to restore %s: %w", backup.path, err))
 		} else {
 			verbose.Printf("Restored %s from backup\n", backup.path)

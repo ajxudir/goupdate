@@ -131,32 +131,30 @@ func TestWriteFilePreservingPermissions(t *testing.T) {
 		assert.Equal(t, os.FileMode(0o755), info.Mode().Perm())
 	})
 
-	t.Run("preserves read-only permissions", func(t *testing.T) {
+	t.Run("preserves restrictive permissions", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFile := filepath.Join(tmpDir, "readonly.txt")
+		testFile := filepath.Join(tmpDir, "restrictive.txt")
 
-		// Create read-only file (but writable by owner for the test)
+		// Create file with restrictive permissions (owner read-write only)
 		err := os.WriteFile(testFile, []byte("original"), 0o644)
 		require.NoError(t, err)
-
-		// Change to more restrictive permissions
-		err = os.Chmod(testFile, 0o444)
+		// Explicit chmod to ensure exact mode
+		err = os.Chmod(testFile, 0o600)
 		require.NoError(t, err)
 
-		// Restore permissions for cleanup
-		defer func() { _ = os.Chmod(testFile, 0o644) }()
-
-		// Make writable temporarily for the test
-		err = os.Chmod(testFile, 0o644)
+		// Verify initial mode
+		info, err := os.Stat(testFile)
 		require.NoError(t, err)
+		require.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "precondition: mode should be 0600")
 
-		// Write should preserve 0644 (we changed it back for write to succeed)
+		// Write should preserve 0600 even though we pass 0755 as default
 		err = writeFilePreservingPermissions(testFile, []byte("updated"), 0o755)
 		require.NoError(t, err)
 
-		info, err := os.Stat(testFile)
+		info, err = os.Stat(testFile)
 		require.NoError(t, err)
-		assert.Equal(t, os.FileMode(0o644), info.Mode().Perm())
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(),
+			"restrictive permissions (0600) should be preserved, not replaced with default (0755)")
 	})
 }
 

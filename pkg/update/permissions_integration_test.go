@@ -40,13 +40,16 @@ func TestIntegration_PermissionsPreserved_JSONUpdate(t *testing.T) {
 
 	// Create manifest with specific permissions (0755 - executable, which is unusual for JSON but tests preservation)
 	content := `{"dependencies": {"lodash": "4.17.0"}}`
-	err := os.WriteFile(manifestPath, []byte(content), 0755)
+	err := os.WriteFile(manifestPath, []byte(content), 0644)
+	require.NoError(t, err)
+	// Explicit chmod to avoid umask affecting permissions
+	err = os.Chmod(manifestPath, 0755)
 	require.NoError(t, err)
 
 	// Verify initial permissions
 	info, err := os.Stat(manifestPath)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0755), info.Mode().Perm(), "initial permissions should be 0755")
+	require.Equal(t, os.FileMode(0755), info.Mode().Perm(), "precondition: initial permissions should be 0755")
 
 	// Create package and config for update
 	pkg := formats.Package{
@@ -99,7 +102,10 @@ func TestIntegration_PermissionsPreserved_MultipleUpdates(t *testing.T) {
 
 	// Create manifest with restrictive permissions
 	content := `{"dependencies": {"express": "4.17.0"}}`
-	err := os.WriteFile(manifestPath, []byte(content), 0600)
+	err := os.WriteFile(manifestPath, []byte(content), 0644)
+	require.NoError(t, err)
+	// Explicit chmod to avoid umask affecting permissions
+	err = os.Chmod(manifestPath, 0600)
 	require.NoError(t, err)
 
 	pkg := formats.Package{
@@ -323,7 +329,10 @@ func TestIntegration_AtomicWritePreservesPermissions(t *testing.T) {
 	testFile := filepath.Join(tmpDir, "test.json")
 
 	// Create file with specific permissions
-	err := os.WriteFile(testFile, []byte(`{"version": "1.0.0"}`), 0700)
+	err := os.WriteFile(testFile, []byte(`{"version": "1.0.0"}`), 0644)
+	require.NoError(t, err)
+	// Explicit chmod to avoid umask affecting permissions
+	err = os.Chmod(testFile, 0700)
 	require.NoError(t, err)
 
 	// Perform multiple atomic writes
@@ -351,7 +360,10 @@ func TestIntegration_BackupRestorePreservesPermissions(t *testing.T) {
 
 	// Create file with specific permissions
 	originalContent := []byte(`{"version": "1.0.0"}`)
-	err := os.WriteFile(testFile, originalContent, 0750)
+	err := os.WriteFile(testFile, originalContent, 0644)
+	require.NoError(t, err)
+	// Explicit chmod to avoid umask affecting permissions
+	err = os.Chmod(testFile, 0750)
 	require.NoError(t, err)
 
 	// Backup the file
@@ -394,7 +406,10 @@ func TestIntegration_ServerScenario_WebAppConfig(t *testing.T) {
 	// Simulate a web app config with group-readable permissions
 	// This is common for configs read by web server processes
 	configContent := `{"dependencies": {"express": "4.17.0", "morgan": "1.10.0"}}`
-	err := os.WriteFile(configPath, []byte(configContent), 0640)
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	require.NoError(t, err)
+	// Explicit chmod to avoid umask affecting permissions
+	err = os.Chmod(configPath, 0640)
 	require.NoError(t, err)
 
 	pkg := formats.Package{
