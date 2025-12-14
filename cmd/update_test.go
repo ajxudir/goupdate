@@ -53,6 +53,7 @@ func TestRunUpdateNoPackages(t *testing.T) {
 	oldDir := updateDirFlag
 	oldConfig := updateConfigFlag
 	oldDryRun := updateDryRunFlag
+	oldOutput := updateOutputFlag
 	defer func() {
 		os.Args = oldArgs
 		updateTypeFlag = oldType
@@ -60,6 +61,7 @@ func TestRunUpdateNoPackages(t *testing.T) {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
+		updateOutputFlag = oldOutput
 	}()
 
 	updateTypeFlag = "all"
@@ -67,6 +69,7 @@ func TestRunUpdateNoPackages(t *testing.T) {
 	updateDirFlag = tmpDir
 	updateConfigFlag = ""
 	updateDryRunFlag = true
+	updateOutputFlag = "" // Ensure table output (default)
 	os.Args = []string{"goupdate", "update", "-d", tmpDir, "--dry-run"}
 
 	output := captureStdout(t, func() {
@@ -234,6 +237,7 @@ func TestRunUpdateWithMockedVersions(t *testing.T) {
 	originalConfig := updateConfigFlag
 	originalDryRun := updateDryRunFlag
 	originalSkipLock := updateSkipLockRun
+	originalOutput := updateOutputFlag
 
 	loadConfigFunc = func(path, workDir string) (*config.Config, error) {
 		return &config.Config{
@@ -277,6 +281,7 @@ func TestRunUpdateWithMockedVersions(t *testing.T) {
 	updateTypeFlag, updatePMFlag, updateDirFlag, updateConfigFlag = "all", "all", ".", ""
 	updateDryRunFlag = true
 	updateSkipLockRun = true
+	updateOutputFlag = "" // Ensure table output (default)
 
 	t.Cleanup(func() {
 		loadConfigFunc = originalLoad
@@ -289,6 +294,7 @@ func TestRunUpdateWithMockedVersions(t *testing.T) {
 		updateConfigFlag = originalConfig
 		updateDryRunFlag = originalDryRun
 		updateSkipLockRun = originalSkipLock
+		updateOutputFlag = originalOutput
 	})
 
 	output := captureStdout(t, func() {
@@ -1455,6 +1461,7 @@ func TestRunUpdateAfterAllValidationFailure(t *testing.T) {
 	oldDry := updateDryRunFlag
 	oldYes := updateYesFlag
 	oldContinue := updateContinueOnFail
+	oldOutput := updateOutputFlag
 	defer func() {
 		loadConfigFunc = oldLoad
 		getPackagesFunc = oldGet
@@ -1469,6 +1476,7 @@ func TestRunUpdateAfterAllValidationFailure(t *testing.T) {
 		updateDryRunFlag = oldDry
 		updateYesFlag = oldYes
 		updateContinueOnFail = oldContinue
+		updateOutputFlag = oldOutput
 	}()
 
 	loadConfigFunc = func(path, workDir string) (*config.Config, error) {
@@ -1522,7 +1530,8 @@ func TestRunUpdateAfterAllValidationFailure(t *testing.T) {
 	updateSkipSystemTests = false // Run system tests (after_all mode)
 	updateDryRunFlag = false      // Actually run updates
 	updateYesFlag = true
-	updateContinueOnFail = true // Allow partial success to be reported
+	updateContinueOnFail = true   // Allow partial success to be reported
+	updateOutputFlag = ""         // Ensure table output (default)
 
 	out := captureStdout(t, func() {
 		err := runUpdate(nil, nil)

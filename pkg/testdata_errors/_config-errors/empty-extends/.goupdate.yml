@@ -1,0 +1,11 @@
+# Test case: Empty extends array with valid rule
+# Expected: Config should load successfully
+extends: []
+
+rules:
+  test:
+    manager: test
+    include: ["*.test"]
+    format: raw
+    fields:
+      packages: prod

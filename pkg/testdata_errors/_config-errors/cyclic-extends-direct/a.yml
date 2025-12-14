@@ -1,0 +1,3 @@
+# Test case: Direct cyclic extends (A extends B, B extends A)
+# Expected: Loading this config should return "cyclic extends" error
+extends: ["b.yml"]

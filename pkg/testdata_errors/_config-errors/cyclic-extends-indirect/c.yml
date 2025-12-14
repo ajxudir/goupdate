@@ -1,0 +1,3 @@
+# Test case: Indirect cyclic extends (A -> B -> C -> A)
+# Part of chain: C extends A (creates cycle)
+extends: ["a.yml"]

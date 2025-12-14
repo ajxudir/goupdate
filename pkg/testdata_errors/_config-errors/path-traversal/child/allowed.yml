@@ -1,0 +1,5 @@
+# Test case: Child config with path traversal explicitly allowed
+# Expected: Loading should succeed when security.allow_path_traversal: true
+security:
+  allow_path_traversal: true
+extends: ["../parent/parent.yml"]

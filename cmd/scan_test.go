@@ -46,14 +46,17 @@ func TestRunScanNoMatches(t *testing.T) {
 	oldArgs := os.Args
 	oldDir := scanDirFlag
 	oldConfig := scanConfigFlag
+	oldOutput := scanOutputFlag
 	defer func() {
 		os.Args = oldArgs
 		scanDirFlag = oldDir
 		scanConfigFlag = oldConfig
+		scanOutputFlag = oldOutput
 	}()
 
 	scanDirFlag = tmpDir
 	scanConfigFlag = ""
+	scanOutputFlag = "" // Ensure table output (default)
 	os.Args = []string{"goupdate", "scan", "-d", tmpDir}
 
 	out := captureStdout(t, func() {

@@ -6,9 +6,11 @@ This directory contains all documentation for goupdate, organized by audience.
 
 ```
 docs/
-├── user/          # User-facing documentation
-├── developer/     # Developer & contributor documentation
-└── internal/      # Internal tracking & progress documents
+├── user/            # User-facing documentation
+├── developer/       # Developer & contributor documentation
+├── checklists/      # Task-specific checklists
+├── agents-progress/ # Agent task progress logs
+└── internal/        # Internal testing documents
 ```
 
 ## User Documentation (`user/`)
@@ -36,12 +38,34 @@ Documentation for contributors and maintainers:
 | [testing.md](developer/testing.md) | Test suite overview and guidelines |
 | [releasing.md](developer/releasing.md) | Release process and versioning |
 
+## Checklists (`checklists/`)
+
+Task-specific checklists for development:
+
+| File | Description |
+|------|-------------|
+| [README.md](checklists/README.md) | Checklist selection guide |
+| [feature-development.md](checklists/feature-development.md) | Adding new features |
+| [bug-fix.md](checklists/bug-fix.md) | Fixing bugs |
+| [refactoring.md](checklists/refactoring.md) | Refactoring code |
+| [test-improvement.md](checklists/test-improvement.md) | Improving test coverage |
+| [test-battle.md](checklists/test-battle.md) | CLI battle testing |
+| [test-chaos.md](checklists/test-chaos.md) | Chaos testing coverage |
+
+## Agent Progress (`agents-progress/`)
+
+Progress logs for AI coding agents (Claude, Codex, etc.):
+
+| File | Description |
+|------|-------------|
+| [README.md](agents-progress/README.md) | Log format and guidelines |
+| `YYYY-MM-DD_task-name.md` | Individual task logs |
+
 ## Internal Documentation (`internal/`)
 
 Internal tracking documents (not user-facing):
 
 | File | Description |
 |------|-------------|
-| [agents-progress/](internal/agents-progress/) | AI agent progress tracking |
 | [testing-progress.md](internal/testing-progress.md) | Testing coverage progress |
-| [chaos-testing.md](internal/chaos-testing.md) | Chaos testing scenarios |
+| [chaos-testing.md](internal/chaos-testing.md) | Detailed chaos testing plan |
