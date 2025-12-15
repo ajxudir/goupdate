@@ -50,6 +50,10 @@ inputs:
     description: '.NET version'
     required: false
     default: '8.0'
+  github-token:
+    description: 'GitHub token for Composer/npm authentication (avoids rate limiting)'
+    required: false
+    default: ''
 
 outputs:
   runtimes-setup:
@@ -157,6 +161,16 @@ runs:
           exit 1
         fi
         echo "composer: $(composer --version | head -1)"
+
+    - name: Configure Composer GitHub OAuth
+      if: inputs.use-php == 'true' && inputs.github-token != ''
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        # Configure GitHub OAuth to avoid rate limiting when downloading packages
+        composer config --global github-oauth.github.com "$GITHUB_TOKEN"
+        echo "Configured Composer with GitHub OAuth token"
 
     # ========================================
     # Python ecosystem
