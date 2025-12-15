@@ -29,17 +29,22 @@ var (
 type filePermissions struct {
 	mode os.FileMode
 	path string
+	uid  int
+	gid  int
 }
 
-// getFilePermissions retrieves the current permissions of a file
+// getFilePermissions retrieves the current permissions and ownership of a file
 func getFilePermissions(path string) (*filePermissions, error) {
 	info, err := statFileFunc(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat file %s: %w", path, err)
 	}
+	uid, gid := getFileOwnership(info)
 	return &filePermissions{
 		mode: info.Mode(),
 		path: path,
+		uid:  uid,
+		gid:  gid,
 	}, nil
 }
 
@@ -55,7 +60,20 @@ func generateTempSuffix() string {
 
 // writeFileAtomic writes content to a file atomically using a temporary file and rename.
 // This prevents corruption if the process is interrupted during write.
+// NOTE: This function checks if the target file is writable before attempting the atomic
+// write, because rename() is a directory operation and may bypass file permissions on
+// some operating systems.
 func writeFileAtomic(path string, content []byte, mode os.FileMode) error {
+	// Check if target file exists and is writable before attempting atomic write
+	// This catches read-only files early, since rename() may bypass file permissions
+	if info, err := statFileFunc(path); err == nil {
+		// File exists - check if it's writable
+		if info.Mode().Perm()&0200 == 0 {
+			// File is not writable by owner
+			return fmt.Errorf("file is read-only: %s", path)
+		}
+	}
+
 	dir := filepath.Dir(path)
 	base := filepath.Base(path)
 
@@ -79,12 +97,12 @@ func writeFileAtomic(path string, content []byte, mode os.FileMode) error {
 	return nil
 }
 
-// writeFilePreservingPermissions writes content to a file while preserving its original permissions.
-// If the file exists, its permissions are preserved. If it doesn't exist, defaultMode is used.
+// writeFilePreservingPermissions writes content to a file while preserving its original permissions and ownership.
+// If the file exists, its permissions and ownership are preserved. If it doesn't exist, defaultMode is used.
 // Uses atomic write (temp file + rename) to prevent corruption on interruption.
-// Warns the user if permissions change unexpectedly after the write operation.
+// Warns the user if permissions or ownership change unexpectedly after the write operation.
 func writeFilePreservingPermissions(path string, content []byte, defaultMode os.FileMode) error {
-	// Get original permissions if file exists
+	// Get original permissions and ownership if file exists
 	origPerms, err := getFilePermissions(path)
 	mode := defaultMode
 
@@ -95,6 +113,14 @@ func writeFilePreservingPermissions(path string, content []byte, defaultMode os.
 	// Use atomic write for safety
 	if writeErr := writeFileAtomic(path, content, mode); writeErr != nil {
 		return writeErr
+	}
+
+	// Restore ownership if we had the original info
+	if origPerms != nil && origPerms.uid >= 0 && origPerms.gid >= 0 {
+		if chownErr := chownFile(path, origPerms.uid, origPerms.gid); chownErr != nil {
+			// Only warn, don't fail - chown may fail if not running as root
+			verbose.Printf("Unable to preserve file ownership for %s: %v\n", path, chownErr)
+		}
 	}
 
 	// Verify permissions after write
@@ -108,6 +134,14 @@ func writeFilePreservingPermissions(path string, content []byte, defaultMode os.
 	if origPerms != nil && newPerms.mode.Perm() != origPerms.mode.Perm() {
 		warnings.Warnf("Warning: file permissions changed for %s: %v -> %v\n",
 			path, origPerms.mode.Perm(), newPerms.mode.Perm())
+	}
+
+	// Check if ownership changed unexpectedly (only warn if we had valid original ownership)
+	if origPerms != nil && origPerms.uid >= 0 && origPerms.gid >= 0 {
+		if newPerms.uid != origPerms.uid || newPerms.gid != origPerms.gid {
+			warnings.Warnf("Warning: file ownership changed for %s: %d:%d -> %d:%d\n",
+				path, origPerms.uid, origPerms.gid, newPerms.uid, newPerms.gid)
+		}
 	}
 
 	return nil
@@ -172,11 +206,34 @@ func backupFiles(paths []string) ([]fileBackup, error) {
 	return backups, nil
 }
 
+// writeFileWithBackupMode writes content to a file and forcefully sets the specified mode.
+// Unlike writeFilePreservingPermissions, this function uses the provided mode instead of
+// preserving the current file's permissions. Used for restore operations where we want
+// to restore the original backed-up permissions.
+func writeFileWithBackupMode(path string, content []byte, mode os.FileMode) error {
+	// Get original ownership if file exists (to restore it after write)
+	origPerms, _ := getFilePermissions(path)
+
+	// Use atomic write
+	if writeErr := writeFileAtomic(path, content, mode); writeErr != nil {
+		return writeErr
+	}
+
+	// Restore ownership if we had the original info
+	if origPerms != nil && origPerms.uid >= 0 && origPerms.gid >= 0 {
+		if chownErr := chownFile(path, origPerms.uid, origPerms.gid); chownErr != nil {
+			verbose.Printf("Unable to preserve file ownership for %s: %v\n", path, chownErr)
+		}
+	}
+
+	return nil
+}
+
 // restoreBackups restores files from their backups after a failed update operation.
 //
 // It performs the following operations:
 //   - Step 1: Iterate through all backups
-//   - Step 2: Write each backup's content back to its original path
+//   - Step 2: Write each backup's content back to its original path with backed-up permissions
 //   - Step 3: Collect any errors that occur during restoration
 //   - Step 4: Log successful restorations
 //
@@ -188,7 +245,8 @@ func backupFiles(paths []string) ([]fileBackup, error) {
 func restoreBackups(backups []fileBackup) []error {
 	var errs []error
 	for _, backup := range backups {
-		if err := writeFileFunc(backup.path, backup.content, backup.mode); err != nil {
+		// Use writeFileWithBackupMode to forcefully restore the backed-up permissions
+		if err := writeFileWithBackupMode(backup.path, backup.content, backup.mode); err != nil {
 			errs = append(errs, fmt.Errorf("failed to restore %s: %w", backup.path, err))
 		} else {
 			verbose.Printf("Restored %s from backup\n", backup.path)
@@ -365,6 +423,12 @@ func updateDeclaredVersion(p formats.Package, target string, cfg *config.Config,
 		return fmt.Errorf("rule configuration missing for %s", p.Rule)
 	}
 
+	// Capture file modification time before read for drift detection
+	var readModTime int64
+	if info, statErr := statFileFunc(p.Source); statErr == nil {
+		readModTime = info.ModTime().UnixNano()
+	}
+
 	content, err := readFileFunc(p.Source)
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", p.Source, err)
@@ -390,6 +454,16 @@ func updateDeclaredVersion(p formats.Package, target string, cfg *config.Config,
 
 	if dryRun {
 		return nil
+	}
+
+	// Check for file drift - another process may have modified the file
+	if readModTime > 0 {
+		if info, statErr := statFileFunc(p.Source); statErr == nil {
+			if info.ModTime().UnixNano() != readModTime {
+				warnings.Warnf("Warning: %s was modified by another process during update\n", p.Source)
+				// Continue anyway - the atomic write will still work, but warn the user
+			}
+		}
 	}
 
 	if writeErr := writeFileFunc(p.Source, updated, 0o644); writeErr != nil {

@@ -27,13 +27,18 @@ system_tests:
       timeout_seconds: 300
       continue_on_fail: true  # Skip if composer not available
 
-    # Start server and verify HTTP response
+    # Start server and verify HTTP 200 response
     - name: http-test
       commands: |
-        php artisan serve --port=8765 & \
-        sleep 3 && \
-        curl -s http://localhost:8765/api/ping | grep -q '"message"' && \
-        curl -s http://localhost:8765/api/health | grep -q '"status"' && \
-        pkill -f "artisan serve" || true && \
-        echo "HTTP tests passed!"
+        php artisan serve --port=8765 &
+        SERVER_PID=$!
+        sleep 3
+        # Check HTTP 200 status and response content
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8765/api/health)
+        BODY=$(curl -s http://localhost:8765/api/health)
+        kill $SERVER_PID 2>/dev/null || true
+        # Verify status is 2xx and response contains expected content
+        [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ] || { echo "HTTP status $STATUS != 2xx"; exit 1; }
+        echo "$BODY" | grep -q '"status"' || { echo "Response missing status field"; exit 1; }
+        echo "HTTP test passed! Status: $STATUS"
       timeout_seconds: 60

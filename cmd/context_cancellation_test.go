@@ -471,9 +471,9 @@ extends:
 
 	_ = listCmd.Execute()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 
 	// Should produce some output (even if just empty results)
 	assert.NotEmpty(t, buf.String())
@@ -529,7 +529,7 @@ func TestLockFile_PermissionDenied(t *testing.T) {
 	// Create lock file with no read permission
 	lockPath := filepath.Join(tmpDir, "package-lock.json")
 	require.NoError(t, os.WriteFile(lockPath, []byte(`{}`), 0000))
-	defer os.Chmod(lockPath, 0644) // Restore permissions for cleanup
+	t.Cleanup(func() { _ = os.Chmod(lockPath, 0644) })
 
 	// Reading should fail with permission denied
 	_, err := os.ReadFile(lockPath)
@@ -718,7 +718,7 @@ func TestErrorHandling_VeryLongPath(t *testing.T) {
 	}
 
 	// If it succeeded, clean up
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 	// Verify we can write to the long path
 	testFile := filepath.Join(longPath, "test.txt")

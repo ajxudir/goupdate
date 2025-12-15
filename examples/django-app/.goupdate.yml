@@ -47,15 +47,20 @@ system_tests:
         DJANGO_SETTINGS_MODULE: "myapp.settings"
       continue_on_fail: true  # Skip if pytest not installed
 
-    # Start server and verify HTTP response
+    # Start server and verify HTTP 200 response
     - name: http-test
       commands: |
-        python manage.py runserver 0.0.0.0:8765 & \
-        sleep 3 && \
-        curl -s http://localhost:8765/ping/ | grep -q '"message"' && \
-        curl -s http://localhost:8765/health/ | grep -q '"status"' && \
-        pkill -f "manage.py runserver" || true && \
-        echo "HTTP tests passed!"
+        python manage.py runserver 0.0.0.0:8765 &
+        SERVER_PID=$!
+        sleep 3
+        # Check HTTP 200 status and response content
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8765/health/)
+        BODY=$(curl -s http://localhost:8765/health/)
+        kill $SERVER_PID 2>/dev/null || true
+        # Verify status is 2xx and response contains expected content
+        [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ] || { echo "HTTP status $STATUS != 2xx"; exit 1; }
+        echo "$BODY" | grep -q '"status"' || { echo "Response missing status field"; exit 1; }
+        echo "HTTP test passed! Status: $STATUS"
       timeout_seconds: 60
       env:
         DJANGO_SETTINGS_MODULE: "myapp.settings"

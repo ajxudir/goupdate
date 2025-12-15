@@ -14,6 +14,8 @@ Run these to verify existing chaos coverage before adding new tests:
 | `pkg/update/chaos_test.go` | 811 | Filesystem errors, rollback, concurrent access |
 | `pkg/outdated/chaos_versioning_test.go` | 849 | Version parsing, malformed versions |
 | `pkg/config/chaos_config_test.go` | 841 | Config loading, validation errors |
+| `pkg/update/permissions_chaos_test.go` | ~200 | Permissions preservation, umask effects |
+| `pkg/update/rollback_chaos_test.go` | ~250 | Backup/restore, rollback permissions |
 
 ```bash
 # Run all existing chaos tests (parallel)
@@ -68,6 +70,54 @@ go test ./... -count=1
 
 # Run chaos test on specific package
 ./scripts/chaos-test.sh pkg/config/loader.go
+```
+
+---
+
+## Lessons Learned & Known Gotchas
+
+### File Permissions Testing
+
+| Issue | Root Cause | Solution |
+|-------|------------|----------|
+| `os.WriteFile()` doesn't set exact permissions | Umask affects permissions | Always call `os.Chmod(path, mode)` after `WriteFile` in tests |
+| Tests pass even when permissions not preserved | Test checks current perms, not if preservation worked | Chaos test: verify feature CHANGES behavior when removed |
+| Root user bypasses permission checks | Root can read/write anything | Skip permission tests when `os.Getuid() == 0` |
+
+### Backup/Restore Testing
+
+| Issue | Root Cause | Solution |
+|-------|------------|----------|
+| Restore preserves CURRENT permissions not BACKED-UP | Used `writeFilePreservingPermissions()` | Use `writeFileWithBackupMode()` for explicit mode restore |
+| Backup doesn't capture permissions | Only captured content | `fileBackup` struct must include `mode os.FileMode` |
+| File ownership not preserved on servers | Chown requires capturing uid/gid | Platform-specific `getFileOwnership()` / `chownFile()` |
+
+### Test Pollution Prevention
+
+| Issue | Root Cause | Solution |
+|-------|------------|----------|
+| Flags leak between tests | Package-level flag variables | Use `t.Cleanup()` to restore original values |
+| `defer` doesn't prevent pollution | defer runs after test but before cleanup | `t.Cleanup()` runs AFTER test completes |
+
+### False Positive Detection
+
+To ensure tests catch real failures:
+
+1. **Mutation Test**: Comment out the feature being tested - tests MUST fail
+2. **Inverse Test**: Verify test fails when behavior is broken
+3. **Value Verification**: Don't just check for errors, verify actual values changed
+4. **State Comparison**: Compare before/after states, not just final state
+
+```go
+// BAD: Only checks final state
+finalPerms := getPerms(file)
+if finalPerms != expectedPerms { ... }
+
+// GOOD: Verifies the feature actually preserved something
+originalPerms := getPerms(file)
+modifyFile(file)  // This should preserve permissions
+finalPerms := getPerms(file)
+if finalPerms != originalPerms { ... }  // Compares against ORIGINAL
 ```
 
 ---

@@ -844,6 +844,6 @@ func BenchmarkFilterNewerVersions(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		FilterNewerVersions("1.0.0", versions, nil)
+		_, _ = FilterNewerVersions("1.0.0", versions, nil)
 	}
 }

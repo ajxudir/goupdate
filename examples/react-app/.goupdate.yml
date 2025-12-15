@@ -52,12 +52,18 @@ system_tests:
       commands: npm run build
       timeout_seconds: 300
 
-    # Start preview server and verify HTTP response
+    # Start preview server and verify HTTP 200 response
     - name: http-test
       commands: |
-        npm run preview -- --port 4173 & \
-        sleep 3 && \
-        curl -s http://localhost:4173/ | grep -q "React Dashboard" && \
-        pkill -f "vite preview" || true && \
-        echo "HTTP test passed!"
+        npm run preview -- --port 4173 &
+        SERVER_PID=$!
+        sleep 3
+        # Check HTTP 200 status and response content
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4173/)
+        BODY=$(curl -s http://localhost:4173/)
+        kill $SERVER_PID 2>/dev/null || pkill -f "vite preview" || true
+        # Verify status is 2xx and response contains expected content
+        [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ] || { echo "HTTP status $STATUS != 2xx"; exit 1; }
+        echo "$BODY" | grep -q "React Dashboard" || { echo "Response missing expected content"; exit 1; }
+        echo "HTTP test passed! Status: $STATUS"
       timeout_seconds: 60

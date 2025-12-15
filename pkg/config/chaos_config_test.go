@@ -126,7 +126,7 @@ func TestChaos_Security_PathTraversal(t *testing.T) {
 	// Create a parent config
 	parentConfig := filepath.Join(parentDir, "parent-test-config.yml")
 	require.NoError(t, os.WriteFile(parentConfig, []byte("rules: {}"), 0644))
-	defer os.Remove(parentConfig)
+	t.Cleanup(func() { _ = os.Remove(parentConfig) })
 
 	testCases := []struct {
 		name        string

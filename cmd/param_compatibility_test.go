@@ -875,14 +875,14 @@ func TestParamCompat_ErrorHandling_JSON(t *testing.T) {
 		{
 			name: "invalid_package_json",
 			setupFunc: func(tmpDir string) {
-				os.WriteFile(filepath.Join(tmpDir, "package.json"), []byte("not json"), 0644)
+				_ = os.WriteFile(filepath.Join(tmpDir, "package.json"), []byte("not json"), 0644)
 			},
 			expectError: true,
 		},
 		{
 			name: "malformed_json",
 			setupFunc: func(tmpDir string) {
-				os.WriteFile(filepath.Join(tmpDir, "package.json"), []byte(`{"name": }`), 0644)
+				_ = os.WriteFile(filepath.Join(tmpDir, "package.json"), []byte(`{"name": }`), 0644)
 			},
 			expectError: true,
 		},
