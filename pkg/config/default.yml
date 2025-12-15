@@ -121,9 +121,10 @@ rules:
         json_key: "versions"
       timeout_seconds: 30
     update:
-      # composer install updates lock file based on composer.json after version is changed
+      # composer update with specific package name updates only the changed package
+      # NOTE: Do NOT use --with-all-dependencies as it updates dependencies recursively
       commands: |
-        composer install --no-interaction --no-scripts
+        composer update {{package}} --no-interaction --no-scripts
       timeout_seconds: 300
     lock_files:
       - files: ["**/composer.lock"]

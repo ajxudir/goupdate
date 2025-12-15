@@ -13,6 +13,15 @@ import (
 	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
+// versionsMatch compares two version strings, normalizing the 'v' prefix.
+// This handles cases where one version has 'v' prefix (e.g., "v3.16.1") and the other doesn't ("3.16.1").
+func versionsMatch(v1, v2 string) bool {
+	normalize := func(v string) string {
+		return strings.TrimPrefix(strings.TrimSpace(v), "v")
+	}
+	return normalize(v1) == normalize(v2)
+}
+
 // PackageUpdater is a function type for updating a package to a target version.
 type PackageUpdater func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error
 
@@ -58,13 +67,13 @@ func ValidateUpdatedPackage(plan *PlannedUpdate, reloadList func() ([]formats.Pa
 	verbose.Printf("After reload - %s: declared=%s, installed=%s (target=%s)\n",
 		plan.Res.Pkg.Name, found.Version, found.InstalledVersion, plan.Res.Target)
 
-	if strings.TrimSpace(found.Version) != strings.TrimSpace(plan.Res.Target) {
+	if !versionsMatch(found.Version, plan.Res.Target) {
 		verbose.Printf("Declared version mismatch for %s: expected %s, got %s\n",
 			plan.Res.Pkg.Name, plan.Res.Target, found.Version)
 		return fmt.Errorf("version mismatch after update: expected %s, found %s", plan.Res.Target, found.Version)
 	}
 
-	if found.InstalledVersion != "" && found.InstalledVersion != constants.PlaceholderNA && strings.TrimSpace(found.InstalledVersion) != strings.TrimSpace(plan.Res.Target) {
+	if found.InstalledVersion != "" && found.InstalledVersion != constants.PlaceholderNA && !versionsMatch(found.InstalledVersion, plan.Res.Target) {
 		verbose.Printf("Installed version mismatch for %s: expected %s, got %s (lock file not updated)\n",
 			plan.Res.Pkg.Name, plan.Res.Target, found.InstalledVersion)
 		return fmt.Errorf("installed version mismatch after update: expected %s, got %s (lock file may not have been updated)", plan.Res.Target, found.InstalledVersion)

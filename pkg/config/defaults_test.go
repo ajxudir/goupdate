@@ -48,12 +48,14 @@ func TestDefaultConfigIncludesUpdateCommands(t *testing.T) {
 		assert.NotEmpty(t, npm.Update.Commands, "rule %s should have Commands", ruleName)
 	}
 
-	// Test composer uses general install command (no package-specific args)
+	// Test composer uses package-specific update command
+	// Unlike npm which can use general install, composer needs explicit package name
+	// to avoid updating all packages to latest within constraints
 	composer := cfg.Rules["composer"]
 	require.NotNil(t, composer.Update)
-	assert.Contains(t, composer.Update.Commands, "composer install")
-	// Should not have package-specific placeholders
-	assert.NotContains(t, composer.Update.Commands, "{{package}}")
+	assert.Contains(t, composer.Update.Commands, "composer update")
+	// Should have package-specific placeholder for targeted updates
+	assert.Contains(t, composer.Update.Commands, "{{package}}")
 
 	// Test Go mod uses go mod tidy (not go get with package-specific args)
 	goMod := cfg.Rules["mod"]
