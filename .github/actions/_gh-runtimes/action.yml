@@ -80,8 +80,9 @@ runs:
       if: inputs.use-node == 'true'
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ steps.node-version-file.outputs.file && '' || inputs.node-version }}
-        node-version-file: ${{ steps.node-version-file.outputs.file }}
+        # Only set node-version when no version file exists
+        node-version: ${{ steps.node-version-file.outputs.file == '' && inputs.node-version || '' }}
+        node-version-file: ${{ steps.node-version-file.outputs.file || '' }}
 
     - name: Verify Node.js installation
       if: inputs.use-node == 'true'
@@ -175,8 +176,9 @@ runs:
       if: inputs.use-python == 'true'
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ steps.python-version-file.outputs.file && '' || inputs.python-version }}
-        python-version-file: ${{ steps.python-version-file.outputs.file }}
+        # Only set python-version when no version file exists
+        python-version: ${{ steps.python-version-file.outputs.file == '' && inputs.python-version || '' }}
+        python-version-file: ${{ steps.python-version-file.outputs.file || '' }}
 
     - name: Verify Python installation
       if: inputs.use-python == 'true'
@@ -207,8 +209,9 @@ runs:
       if: inputs.use-go == 'true'
       uses: actions/setup-go@v5
       with:
-        go-version: ${{ steps.go-version-file.outputs.file && '' || inputs.go-version }}
-        go-version-file: ${{ steps.go-version-file.outputs.file }}
+        # Only set go-version when no version file exists
+        go-version: ${{ steps.go-version-file.outputs.file == '' && inputs.go-version || '' }}
+        go-version-file: ${{ steps.go-version-file.outputs.file || '' }}
 
     - name: Verify Go installation
       if: inputs.use-go == 'true'
@@ -238,8 +241,9 @@ runs:
       if: inputs.use-dotnet == 'true'
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ steps.dotnet-version-file.outputs.file && '' || inputs.dotnet-version }}
-        global-json-file: ${{ steps.dotnet-version-file.outputs.file }}
+        # Only set dotnet-version when no version file exists
+        dotnet-version: ${{ steps.dotnet-version-file.outputs.file == '' && inputs.dotnet-version || '' }}
+        global-json-file: ${{ steps.dotnet-version-file.outputs.file || '' }}
 
     - name: Verify .NET installation
       if: inputs.use-dotnet == 'true'
