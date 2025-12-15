@@ -140,9 +140,25 @@ const DefaultMaxConfigFileSize = 10 * 1024 * 1024
 // DefaultMaxRegexComplexity is the default maximum regex pattern length.
 const DefaultMaxRegexComplexity = 1000
 
+// PackageSettings holds per-package configuration options within groups or at the package manager level.
+type PackageSettings struct {
+	// WithAllDependencies enables updating with all dependencies (-W flag for composer).
+	// When true, the update command includes transitive dependencies.
+	WithAllDependencies bool `yaml:"with_all_dependencies,omitempty"`
+}
+
 // GroupCfg holds group configuration for package grouping.
 type GroupCfg struct {
+	// Packages is the list of package names in this group.
 	Packages []string `yaml:"-"`
+
+	// WithAllDependencies enables updating with all dependencies for the entire group.
+	// This applies -W flag (or equivalent) for all packages in the group.
+	WithAllDependencies bool `yaml:"-"`
+
+	// PackageSettings holds per-package settings within the group.
+	// Key is the package name, value is the settings for that package.
+	PackageSettings map[string]PackageSettings `yaml:"-"`
 }
 
 // PackageManagerCfg holds configuration for a package manager rule.
@@ -154,6 +170,9 @@ type PackageManagerCfg struct {
 	Include           []string                      `yaml:"include"`
 	Exclude           []string                      `yaml:"exclude,omitempty"`
 	Groups            map[string]GroupCfg           `yaml:"groups,omitempty"`
+	// Packages holds per-package settings for individual packages outside of groups.
+	// Key is the package name, value is the settings for that package.
+	Packages          map[string]PackageSettings    `yaml:"packages,omitempty"`
 	Format            string                        `yaml:"format"`
 	Fields            map[string]string             `yaml:"fields"`
 	Ignore            []string                      `yaml:"ignore,omitempty"`
@@ -185,6 +204,62 @@ func (p *PackageManagerCfg) IsEnabled() bool {
 		return true
 	}
 	return *p.Enabled
+}
+
+// ShouldUpdateWithAllDependencies returns true if the package should be updated
+// with all its dependencies (e.g., -W flag for composer).
+//
+// Resolution order (first match wins):
+//  1. Individual package settings in rules.<manager>.packages.<package>
+//  2. Per-package settings within a group
+//  3. Group-level with_all_dependencies setting
+//
+// Parameters:
+//   - packageName: the name of the package to check
+//
+// Returns:
+//   - bool: true if the package should be updated with all dependencies
+func (p *PackageManagerCfg) ShouldUpdateWithAllDependencies(packageName string) bool {
+	// Check individual package settings first (highest priority)
+	if p.Packages != nil {
+		if settings, ok := p.Packages[packageName]; ok {
+			if settings.WithAllDependencies {
+				return true
+			}
+		}
+	}
+
+	// Check group settings
+	for _, group := range p.Groups {
+		// Check if package is in this group
+		inGroup := false
+		for _, pkg := range group.Packages {
+			if pkg == packageName {
+				inGroup = true
+				break
+			}
+		}
+
+		if !inGroup {
+			continue
+		}
+
+		// Check per-package settings within group (higher priority than group-level)
+		if group.PackageSettings != nil {
+			if settings, ok := group.PackageSettings[packageName]; ok {
+				if settings.WithAllDependencies {
+					return true
+				}
+			}
+		}
+
+		// Check group-level setting
+		if group.WithAllDependencies {
+			return true
+		}
+	}
+
+	return false
 }
 
 // LatestMappingCfg holds configuration for mapping version tokens to latest values.

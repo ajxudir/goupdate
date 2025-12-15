@@ -8,9 +8,21 @@ extends: [default]
 
 rules:
   # PHP/Composer dependencies
-  # No groups needed - packages update independently
-  # System tests catch any incompatibilities
-  composer: {}
+  # Some packages need --with-all-dependencies (-W) flag to update transitive dependencies
+  # This is required when composer.lock has sub-dependencies that need updating together
+  composer:
+    packages:
+      # Packages with complex transitive dependencies that require -W flag
+      sentry/sentry-laravel:
+        with_all_dependencies: true
+      intervention/image:
+        with_all_dependencies: true
+      maatwebsite/excel:
+        with_all_dependencies: true
+      phpoffice/phpspreadsheet:
+        with_all_dependencies: true
+      spatie/laravel-medialibrary:
+        with_all_dependencies: true
 
   # Node.js/npm dependencies (frontend assets)
   npm:

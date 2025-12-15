@@ -299,7 +299,17 @@ func processGroupWithGroupLock(ctx *UpdateContext, plans []*PlannedUpdate, group
 	}
 
 	if len(*applied) > 0 && groupErr == nil && !ctx.DryRun {
-		lockErr := RunGroupLockCommand(groupUpdateCfg, ctx.WorkDir)
+		// Check if any package in the group needs -W flag (with all dependencies)
+		withAllDeps := false
+		for _, plan := range *applied {
+			if ruleCfg, ok := ctx.Cfg.Rules[plan.Res.Pkg.Rule]; ok {
+				if ruleCfg.ShouldUpdateWithAllDependencies(plan.Res.Pkg.Name) {
+					withAllDeps = true
+					break
+				}
+			}
+		}
+		lockErr := RunGroupLockCommand(groupUpdateCfg, ctx.WorkDir, withAllDeps)
 		if lockErr != nil {
 			groupErr = lockErr
 			ctx.AppendFailure(fmt.Errorf("group lock failed: %w", lockErr))
@@ -681,7 +691,17 @@ func processGroupWithGroupLockProgress(ctx *UpdateContext, plans []*PlannedUpdat
 	}
 
 	if len(*applied) > 0 && groupErr == nil && !ctx.DryRun {
-		lockErr := RunGroupLockCommand(groupUpdateCfg, ctx.WorkDir)
+		// Check if any package in the group needs -W flag (with all dependencies)
+		withAllDeps := false
+		for _, plan := range *applied {
+			if ruleCfg, ok := ctx.Cfg.Rules[plan.Res.Pkg.Rule]; ok {
+				if ruleCfg.ShouldUpdateWithAllDependencies(plan.Res.Pkg.Name) {
+					withAllDeps = true
+					break
+				}
+			}
+		}
+		lockErr := RunGroupLockCommand(groupUpdateCfg, ctx.WorkDir, withAllDeps)
 		if lockErr != nil {
 			groupErr = lockErr
 			ctx.AppendFailure(fmt.Errorf("group lock failed: %w", lockErr))

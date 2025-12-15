@@ -8,9 +8,12 @@ rules:
     # Only group packages with actual version coupling
     groups:
       # Laravel core - sanctum has peer dep on framework
+      # Use with_all_dependencies for complex transitive dependencies
       laravel:
-        - laravel/framework
-        - laravel/sanctum
+        with_all_dependencies: true
+        packages:
+          - laravel/framework
+          - laravel/sanctum
 
     # Note: Pre-release filtering inherits from default config
     # Default patterns exclude: alpha, beta, rc, dev, canary, snapshot, nightly, preview, next
