@@ -256,12 +256,18 @@ Each rule under `rules:` controls discovery, parsing, and lock-file handling:
 | `incremental` | `[]string` | Packages requiring step-by-step updates | `["react", "service-.*"]` |
 
 **Groups example:**
+
+Groups can be defined in two formats:
+1. **Simple list format** - just package names
+2. **Map format** - when you need `with_all_dependencies` or other settings
+
 ```yaml
 groups:
+  # Simple list format (most common)
   frontend:
     - react
     - react-dom
-  # Group with transitive dependency flag for composer
+  # Map format with settings (for composer -W flag)
   laravel:
     with_all_dependencies: true
     packages:
