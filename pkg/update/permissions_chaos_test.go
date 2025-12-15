@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -239,6 +240,85 @@ func TestChaos_OwnershipActuallyExtracted(t *testing.T) {
 	stat := info.Sys().(*syscall.Stat_t)
 	assert.Equal(t, int(stat.Uid), uid, "uid should match syscall")
 	assert.Equal(t, int(stat.Gid), gid, "gid should match syscall")
+}
+
+// mockFileInfo is a mock implementation of os.FileInfo that returns nil from Sys()
+type mockFileInfo struct {
+	name    string
+	size    int64
+	mode    os.FileMode
+	modTime int64
+	isDir   bool
+}
+
+func (m mockFileInfo) Name() string       { return m.name }
+func (m mockFileInfo) Size() int64        { return m.size }
+func (m mockFileInfo) Mode() os.FileMode  { return m.mode }
+func (m mockFileInfo) ModTime() time.Time { return time.Unix(m.modTime, 0) }
+func (m mockFileInfo) IsDir() bool        { return m.isDir }
+func (m mockFileInfo) Sys() interface{}   { return nil } // Return nil to trigger fallback
+
+// TestChaos_OwnershipWithNilSys verifies that getFileOwnership returns -1, -1
+// when Sys() doesn't return *syscall.Stat_t (coverage for fallback branch).
+func TestChaos_OwnershipWithNilSys(t *testing.T) {
+	// Use mock FileInfo that returns nil from Sys()
+	mock := mockFileInfo{
+		name: "test.txt",
+		size: 100,
+		mode: 0644,
+	}
+
+	uid, gid := getFileOwnership(mock)
+
+	// Should return -1, -1 when Sys() doesn't return *syscall.Stat_t
+	assert.Equal(t, -1, uid, "uid should be -1 when Sys() returns nil")
+	assert.Equal(t, -1, gid, "gid should be -1 when Sys() returns nil")
+}
+
+// TestChaos_ChownFileWithValidIds verifies chownFile works with valid uid/gid.
+func TestChaos_ChownFileWithValidIds(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.txt")
+
+	err := os.WriteFile(testFile, []byte("content"), 0644)
+	require.NoError(t, err)
+
+	// Get current uid/gid
+	info, err := os.Stat(testFile)
+	require.NoError(t, err)
+	uid, gid := getFileOwnership(info)
+
+	// chownFile with current uid/gid should succeed (no actual change)
+	err = chownFile(testFile, uid, gid)
+	assert.NoError(t, err, "chownFile with valid ids should succeed")
+
+	// Verify ownership unchanged
+	info2, err := os.Stat(testFile)
+	require.NoError(t, err)
+	uid2, gid2 := getFileOwnership(info2)
+	assert.Equal(t, uid, uid2, "uid should be unchanged")
+	assert.Equal(t, gid, gid2, "gid should be unchanged")
+}
+
+// TestChaos_ChownFileWithNegativeIds verifies chownFile returns nil for -1 ids.
+func TestChaos_ChownFileWithNegativeIds(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.txt")
+
+	err := os.WriteFile(testFile, []byte("content"), 0644)
+	require.NoError(t, err)
+
+	// chownFile with -1 uid should return nil without calling os.Chown
+	err = chownFile(testFile, -1, 1000)
+	assert.NoError(t, err, "chownFile with uid=-1 should return nil")
+
+	// chownFile with -1 gid should return nil without calling os.Chown
+	err = chownFile(testFile, 1000, -1)
+	assert.NoError(t, err, "chownFile with gid=-1 should return nil")
+
+	// chownFile with both -1 should return nil
+	err = chownFile(testFile, -1, -1)
+	assert.NoError(t, err, "chownFile with both=-1 should return nil")
 }
 
 // TestChaos_OwnershipPreservationWithDifferentOwner tests ownership preservation
