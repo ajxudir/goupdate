@@ -92,7 +92,7 @@ func TestIntegration_UpdateNPM_RealExecution(t *testing.T) {
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -105,7 +105,7 @@ func TestIntegration_UpdateNPM_RealExecution(t *testing.T) {
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution (NOT dry-run)
 	updateDirFlag = tmpDir
@@ -204,7 +204,7 @@ func main() {}
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -217,7 +217,7 @@ func main() {}
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution
 	updateDirFlag = tmpDir
@@ -302,7 +302,7 @@ flask==2.0.0
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -315,7 +315,7 @@ flask==2.0.0
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution
 	updateDirFlag = tmpDir
@@ -401,7 +401,7 @@ func TestIntegration_UpdatePNPM_RealExecution(t *testing.T) {
 	oldRule := updateRuleFlag
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -412,7 +412,7 @@ func TestIntegration_UpdatePNPM_RealExecution(t *testing.T) {
 		updateRuleFlag = oldRule
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
-	}()
+	})
 
 	// Configure for real execution
 	updateDirFlag = tmpDir
@@ -493,7 +493,7 @@ func TestIntegration_UpdateYarn_RealExecution(t *testing.T) {
 	oldRule := updateRuleFlag
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -504,7 +504,7 @@ func TestIntegration_UpdateYarn_RealExecution(t *testing.T) {
 		updateRuleFlag = oldRule
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
-	}()
+	})
 
 	// Configure for real execution
 	updateDirFlag = tmpDir
@@ -578,7 +578,7 @@ func TestIntegration_UpdateComposer_RealExecution(t *testing.T) {
 	oldRule := updateRuleFlag
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -589,7 +589,7 @@ func TestIntegration_UpdateComposer_RealExecution(t *testing.T) {
 		updateRuleFlag = oldRule
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
-	}()
+	})
 
 	// Configure for real execution
 	updateDirFlag = tmpDir
@@ -665,7 +665,7 @@ func TestIntegration_UpdateDotnet_RealExecution(t *testing.T) {
 	oldRule := updateRuleFlag
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -676,7 +676,7 @@ func TestIntegration_UpdateDotnet_RealExecution(t *testing.T) {
 		updateRuleFlag = oldRule
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
-	}()
+	})
 
 	// Configure for real execution
 	updateDirFlag = tmpDir
@@ -768,7 +768,7 @@ func TestIntegration_ManifestModification_NPM(t *testing.T) {
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldMinor := updateMinorFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -781,7 +781,7 @@ func TestIntegration_ManifestModification_NPM(t *testing.T) {
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updateMinorFlag = oldMinor
-	}()
+	})
 
 	// Configure for real execution with minor update
 	updateDirFlag = tmpDir
@@ -883,7 +883,7 @@ func main() {}
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -896,7 +896,7 @@ func main() {}
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution
 	updateDirFlag = tmpDir
@@ -985,7 +985,7 @@ rules:
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldContinue := updateContinueOnFail
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -997,7 +997,7 @@ rules:
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updateContinueOnFail = oldContinue
-	}()
+	})
 
 	// Configure for real execution with invalid lock command
 	updateDirFlag = tmpDir
@@ -1081,7 +1081,7 @@ func TestIntegration_ConcurrentUpdates(t *testing.T) {
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldContinue := updateContinueOnFail
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -1093,7 +1093,7 @@ func TestIntegration_ConcurrentUpdates(t *testing.T) {
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updateContinueOnFail = oldContinue
-	}()
+	})
 
 	// Configure for real execution
 	updateDirFlag = tmpDir
@@ -1185,7 +1185,7 @@ func TestIntegration_ComposerTargetedUpdate_OnlySpecifiedPackageUpdated(t *testi
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -1198,7 +1198,7 @@ func TestIntegration_ComposerTargetedUpdate_OnlySpecifiedPackageUpdated(t *testi
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution - target only monolog/monolog
 	updateDirFlag = tmpDir
@@ -1340,7 +1340,7 @@ func TestIntegration_NPMTargetedUpdate_OnlySpecifiedPackageUpdated(t *testing.T)
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -1353,7 +1353,7 @@ func TestIntegration_NPMTargetedUpdate_OnlySpecifiedPackageUpdated(t *testing.T)
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution - target only is-odd
 	updateDirFlag = tmpDir
@@ -1496,7 +1496,7 @@ func main() {}
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -1509,7 +1509,7 @@ func main() {}
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution - target only github.com/pkg/errors
 	updateDirFlag = tmpDir
@@ -1628,7 +1628,7 @@ func TestIntegration_PNPMTargetedUpdate_OnlySpecifiedPackageUpdated(t *testing.T
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -1641,7 +1641,7 @@ func TestIntegration_PNPMTargetedUpdate_OnlySpecifiedPackageUpdated(t *testing.T
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution - target only is-odd
 	updateDirFlag = tmpDir
@@ -1732,7 +1732,7 @@ func TestIntegration_YarnTargetedUpdate_OnlySpecifiedPackageUpdated(t *testing.T
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -1745,7 +1745,7 @@ func TestIntegration_YarnTargetedUpdate_OnlySpecifiedPackageUpdated(t *testing.T
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution - target only is-odd
 	updateDirFlag = tmpDir
@@ -1854,7 +1854,7 @@ rules:
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
 	oldGroup := updateGroupFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -1868,7 +1868,7 @@ rules:
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
 		updateGroupFlag = oldGroup
-	}()
+	})
 
 	// Configure for real execution - target the psr-core group
 	updateDirFlag = tmpDir
@@ -1996,7 +1996,7 @@ rules:
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
 	oldGroup := updateGroupFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -2010,7 +2010,7 @@ rules:
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
 		updateGroupFlag = oldGroup
-	}()
+	})
 
 	// Configure for real execution - target the is-checks group
 	updateDirFlag = tmpDir
@@ -2156,7 +2156,7 @@ rules:
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
 	oldGroup := updateGroupFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -2170,7 +2170,7 @@ rules:
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
 		updateGroupFlag = oldGroup
-	}()
+	})
 
 	// Configure for real execution - target the github-pkgs group
 	updateDirFlag = tmpDir
@@ -2313,7 +2313,7 @@ rules:
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
 	oldGroup := updateGroupFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -2327,7 +2327,7 @@ rules:
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
 		updateGroupFlag = oldGroup
-	}()
+	})
 
 	// Configure for real execution - target the is-checks group
 	updateDirFlag = tmpDir
@@ -2489,7 +2489,7 @@ rules:
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
 	oldGroup := updateGroupFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -2503,7 +2503,7 @@ rules:
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
 		updateGroupFlag = oldGroup
-	}()
+	})
 
 	// Configure for real execution - target the is-checks group
 	updateDirFlag = tmpDir
@@ -2672,7 +2672,7 @@ system_tests:
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -2685,7 +2685,7 @@ system_tests:
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution with system tests enabled
 	updateDirFlag = tmpDir
@@ -2804,7 +2804,7 @@ system_tests:
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -2817,7 +2817,7 @@ system_tests:
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution with system tests enabled
 	updateDirFlag = tmpDir
@@ -2925,7 +2925,7 @@ system_tests:
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -2938,7 +2938,7 @@ system_tests:
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution with system tests enabled
 	updateDirFlag = tmpDir
@@ -3049,7 +3049,7 @@ rules:
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -3062,7 +3062,7 @@ rules:
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution
 	updateDirFlag = tmpDir
@@ -3166,7 +3166,7 @@ system_tests:
 	oldType := updateTypeFlag
 	oldPM := updatePMFlag
 	oldPatch := updatePatchFlag
-	defer func() {
+	t.Cleanup(func() {
 		updateDirFlag = oldDir
 		updateConfigFlag = oldConfig
 		updateDryRunFlag = oldDryRun
@@ -3179,7 +3179,7 @@ system_tests:
 		updateTypeFlag = oldType
 		updatePMFlag = oldPM
 		updatePatchFlag = oldPatch
-	}()
+	})
 
 	// Configure for real execution with system tests
 	updateDirFlag = tmpDir

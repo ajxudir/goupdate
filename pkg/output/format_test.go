@@ -223,3 +223,96 @@ func TestFormatter_WriteXML_Error(t *testing.T) {
 	err := f.WriteXML(unmarshalableXML{})
 	assert.Error(t, err)
 }
+
+// TestValidateStructuredOutputFlags tests the behavior of ValidateStructuredOutputFlags.
+//
+// It verifies:
+//   - Returns nil for non-structured formats regardless of verbose flag
+//   - Returns error when verbose is true with structured formats
+//   - Returns nil when verbose is false with structured formats
+func TestValidateStructuredOutputFlags(t *testing.T) {
+	tests := []struct {
+		name      string
+		format    Format
+		verbose   bool
+		expectErr bool
+	}{
+		// Table format (non-structured) - should always pass
+		{"table format, verbose=false", FormatTable, false, false},
+		{"table format, verbose=true", FormatTable, true, false},
+
+		// JSON format (structured)
+		{"json format, verbose=false", FormatJSON, false, false},
+		{"json format, verbose=true", FormatJSON, true, true},
+
+		// CSV format (structured)
+		{"csv format, verbose=false", FormatCSV, false, false},
+		{"csv format, verbose=true", FormatCSV, true, true},
+
+		// XML format (structured)
+		{"xml format, verbose=false", FormatXML, false, false},
+		{"xml format, verbose=true", FormatXML, true, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateStructuredOutputFlags(tt.format, tt.verbose)
+			if tt.expectErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "--verbose is not supported")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestValidateUpdateStructuredFlags tests the behavior of ValidateUpdateStructuredFlags.
+//
+// It verifies:
+//   - Returns nil for non-structured formats regardless of yes/dryRun flags
+//   - Returns error when neither yes nor dryRun is true with structured formats
+//   - Returns nil when yes or dryRun is true with structured formats
+func TestValidateUpdateStructuredFlags(t *testing.T) {
+	tests := []struct {
+		name      string
+		format    Format
+		yes       bool
+		dryRun    bool
+		expectErr bool
+	}{
+		// Table format (non-structured) - should always pass
+		{"table format, yes=false, dryRun=false", FormatTable, false, false, false},
+		{"table format, yes=true, dryRun=false", FormatTable, true, false, false},
+		{"table format, yes=false, dryRun=true", FormatTable, false, true, false},
+		{"table format, yes=true, dryRun=true", FormatTable, true, true, false},
+
+		// JSON format (structured)
+		{"json format, yes=false, dryRun=false", FormatJSON, false, false, true},
+		{"json format, yes=true, dryRun=false", FormatJSON, true, false, false},
+		{"json format, yes=false, dryRun=true", FormatJSON, false, true, false},
+		{"json format, yes=true, dryRun=true", FormatJSON, true, true, false},
+
+		// CSV format (structured)
+		{"csv format, yes=false, dryRun=false", FormatCSV, false, false, true},
+		{"csv format, yes=true, dryRun=false", FormatCSV, true, false, false},
+		{"csv format, yes=false, dryRun=true", FormatCSV, false, true, false},
+
+		// XML format (structured)
+		{"xml format, yes=false, dryRun=false", FormatXML, false, false, true},
+		{"xml format, yes=true, dryRun=false", FormatXML, true, false, false},
+		{"xml format, yes=false, dryRun=true", FormatXML, false, true, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateUpdateStructuredFlags(tt.format, tt.yes, tt.dryRun)
+			if tt.expectErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "requires --yes or --dry-run")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
