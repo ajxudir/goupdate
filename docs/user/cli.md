@@ -105,11 +105,19 @@ goupdate outdated -o csv
 goupdate scan --output xml
 ```
 
-When using these flags:
-- Live table output is replaced with a progress indicator (shown on stderr)
+When using structured output formats:
+- Progress messages are completely suppressed (not shown on stderr)
 - The structured output is written to stdout after processing completes
-- For `update`, confirmation prompts are skipped (like `--yes`)
 - Output includes summary statistics, package data, warnings, and errors
+- `--verbose` flag is not supported (will return an error)
+- For `update`, you must specify `--yes` or `--dry-run` (interactive prompts not supported)
+
+**Update command with structured output:**
+```bash
+# Must use --yes or --dry-run with structured output
+goupdate update --output json --yes
+goupdate update --output json --dry-run
+```
 
 ## list
 

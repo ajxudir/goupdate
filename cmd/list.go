@@ -70,6 +70,12 @@ func init() {
 // Returns:
 //   - error: Returns error on config or parsing failure
 func runList(cmd *cobra.Command, args []string) error {
+	// Validate flag compatibility before proceeding
+	outputFormat := getListOutputFormat()
+	if err := output.ValidateStructuredOutputFlags(outputFormat, verboseFlag); err != nil {
+		return err
+	}
+
 	collector := &display.WarningCollector{}
 	restoreWarnings := warnings.SetWarningWriter(collector)
 	defer restoreWarnings()
@@ -107,8 +113,6 @@ func runList(cmd *cobra.Command, args []string) error {
 			unsupported.Add(p, supervision.DeriveUnsupportedReason(p, cfg, nil, false))
 		}
 	}
-
-	outputFormat := getListOutputFormat()
 
 	if len(pkgs) == 0 {
 		if output.IsStructuredFormat(outputFormat) {

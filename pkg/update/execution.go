@@ -653,7 +653,9 @@ func processGroupWithGroupLockProgress(ctx *UpdateContext, plans []*PlannedUpdat
 				ctx.Unsupported.Add(res.Pkg, callbacks.DeriveReason(res.Pkg, ctx.Cfg, res.Err, false))
 			}
 			*results = append(*results, *res)
-			progress.Increment()
+			if progress != nil {
+				progress.Increment()
+			}
 			continue
 		}
 
@@ -698,7 +700,9 @@ func processGroupWithGroupLockProgress(ctx *UpdateContext, plans []*PlannedUpdat
 				ctx.Unsupported.Add(plan.Res.Pkg, callbacks.DeriveReason(plan.Res.Pkg, ctx.Cfg, plan.Res.Err, false))
 			}
 			*results = append(*results, plan.Res)
-			progress.Increment()
+			if progress != nil {
+				progress.Increment()
+			}
 		}
 	} else {
 		for _, plan := range *applied {
@@ -706,7 +710,9 @@ func processGroupWithGroupLockProgress(ctx *UpdateContext, plans []*PlannedUpdat
 				ctx.Unsupported.Add(plan.Res.Pkg, callbacks.DeriveReason(plan.Res.Pkg, ctx.Cfg, plan.Res.Err, false))
 			}
 			*results = append(*results, plan.Res)
-			progress.Increment()
+			if progress != nil {
+				progress.Increment()
+			}
 		}
 	}
 
@@ -740,7 +746,9 @@ func processGroupPerPackageProgress(ctx *UpdateContext, plans []*PlannedUpdate, 
 				ctx.Unsupported.Add(res.Pkg, callbacks.DeriveReason(res.Pkg, ctx.Cfg, res.Err, false))
 			}
 			*results = append(*results, *res)
-			progress.Increment()
+			if progress != nil {
+				progress.Increment()
+			}
 			continue
 		}
 
@@ -754,7 +762,9 @@ func processGroupPerPackageProgress(ctx *UpdateContext, plans []*PlannedUpdate, 
 				ctx.Unsupported.Add(res.Pkg, callbacks.DeriveReason(res.Pkg, ctx.Cfg, res.Err, false))
 			}
 			*results = append(*results, *res)
-			progress.Increment()
+			if progress != nil {
+				progress.Increment()
+			}
 			continue
 		}
 
@@ -770,7 +780,9 @@ func processGroupPerPackageProgress(ctx *UpdateContext, plans []*PlannedUpdate, 
 					ctx.Unsupported.Add(res.Pkg, callbacks.DeriveReason(res.Pkg, ctx.Cfg, res.Err, false))
 				}
 				*results = append(*results, *res)
+				if progress != nil {
 				progress.Increment()
+			}
 				continue
 			}
 		}
@@ -783,7 +795,9 @@ func processGroupPerPackageProgress(ctx *UpdateContext, plans []*PlannedUpdate, 
 			ctx.Unsupported.Add(res.Pkg, callbacks.DeriveReason(res.Pkg, ctx.Cfg, res.Err, false))
 		}
 		*results = append(*results, *res)
-		progress.Increment()
+		if progress != nil {
+			progress.Increment()
+		}
 	}
 
 	return groupErr
