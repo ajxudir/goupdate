@@ -1022,6 +1022,208 @@ func TestIntegration_WriteToJSONFile_List(t *testing.T) {
 	assert.Empty(t, issues, "list JSON output file should not contain plain text: %v", issues)
 }
 
+// TestIntegration_WriteToJSONFile_Outdated writes outdated output to a .json file and validates it.
+//
+// This test simulates: goupdate outdated -o json > outdated.json
+// It verifies that:
+//   - Only JSON goes to stdout (the file)
+//   - Progress messages go to stderr (not captured)
+//   - The resulting file contains valid JSON
+func TestIntegration_WriteToJSONFile_Outdated(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	tmpDir := t.TempDir()
+
+	// Create package.json with dependency
+	packageJSON := `{"name": "test", "dependencies": {"is-odd": "^3.0.0"}}`
+	err := os.WriteFile(filepath.Join(tmpDir, "package.json"), []byte(packageJSON), 0644)
+	require.NoError(t, err)
+
+	// Output file
+	outputFile := filepath.Join(tmpDir, "outdated_result.json")
+
+	// Save and restore flags
+	oldDir := outdatedDirFlag
+	oldConfig := outdatedConfigFlag
+	oldOutput := outdatedOutputFlag
+	oldType := outdatedTypeFlag
+	oldPM := outdatedPMFlag
+	oldSkipPreflight := outdatedSkipPreflight
+	defer func() {
+		outdatedDirFlag = oldDir
+		outdatedConfigFlag = oldConfig
+		outdatedOutputFlag = oldOutput
+		outdatedTypeFlag = oldType
+		outdatedPMFlag = oldPM
+		outdatedSkipPreflight = oldSkipPreflight
+	}()
+
+	outdatedDirFlag = tmpDir
+	outdatedConfigFlag = ""
+	outdatedOutputFlag = "json"
+	outdatedTypeFlag = "all"
+	outdatedPMFlag = "all"
+	outdatedSkipPreflight = true
+
+	// Capture stdout and command error
+	var cmdErr error
+	output := captureStdout(t, func() {
+		cmdErr = runOutdated(nil, nil)
+	})
+
+	// Log any command error for debugging
+	if cmdErr != nil {
+		t.Logf("runOutdated (JSON) returned error: %v", cmdErr)
+	}
+
+	// Write to actual file
+	err = os.WriteFile(outputFile, []byte(output), 0644)
+	require.NoError(t, err)
+
+	// Validate the file
+	data, err := validateJSONFile(outputFile)
+	assert.NoError(t, err, "outdated output file should contain valid JSON")
+	_ = data // May be nil if no packages found
+
+	// Check for corruption - particularly progress messages
+	issues := checkFileForCorruption(outputFile)
+	assert.Empty(t, issues, "outdated JSON output file should not contain plain text: %v", issues)
+
+	// Specifically verify no progress messages in output
+	content, _ := os.ReadFile(outputFile)
+	assert.False(t, strings.Contains(string(content), "Checking packages"),
+		"JSON output file should not contain progress messages - they should go to stderr")
+}
+
+// TestIntegration_WriteToXMLFile_Outdated writes outdated output to a .xml file and validates it.
+func TestIntegration_WriteToXMLFile_Outdated(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	tmpDir := t.TempDir()
+
+	// Create package.json with dependency
+	packageJSON := `{"name": "test", "dependencies": {"is-odd": "^3.0.0"}}`
+	err := os.WriteFile(filepath.Join(tmpDir, "package.json"), []byte(packageJSON), 0644)
+	require.NoError(t, err)
+
+	// Output file
+	outputFile := filepath.Join(tmpDir, "outdated_result.xml")
+
+	// Save and restore flags
+	oldDir := outdatedDirFlag
+	oldConfig := outdatedConfigFlag
+	oldOutput := outdatedOutputFlag
+	oldType := outdatedTypeFlag
+	oldPM := outdatedPMFlag
+	oldSkipPreflight := outdatedSkipPreflight
+	defer func() {
+		outdatedDirFlag = oldDir
+		outdatedConfigFlag = oldConfig
+		outdatedOutputFlag = oldOutput
+		outdatedTypeFlag = oldType
+		outdatedPMFlag = oldPM
+		outdatedSkipPreflight = oldSkipPreflight
+	}()
+
+	outdatedDirFlag = tmpDir
+	outdatedConfigFlag = ""
+	outdatedOutputFlag = "xml"
+	outdatedTypeFlag = "all"
+	outdatedPMFlag = "all"
+	outdatedSkipPreflight = true
+
+	// Capture stdout and command error
+	var cmdErr error
+	output := captureStdout(t, func() {
+		cmdErr = runOutdated(nil, nil)
+	})
+
+	// Log any command error for debugging
+	if cmdErr != nil {
+		t.Logf("runOutdated (XML) returned error: %v", cmdErr)
+	}
+
+	// Write to actual file
+	err = os.WriteFile(outputFile, []byte(output), 0644)
+	require.NoError(t, err)
+
+	// Validate the file
+	err = validateXMLFile(outputFile)
+	assert.NoError(t, err, "outdated output file should contain valid XML")
+
+	// Check for corruption
+	issues := checkFileForCorruption(outputFile)
+	assert.Empty(t, issues, "outdated XML output file should not contain plain text: %v", issues)
+}
+
+// TestIntegration_WriteToCSVFile_Outdated writes outdated output to a .csv file and validates it.
+func TestIntegration_WriteToCSVFile_Outdated(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	tmpDir := t.TempDir()
+
+	// Create package.json with dependency
+	packageJSON := `{"name": "test", "dependencies": {"is-odd": "^3.0.0"}}`
+	err := os.WriteFile(filepath.Join(tmpDir, "package.json"), []byte(packageJSON), 0644)
+	require.NoError(t, err)
+
+	// Output file
+	outputFile := filepath.Join(tmpDir, "outdated_result.csv")
+
+	// Save and restore flags
+	oldDir := outdatedDirFlag
+	oldConfig := outdatedConfigFlag
+	oldOutput := outdatedOutputFlag
+	oldType := outdatedTypeFlag
+	oldPM := outdatedPMFlag
+	oldSkipPreflight := outdatedSkipPreflight
+	defer func() {
+		outdatedDirFlag = oldDir
+		outdatedConfigFlag = oldConfig
+		outdatedOutputFlag = oldOutput
+		outdatedTypeFlag = oldType
+		outdatedPMFlag = oldPM
+		outdatedSkipPreflight = oldSkipPreflight
+	}()
+
+	outdatedDirFlag = tmpDir
+	outdatedConfigFlag = ""
+	outdatedOutputFlag = "csv"
+	outdatedTypeFlag = "all"
+	outdatedPMFlag = "all"
+	outdatedSkipPreflight = true
+
+	// Capture stdout and command error
+	var cmdErr error
+	output := captureStdout(t, func() {
+		cmdErr = runOutdated(nil, nil)
+	})
+
+	// Log any command error for debugging
+	if cmdErr != nil {
+		t.Logf("runOutdated (CSV) returned error: %v", cmdErr)
+	}
+
+	// Write to actual file
+	err = os.WriteFile(outputFile, []byte(output), 0644)
+	require.NoError(t, err)
+
+	// Validate the file
+	rows, err := validateCSVFile(outputFile)
+	assert.NoError(t, err, "outdated output file should contain valid CSV")
+	assert.NotNil(t, rows, "outdated CSV output should not be empty")
+
+	// Check for corruption
+	issues := checkFileForCorruption(outputFile)
+	assert.Empty(t, issues, "outdated CSV output file should not contain plain text: %v", issues)
+}
+
 // TestIntegration_WriteToJSONFile_Update_DryRun writes update --dry-run output to a .json file.
 func TestIntegration_WriteToJSONFile_Update_DryRun(t *testing.T) {
 	if testing.Short() {
@@ -1688,6 +1890,9 @@ func TestIntegration_AllCommands_XMLFileOutput(t *testing.T) {
 	oldScanDir, oldScanConfig, oldScanOutput := scanDirFlag, scanConfigFlag, scanOutputFlag
 	oldListDir, oldListConfig, oldListOutput := listDirFlag, listConfigFlag, listOutputFlag
 	oldListType, oldListPM := listTypeFlag, listPMFlag
+	oldOutdatedDir, oldOutdatedConfig, oldOutdatedOutput := outdatedDirFlag, outdatedConfigFlag, outdatedOutputFlag
+	oldOutdatedType, oldOutdatedPM := outdatedTypeFlag, outdatedPMFlag
+	oldOutdatedSkipPreflight := outdatedSkipPreflight
 	oldUpdateDir, oldUpdateConfig, oldUpdateOutput := updateDirFlag, updateConfigFlag, updateOutputFlag
 	oldUpdateDryRun, oldUpdateYes := updateDryRunFlag, updateYesFlag
 	oldUpdateSkipPreflight, oldUpdateSkipSystemTests := updateSkipPreflight, updateSkipSystemTests
@@ -1697,6 +1902,9 @@ func TestIntegration_AllCommands_XMLFileOutput(t *testing.T) {
 		scanDirFlag, scanConfigFlag, scanOutputFlag = oldScanDir, oldScanConfig, oldScanOutput
 		listDirFlag, listConfigFlag, listOutputFlag = oldListDir, oldListConfig, oldListOutput
 		listTypeFlag, listPMFlag = oldListType, oldListPM
+		outdatedDirFlag, outdatedConfigFlag, outdatedOutputFlag = oldOutdatedDir, oldOutdatedConfig, oldOutdatedOutput
+		outdatedTypeFlag, outdatedPMFlag = oldOutdatedType, oldOutdatedPM
+		outdatedSkipPreflight = oldOutdatedSkipPreflight
 		updateDirFlag, updateConfigFlag, updateOutputFlag = oldUpdateDir, oldUpdateConfig, oldUpdateOutput
 		updateDryRunFlag, updateYesFlag = oldUpdateDryRun, oldUpdateYes
 		updateSkipPreflight, updateSkipSystemTests = oldUpdateSkipPreflight, oldUpdateSkipSystemTests
@@ -1735,6 +1943,18 @@ func TestIntegration_AllCommands_XMLFileOutput(t *testing.T) {
 				listPMFlag = "all"
 			},
 			runCmd: func() error { return runList(nil, nil) },
+		},
+		{
+			name: "outdated",
+			setupFunc: func() {
+				outdatedDirFlag = tmpDir
+				outdatedConfigFlag = ""
+				outdatedOutputFlag = "xml"
+				outdatedTypeFlag = "all"
+				outdatedPMFlag = "all"
+				outdatedSkipPreflight = true
+			},
+			runCmd: func() error { return runOutdated(nil, nil) },
 		},
 		{
 			name: "update_dryrun",
@@ -1799,6 +2019,9 @@ func TestIntegration_AllCommands_CSVFileOutput(t *testing.T) {
 	oldScanDir, oldScanConfig, oldScanOutput := scanDirFlag, scanConfigFlag, scanOutputFlag
 	oldListDir, oldListConfig, oldListOutput := listDirFlag, listConfigFlag, listOutputFlag
 	oldListType, oldListPM := listTypeFlag, listPMFlag
+	oldOutdatedDir, oldOutdatedConfig, oldOutdatedOutput := outdatedDirFlag, outdatedConfigFlag, outdatedOutputFlag
+	oldOutdatedType, oldOutdatedPM := outdatedTypeFlag, outdatedPMFlag
+	oldOutdatedSkipPreflight := outdatedSkipPreflight
 	oldUpdateDir, oldUpdateConfig, oldUpdateOutput := updateDirFlag, updateConfigFlag, updateOutputFlag
 	oldUpdateDryRun, oldUpdateYes := updateDryRunFlag, updateYesFlag
 	oldUpdateSkipPreflight, oldUpdateSkipSystemTests := updateSkipPreflight, updateSkipSystemTests
@@ -1808,6 +2031,9 @@ func TestIntegration_AllCommands_CSVFileOutput(t *testing.T) {
 		scanDirFlag, scanConfigFlag, scanOutputFlag = oldScanDir, oldScanConfig, oldScanOutput
 		listDirFlag, listConfigFlag, listOutputFlag = oldListDir, oldListConfig, oldListOutput
 		listTypeFlag, listPMFlag = oldListType, oldListPM
+		outdatedDirFlag, outdatedConfigFlag, outdatedOutputFlag = oldOutdatedDir, oldOutdatedConfig, oldOutdatedOutput
+		outdatedTypeFlag, outdatedPMFlag = oldOutdatedType, oldOutdatedPM
+		outdatedSkipPreflight = oldOutdatedSkipPreflight
 		updateDirFlag, updateConfigFlag, updateOutputFlag = oldUpdateDir, oldUpdateConfig, oldUpdateOutput
 		updateDryRunFlag, updateYesFlag = oldUpdateDryRun, oldUpdateYes
 		updateSkipPreflight, updateSkipSystemTests = oldUpdateSkipPreflight, oldUpdateSkipSystemTests
@@ -1846,6 +2072,18 @@ func TestIntegration_AllCommands_CSVFileOutput(t *testing.T) {
 				listPMFlag = "all"
 			},
 			runCmd: func() error { return runList(nil, nil) },
+		},
+		{
+			name: "outdated",
+			setupFunc: func() {
+				outdatedDirFlag = tmpDir
+				outdatedConfigFlag = ""
+				outdatedOutputFlag = "csv"
+				outdatedTypeFlag = "all"
+				outdatedPMFlag = "all"
+				outdatedSkipPreflight = true
+			},
+			runCmd: func() error { return runOutdated(nil, nil) },
 		},
 		{
 			name: "update_dryrun",
