@@ -121,10 +121,10 @@ rules:
         json_key: "versions"
       timeout_seconds: 30
     update:
-      # composer update with specific package updates only the changed package
-      # --with-all-dependencies ensures related dependencies are also updated
+      # composer update with specific package name updates only the changed package
+      # NOTE: Do NOT use --with-all-dependencies as it updates dependencies recursively
       commands: |
-        composer update {{package}} --no-interaction --no-scripts --with-all-dependencies
+        composer update {{package}} --no-interaction --no-scripts
       timeout_seconds: 300
     lock_files:
       - files: ["**/composer.lock"]
