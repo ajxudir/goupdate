@@ -53,7 +53,12 @@ func NewProgress(writer io.Writer, total int, message string) *Progress {
 //
 // Parameters:
 //   - enabled: true to enable progress output; false to disable
+//
+// If the receiver is nil, this method is a no-op (nil-safe).
 func (p *Progress) SetEnabled(enabled bool) {
+	if p == nil {
+		return
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.enabled = enabled
@@ -66,7 +71,11 @@ func (p *Progress) SetEnabled(enabled bool) {
 //   - Step 2: Renders progress outside the critical section to prevent I/O deadlocks
 //
 // This method is thread-safe and can be called concurrently from multiple goroutines.
+// If the receiver is nil, this method is a no-op (nil-safe).
 func (p *Progress) Increment() {
+	if p == nil {
+		return
+	}
 	p.mu.Lock()
 	p.current++
 	current := p.current
@@ -89,7 +98,11 @@ func (p *Progress) Increment() {
 //   - current: The step number to set (0 to total)
 //
 // This method is thread-safe.
+// If the receiver is nil, this method is a no-op (nil-safe).
 func (p *Progress) SetCurrent(current int) {
+	if p == nil {
+		return
+	}
 	p.mu.Lock()
 	p.current = current
 	total := p.total
@@ -109,7 +122,11 @@ func (p *Progress) SetCurrent(current int) {
 //   - Step 3: Prints a newline to move past the progress line
 //
 // This should be called when the operation completes successfully.
+// If the receiver is nil, this method is a no-op (nil-safe).
 func (p *Progress) Done() {
+	if p == nil {
+		return
+	}
 	p.mu.Lock()
 	p.current = p.total
 	current := p.current
@@ -128,7 +145,11 @@ func (p *Progress) Done() {
 // This overwrites the current progress line with spaces and returns the cursor
 // to the beginning. Useful when you need to print other content without the
 // progress indicator interfering.
+// If the receiver is nil, this method is a no-op (nil-safe).
 func (p *Progress) Clear() {
+	if p == nil {
+		return
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.enabled && p.lastWidth > 0 {

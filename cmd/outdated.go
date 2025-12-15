@@ -104,6 +104,12 @@ const (
 // Returns:
 //   - error: Returns ExitError with appropriate code on failure
 func runOutdated(cmd *cobra.Command, args []string) error {
+	// Validate flag compatibility before proceeding
+	outputFormat := getOutdatedOutputFormat()
+	if err := output.ValidateStructuredOutputFlags(outputFormat, verboseFlag); err != nil {
+		return err
+	}
+
 	collector := &display.WarningCollector{}
 	restoreWarnings := warnings.SetWarningWriter(collector)
 	defer restoreWarnings()
@@ -143,8 +149,6 @@ func runOutdated(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	outputFormat := getOutdatedOutputFormat()
-
 	if len(packages) == 0 {
 		if output.IsStructuredFormat(outputFormat) {
 			return printOutdatedStructured(nil, collector.Messages(), nil, outputFormat)
@@ -164,12 +168,10 @@ func runOutdated(cmd *cobra.Command, args []string) error {
 
 	ordered := filtering.SortPackagesForDisplay(packages)
 
-	// For structured output, use progress indicator instead of live table output
+	// For structured output, suppress progress entirely (no stderr output)
+	// Progress messages are only shown in table (interactive) mode
 	useStructuredOutput := output.IsStructuredFormat(outputFormat)
-	var progress *output.Progress
-	if useStructuredOutput {
-		progress = output.NewProgress(os.Stderr, len(ordered), "Checking packages")
-	}
+	var progress *output.Progress // nil for structured output - Progress methods are nil-safe
 
 	var table *output.Table
 	if !useStructuredOutput {

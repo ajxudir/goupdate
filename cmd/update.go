@@ -107,6 +107,15 @@ func init() {
 // Returns:
 //   - error: Returns ExitError with appropriate code on failure
 func runUpdate(cmd *cobra.Command, args []string) error {
+	// Validate flag compatibility before proceeding
+	outputFormat := output.ParseFormat(updateOutputFlag)
+	if err := output.ValidateStructuredOutputFlags(outputFormat, verboseFlag); err != nil {
+		return err
+	}
+	if err := output.ValidateUpdateStructuredFlags(outputFormat, updateYesFlag, updateDryRunFlag); err != nil {
+		return err
+	}
+
 	collector := &display.WarningCollector{}
 	restoreWarnings := warnings.SetWarningWriter(collector)
 	defer restoreWarnings()
@@ -145,8 +154,6 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 			unsupported.Add(p, supervision.DeriveUnsupportedReason(p, cfg, nil, false))
 		}
 	}
-
-	outputFormat := output.ParseFormat(updateOutputFlag)
 
 	if len(packages) == 0 {
 		if output.IsStructuredFormat(outputFormat) {
@@ -231,10 +238,9 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	if useStructuredOutput {
-		// Process with progress indicator
-		progress := output.NewProgress(os.Stderr, len(groupedPlans), "Processing updates")
-		update.ProcessGroupedPlansWithProgress(updateCtx, groupedPlans, &results, progress, callbacks)
-		progress.Done()
+		// Process without progress indicator - structured output suppresses stderr
+		// Progress messages are only shown in table (interactive) mode
+		update.ProcessGroupedPlansWithProgress(updateCtx, groupedPlans, &results, nil, callbacks)
 
 		var errStrings []string
 		for _, e := range updateCtx.Failures {

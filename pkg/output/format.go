@@ -62,6 +62,57 @@ func IsStructuredFormat(f Format) bool {
 	return f == FormatCSV || f == FormatJSON || f == FormatXML
 }
 
+// ValidateStructuredOutputFlags validates that flags are compatible with structured output formats.
+//
+// When using structured output (JSON, CSV, XML), certain interactive and verbose flags
+// are not supported because:
+//   - Progress messages are suppressed (not sent to stderr)
+//   - Verbose output would corrupt the structured data
+//   - Interactive prompts are not compatible with machine-readable output
+//
+// Parameters:
+//   - format: The output format being used
+//   - verbose: Whether --verbose flag is enabled
+//
+// Returns:
+//   - error: Validation error describing the incompatible flags, or nil if valid
+func ValidateStructuredOutputFlags(format Format, verbose bool) error {
+	if !IsStructuredFormat(format) {
+		return nil
+	}
+
+	if verbose {
+		return fmt.Errorf("--verbose is not supported with structured output formats (--output %s)\n  💡 Use table format (default) for verbose output, or use --output json/csv/xml without --verbose", format)
+	}
+
+	return nil
+}
+
+// ValidateUpdateStructuredFlags validates update command flags for structured output.
+//
+// When using structured output with the update command, either --yes or --dry-run
+// must be specified because interactive confirmation prompts are not compatible
+// with machine-readable output.
+//
+// Parameters:
+//   - format: The output format being used
+//   - yes: Whether --yes flag is enabled (skip confirmation)
+//   - dryRun: Whether --dry-run flag is enabled (preview only)
+//
+// Returns:
+//   - error: Validation error if neither flag is set with structured output, or nil if valid
+func ValidateUpdateStructuredFlags(format Format, yes, dryRun bool) error {
+	if !IsStructuredFormat(format) {
+		return nil
+	}
+
+	if !yes && !dryRun {
+		return fmt.Errorf("structured output (--output %s) requires --yes or --dry-run\n  💡 Use --yes to skip confirmation, or --dry-run to preview changes without prompts", format)
+	}
+
+	return nil
+}
+
 // Formatter handles writing data in a specific format.
 //
 // Fields:
