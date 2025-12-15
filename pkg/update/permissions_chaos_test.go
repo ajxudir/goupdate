@@ -138,10 +138,13 @@ func TestChaos_VerifyContentActuallyChanges(t *testing.T) {
 		"CHAOS TEST FAILED: Updated content should NOT contain old version")
 }
 
-// TestChaos_PermissionsNotPreservedWithoutFeature tests that if we bypass the
-// preservation mechanism, permissions DO change.
+// TestChaos_PermissionsNotPreservedWithoutFeature tests that if we delete and
+// recreate a file (simulating a naive implementation), permissions DO change.
 //
 // This validates that our test would catch a bug if the feature were broken.
+// NOTE: os.WriteFile only sets permissions when CREATING a new file, not when
+// truncating an existing one. So we must delete first to simulate what happens
+// with atomic write (temp file + rename) if we don't restore permissions.
 // NOTE: This test is skipped when running as root because root can bypass
 // permission restrictions and the behavior differs.
 func TestChaos_PermissionsNotPreservedWithoutFeature(t *testing.T) {
@@ -163,7 +166,11 @@ func TestChaos_PermissionsNotPreservedWithoutFeature(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0700), info.Mode().Perm())
 
-	// Write directly with os.WriteFile (bypassing our preservation)
+	// Simulate atomic write WITHOUT permission preservation:
+	// Delete and recreate (this is what would happen with temp+rename
+	// if we didn't explicitly restore the mode after rename)
+	err = os.Remove(testFile)
+	require.NoError(t, err)
 	err = os.WriteFile(testFile, []byte("updated"), 0644)
 	require.NoError(t, err)
 
@@ -172,8 +179,9 @@ func TestChaos_PermissionsNotPreservedWithoutFeature(t *testing.T) {
 	require.NoError(t, err)
 
 	// The key assertion: permissions should NOT be 0700 anymore
+	// (they will be 0644 minus umask, but definitely not 0700)
 	assert.NotEqual(t, os.FileMode(0700), info.Mode().Perm(),
-		"CHAOS TEST FAILED: Direct os.WriteFile should change permissions, proving our test can detect the difference")
+		"CHAOS TEST FAILED: Delete+recreate should change permissions, proving our test can detect the difference")
 }
 
 // TestChaos_PreservationFeatureWorks tests that writeFilePreservingPermissions

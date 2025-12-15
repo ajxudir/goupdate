@@ -60,7 +60,20 @@ func generateTempSuffix() string {
 
 // writeFileAtomic writes content to a file atomically using a temporary file and rename.
 // This prevents corruption if the process is interrupted during write.
+// NOTE: This function checks if the target file is writable before attempting the atomic
+// write, because rename() is a directory operation and may bypass file permissions on
+// some operating systems.
 func writeFileAtomic(path string, content []byte, mode os.FileMode) error {
+	// Check if target file exists and is writable before attempting atomic write
+	// This catches read-only files early, since rename() may bypass file permissions
+	if info, err := statFileFunc(path); err == nil {
+		// File exists - check if it's writable
+		if info.Mode().Perm()&0200 == 0 {
+			// File is not writable by owner
+			return fmt.Errorf("file is read-only: %s", path)
+		}
+	}
+
 	dir := filepath.Dir(path)
 	base := filepath.Base(path)
 
