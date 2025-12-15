@@ -188,10 +188,34 @@ func (r *Result) formatResults(showPassing bool) string {
 		sb.WriteString(fmt.Sprintf("  %s %-40s [%s]\n", icon, t.Name, durationStr))
 
 		if !t.Passed && t.Error != nil {
-			// Show first line of error
+			// Show all error lines (not just first) for better debugging
 			errLines := strings.Split(t.Error.Error(), "\n")
-			if len(errLines) > 0 {
-				sb.WriteString(fmt.Sprintf("    └─ %s\n", errLines[0]))
+			for i, line := range errLines {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				if i == 0 {
+					sb.WriteString(fmt.Sprintf("    └─ %s\n", line))
+				} else {
+					sb.WriteString(fmt.Sprintf("       %s\n", line))
+				}
+			}
+			// Also show output if available and not already in error
+			if t.Output != "" && !strings.Contains(t.Error.Error(), t.Output) {
+				outputLines := strings.Split(strings.TrimSpace(t.Output), "\n")
+				// Show last 10 lines of output for context
+				start := 0
+				if len(outputLines) > 10 {
+					start = len(outputLines) - 10
+					sb.WriteString(fmt.Sprintf("       ... (%d lines truncated)\n", start))
+				}
+				for _, line := range outputLines[start:] {
+					line = strings.TrimSpace(line)
+					if line != "" {
+						sb.WriteString(fmt.Sprintf("       %s\n", line))
+					}
+				}
 			}
 		}
 	}
