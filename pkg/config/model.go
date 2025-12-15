@@ -140,7 +140,7 @@ const DefaultMaxConfigFileSize = 10 * 1024 * 1024
 // DefaultMaxRegexComplexity is the default maximum regex pattern length.
 const DefaultMaxRegexComplexity = 1000
 
-// PackageSettings holds per-package configuration options within groups or at the package manager level.
+// PackageSettings holds per-package configuration options at the package manager level.
 type PackageSettings struct {
 	// WithAllDependencies enables updating with all dependencies (-W flag for composer).
 	// When true, the update command includes transitive dependencies.
@@ -155,10 +155,6 @@ type GroupCfg struct {
 	// WithAllDependencies enables updating with all dependencies for the entire group.
 	// This applies -W flag (or equivalent) for all packages in the group.
 	WithAllDependencies bool `yaml:"-"`
-
-	// PackageSettings holds per-package settings within the group.
-	// Key is the package name, value is the settings for that package.
-	PackageSettings map[string]PackageSettings `yaml:"-"`
 }
 
 // PackageManagerCfg holds configuration for a package manager rule.
@@ -211,8 +207,7 @@ func (p *PackageManagerCfg) IsEnabled() bool {
 //
 // Resolution order (first match wins):
 //  1. Individual package settings in rules.<manager>.packages.<package>
-//  2. Per-package settings within a group
-//  3. Group-level with_all_dependencies setting
+//  2. Group-level with_all_dependencies setting (if package is in a group)
 //
 // Parameters:
 //   - packageName: the name of the package to check
@@ -229,7 +224,7 @@ func (p *PackageManagerCfg) ShouldUpdateWithAllDependencies(packageName string) 
 		}
 	}
 
-	// Check group settings
+	// Check group-level settings
 	for _, group := range p.Groups {
 		// Check if package is in this group
 		inGroup := false
@@ -242,15 +237,6 @@ func (p *PackageManagerCfg) ShouldUpdateWithAllDependencies(packageName string) 
 
 		if !inGroup {
 			continue
-		}
-
-		// Check per-package settings within group (higher priority than group-level)
-		if group.PackageSettings != nil {
-			if settings, ok := group.PackageSettings[packageName]; ok {
-				if settings.WithAllDependencies {
-					return true
-				}
-			}
 		}
 
 		// Check group-level setting

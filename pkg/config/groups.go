@@ -10,11 +10,9 @@ import (
 
 // UnmarshalYAML implements custom YAML unmarshaling for GroupCfg.
 //
-// This allows groups to be specified in multiple formats:
+// This allows groups to be specified in two formats:
 //   - Simple list: ["pkg1", "pkg2"]
-//   - Map with packages: {packages: ["pkg1", "pkg2"]}
 //   - Map with settings: {with_all_dependencies: true, packages: ["pkg1", "pkg2"]}
-//   - Map with per-package settings: {packages: [{name: "pkg1", with_all_dependencies: true}]}
 //
 // Parameters:
 //   - value: the YAML node to unmarshal
@@ -24,12 +22,11 @@ import (
 func (g *GroupCfg) UnmarshalYAML(value *yaml.Node) error {
 	switch value.Kind {
 	case yaml.SequenceNode:
-		packages, pkgSettings, err := parseGroupSequenceWithSettings(value.Content)
+		packages, err := parseGroupSequence(value.Content)
 		if err != nil {
 			return err
 		}
 		g.Packages = packages
-		g.PackageSettings = pkgSettings
 		return nil
 	case yaml.MappingNode:
 		if len(value.Content)%2 != 0 {
@@ -37,7 +34,6 @@ func (g *GroupCfg) UnmarshalYAML(value *yaml.Node) error {
 		}
 
 		packages := make([]string, 0)
-		pkgSettings := make(map[string]PackageSettings)
 		for i := 0; i < len(value.Content); i += 2 {
 			key := strings.TrimSpace(value.Content[i].Value)
 			node := value.Content[i+1]
@@ -47,14 +43,11 @@ func (g *GroupCfg) UnmarshalYAML(value *yaml.Node) error {
 				if node.Kind != yaml.SequenceNode {
 					return fmt.Errorf("group %s must be a sequence", key)
 				}
-				parsed, settings, err := parseGroupSequenceWithSettings(node.Content)
+				parsed, err := parseGroupSequence(node.Content)
 				if err != nil {
 					return err
 				}
 				packages = append(packages, parsed...)
-				for k, v := range settings {
-					pkgSettings[k] = v
-				}
 			case "with_all_dependencies":
 				if node.Kind == yaml.ScalarNode {
 					g.WithAllDependencies = node.Value == "true"
@@ -65,30 +58,25 @@ func (g *GroupCfg) UnmarshalYAML(value *yaml.Node) error {
 		}
 
 		g.Packages = packages
-		g.PackageSettings = pkgSettings
 		return nil
 	default:
 		return fmt.Errorf("group configuration must be a sequence or map")
 	}
 }
 
-// parseGroupSequenceWithSettings parses a YAML sequence into package names and settings.
+// parseGroupSequence parses a YAML sequence into a list of package names.
 //
-// This handles multiple entry formats:
-//   - Simple string: "pkg1"
-//   - Map with name only: {name: "pkg1"}
-//   - Map with settings: {name: "pkg1", with_all_dependencies: true}
+// This handles both simple string entries and map entries with a "name" field.
+// Empty strings are skipped.
 //
 // Parameters:
 //   - nodes: YAML nodes representing the sequence items
 //
 // Returns:
 //   - []string: list of package names
-//   - map[string]PackageSettings: per-package settings (may be empty)
 //   - error: error if a node has invalid structure or missing name
-func parseGroupSequenceWithSettings(nodes []*yaml.Node) ([]string, map[string]PackageSettings, error) {
+func parseGroupSequence(nodes []*yaml.Node) ([]string, error) {
 	packages := make([]string, 0, len(nodes))
-	pkgSettings := make(map[string]PackageSettings)
 
 	for _, item := range nodes {
 		switch item.Kind {
@@ -99,34 +87,26 @@ func parseGroupSequenceWithSettings(nodes []*yaml.Node) ([]string, map[string]Pa
 			}
 			packages = append(packages, name)
 		case yaml.MappingNode:
-			var entry struct {
-				Name                string `yaml:"name"`
-				WithAllDependencies bool   `yaml:"with_all_dependencies"`
+			var alias struct {
+				Name string `yaml:"name"`
 			}
 
-			if err := item.Decode(&entry); err != nil {
-				return nil, nil, fmt.Errorf("failed to decode group member: %w", err)
+			if err := item.Decode(&alias); err != nil {
+				return nil, fmt.Errorf("failed to decode group member: %w", err)
 			}
 
-			name := strings.TrimSpace(entry.Name)
+			name := strings.TrimSpace(alias.Name)
 			if name == "" {
-				return nil, nil, fmt.Errorf("group member is missing a name")
+				return nil, fmt.Errorf("group member is missing a name")
 			}
 
 			packages = append(packages, name)
-
-			// Store settings if any non-default values
-			if entry.WithAllDependencies {
-				pkgSettings[name] = PackageSettings{
-					WithAllDependencies: entry.WithAllDependencies,
-				}
-			}
 		default:
-			return nil, nil, fmt.Errorf("group entries must be package names")
+			return nil, fmt.Errorf("group entries must be package names")
 		}
 	}
 
-	return packages, pkgSettings, nil
+	return packages, nil
 }
 
 // validateGroupMembership validates that packages are not assigned to multiple groups.

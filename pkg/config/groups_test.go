@@ -141,7 +141,7 @@ func TestGroupConfigUnmarshalSupportsMembers(t *testing.T) {
 	assert.Equal(t, []string{"base", "extra", "direct"}, cfg.Group.Packages)
 }
 
-// TestParseGroupSequenceWithSettingsValidatesEntries tests the behavior of parseGroupSequenceWithSettings with validation.
+// TestParseGroupSequenceValidatesEntries tests the behavior of parseGroupSequence with validation.
 //
 // It verifies:
 //   - Whitespace is trimmed from entries
@@ -149,22 +149,22 @@ func TestGroupConfigUnmarshalSupportsMembers(t *testing.T) {
 //   - Empty name mappings return error
 //   - Invalid name mappings return error
 //   - Invalid entry types return error
-func TestParseGroupSequenceWithSettingsValidatesEntries(t *testing.T) {
+func TestParseGroupSequenceValidatesEntries(t *testing.T) {
 	nodes := []*yaml.Node{{Kind: yaml.ScalarNode, Value: " first "}, {Kind: yaml.ScalarNode, Value: "   "}}
-	packages, _, err := parseGroupSequenceWithSettings(nodes)
+	packages, err := parseGroupSequence(nodes)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"first"}, packages)
 
 	nodes = []*yaml.Node{{Kind: yaml.MappingNode, Content: []*yaml.Node{{Kind: yaml.ScalarNode, Value: "name"}, {Kind: yaml.ScalarNode, Value: ""}}}}
-	_, _, err = parseGroupSequenceWithSettings(nodes)
+	_, err = parseGroupSequence(nodes)
 	assert.Error(t, err)
 
 	nodes = []*yaml.Node{{Kind: yaml.MappingNode, Content: []*yaml.Node{{Kind: yaml.ScalarNode, Value: "name"}, {Kind: yaml.SequenceNode}}}}
-	_, _, err = parseGroupSequenceWithSettings(nodes)
+	_, err = parseGroupSequence(nodes)
 	assert.Error(t, err)
 
 	nodes = []*yaml.Node{{Kind: yaml.SequenceNode}}
-	_, _, err = parseGroupSequenceWithSettings(nodes)
+	_, err = parseGroupSequence(nodes)
 	assert.Error(t, err)
 }
 
@@ -229,43 +229,6 @@ func TestGroupWithAllDependenciesGroupLevel(t *testing.T) {
 	assert.Equal(t, "laravel/framework", group.Packages[0])
 }
 
-// TestGroupWithAllDependenciesPackageLevel tests the behavior of with_all_dependencies at package level.
-//
-// It verifies:
-//   - Package-level with_all_dependencies within groups is parsed correctly
-//   - Settings are stored per-package
-func TestGroupWithAllDependenciesPackageLevel(t *testing.T) {
-	content := []byte(`rules:
-  composer:
-    groups:
-      mixed:
-        packages:
-          - name: sentry/sentry-laravel
-            with_all_dependencies: true
-          - laravel/framework
-`)
-	var cfg Config
-	require.NoError(t, yaml.Unmarshal(content, &cfg))
-
-	rule, ok := cfg.Rules["composer"]
-	require.True(t, ok)
-
-	group, ok := rule.Groups["mixed"]
-	require.True(t, ok)
-	assert.Len(t, group.Packages, 2)
-	assert.Contains(t, group.Packages, "sentry/sentry-laravel")
-	assert.Contains(t, group.Packages, "laravel/framework")
-
-	// Check per-package settings
-	settings, ok := group.PackageSettings["sentry/sentry-laravel"]
-	assert.True(t, ok)
-	assert.True(t, settings.WithAllDependencies)
-
-	// laravel/framework should not have settings (plain string entry)
-	_, ok = group.PackageSettings["laravel/framework"]
-	assert.False(t, ok)
-}
-
 // TestRuleLevelPackageSettings tests the behavior of packages settings at rule level.
 //
 // It verifies:
@@ -294,7 +257,6 @@ func TestRuleLevelPackageSettings(t *testing.T) {
 //
 // It verifies:
 //   - Rule-level package settings have highest priority
-//   - Group-level per-package settings take precedence over group-level settings
 //   - Group-level settings apply to all packages in the group
 func TestShouldUpdateWithAllDependencies(t *testing.T) {
 	rule := PackageManagerCfg{
@@ -303,14 +265,12 @@ func TestShouldUpdateWithAllDependencies(t *testing.T) {
 		},
 		Groups: map[string]GroupCfg{
 			"group1": {
-				Packages:            []string{"group-pkg", "override-pkg"},
+				Packages:            []string{"group-pkg", "another-pkg"},
 				WithAllDependencies: true,
 			},
 			"group2": {
-				Packages: []string{"mixed-pkg"},
-				PackageSettings: map[string]PackageSettings{
-					"mixed-pkg": {WithAllDependencies: true},
-				},
+				Packages:            []string{"no-flag-pkg"},
+				WithAllDependencies: false,
 			},
 		},
 	}
@@ -320,10 +280,10 @@ func TestShouldUpdateWithAllDependencies(t *testing.T) {
 
 	// Group-level setting applies to packages in group
 	assert.True(t, rule.ShouldUpdateWithAllDependencies("group-pkg"))
-	assert.True(t, rule.ShouldUpdateWithAllDependencies("override-pkg"))
+	assert.True(t, rule.ShouldUpdateWithAllDependencies("another-pkg"))
 
-	// Per-package setting within group
-	assert.True(t, rule.ShouldUpdateWithAllDependencies("mixed-pkg"))
+	// Group without flag returns false
+	assert.False(t, rule.ShouldUpdateWithAllDependencies("no-flag-pkg"))
 
 	// Unknown package returns false
 	assert.False(t, rule.ShouldUpdateWithAllDependencies("unknown-pkg"))

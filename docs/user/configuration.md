@@ -255,7 +255,7 @@ Each rule under `rules:` controls discovery, parsing, and lock-file handling:
 | `packages` | `map` | Per-package update settings (e.g., `with_all_dependencies`) | See example below |
 | `incremental` | `[]string` | Packages requiring step-by-step updates | `["react", "service-.*"]` |
 
-**Groups example (with all dependencies option):**
+**Groups example:**
 ```yaml
 groups:
   frontend:
@@ -279,7 +279,9 @@ packages:
     with_all_dependencies: true
 ```
 
-The `with_all_dependencies` option adds the `-W` flag to composer update commands, which updates transitive dependencies. This is required for packages like Laravel framework that have tightly-coupled sub-packages.
+The `with_all_dependencies` option adds the `-W` flag to composer update commands, which updates transitive dependencies. This is useful for:
+- Individual packages: Configure at `rules.<manager>.packages.<name>.with_all_dependencies: true`
+- All packages in a group: Configure at `rules.<manager>.groups.<name>.with_all_dependencies: true`
 
 #### Override Options
 
