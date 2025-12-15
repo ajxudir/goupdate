@@ -157,10 +157,11 @@ All main commands (`scan`, `list`, `outdated`, `update`) support multiple output
 
 ### Structured Output Features
 
-- **Progress Indicator**: Shows percentage completion instead of live table rows
+- **Clean Output**: Progress messages are completely suppressed (no stderr noise)
 - **Consistent Structure**: All formats include summary, packages, warnings, and errors
-- **Clean Stdout**: Progress output goes to stderr, data to stdout
+- **Pure Stdout**: Only structured data is written to stdout
 - **CI-Friendly**: Non-interactive when using structured formats
+- **Flag Validation**: `--verbose` is rejected; `update` requires `--yes` or `--dry-run`
 
 ## How It Works
 

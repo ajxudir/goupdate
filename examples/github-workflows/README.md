@@ -179,8 +179,13 @@ Go to Actions → Auto Update Dependencies → Run workflow:
 │   ├── _goupdate-install/   # Download goupdate binary
 │   ├── _goupdate-check/     # Check for updates
 │   ├── _goupdate-update/    # Apply updates
+│   ├── _gh-runtimes/        # Setup language runtimes (Node, PHP, Python, Go, .NET)
 │   ├── _gh-pr/              # Create pull requests
 │   └── _git-branch/         # Branch management
 └── workflows/
     └── auto-update.yml      # Main workflow
 ```
+
+## Composer Rate Limiting
+
+If your project uses PHP/Composer, the `_gh-runtimes` action automatically configures GitHub OAuth to avoid API rate limiting when downloading packages. The workflow passes `github-token: ${{ secrets.GITHUB_TOKEN }}` to the action.
