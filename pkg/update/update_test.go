@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/ajxudir/goupdate/pkg/config"
 	pkgerrors "github.com/ajxudir/goupdate/pkg/errors"
 	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // writeFile is a test helper that writes content to a file.
@@ -540,7 +540,7 @@ func TestResolveUpdateCfgNoOverride(t *testing.T) {
 	cfg := &config.Config{Rules: map[string]config.PackageManagerCfg{
 		"r": {
 			Update: &config.UpdateCfg{
-				Commands:   "npm install",
+				Commands:       "npm install",
 				Group:          "base-group",
 				TimeoutSeconds: 60,
 			},
@@ -562,7 +562,7 @@ func TestResolveUpdateCfgWithTimeoutOverride(t *testing.T) {
 	cfg := &config.Config{Rules: map[string]config.PackageManagerCfg{
 		"r": {
 			Update: &config.UpdateCfg{
-				Commands:   "npm install",
+				Commands:       "npm install",
 				TimeoutSeconds: 60,
 			},
 			PackageOverrides: map[string]config.PackageOverrideCfg{
@@ -604,7 +604,7 @@ func TestResolveUpdateCfgWithEnvOverride(t *testing.T) {
 		"r": {
 			Update: &config.UpdateCfg{
 				Commands: "npm install",
-				Env:          map[string]string{"DEBUG": "1"},
+				Env:      map[string]string{"DEBUG": "1"},
 			},
 			PackageOverrides: map[string]config.PackageOverrideCfg{
 				"test-pkg": {

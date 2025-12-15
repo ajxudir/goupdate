@@ -220,8 +220,8 @@ func TestChaos_ParseVersion_PrereleaseTagManipulation(t *testing.T) {
 	t.Run("deceptive_prerelease_tags", func(t *testing.T) {
 		// These look like production but have hidden prerelease markers
 		deceptive := []struct {
-			version  string
-			desc     string
+			version string
+			desc    string
 		}{
 			{"1.0.0-", "empty prerelease"},
 			{"1.0.0--", "double dash"},
@@ -404,11 +404,11 @@ func TestChaos_ReDoS_DefaultRegex(t *testing.T) {
 func TestChaos_CustomRegex_ReDoS(t *testing.T) {
 	// These are known dangerous regex patterns
 	dangerousPatterns := []string{
-		`(a+)+b`,           // Nested quantifiers
-		`(a|ab)+`,          // Overlapping alternatives
-		`(.*)*b`,           // Nested wildcards
-		`([a-zA-Z]+)*`,     // Nested character classes
-		`(a|a)+`,           // Redundant alternatives
+		`(a+)+b`,       // Nested quantifiers
+		`(a|ab)+`,      // Overlapping alternatives
+		`(.*)*b`,       // Nested wildcards
+		`([a-zA-Z]+)*`, // Nested character classes
+		`(a|a)+`,       // Redundant alternatives
 	}
 
 	for _, pattern := range dangerousPatterns {
@@ -460,13 +460,13 @@ func TestChaos_CustomRegex_ReDoS(t *testing.T) {
 func TestChaos_VersioningStrategy_UnknownFormat(t *testing.T) {
 	unknownFormats := []string{
 		"unknown",
-		"SEMVER",           // Case sensitivity
-		"semver ",          // Trailing space
-		" semver",          // Leading space
-		"semver\n",         // Newline
-		"json",             // Wrong type
+		"SEMVER",              // Case sensitivity
+		"semver ",             // Trailing space
+		" semver",             // Leading space
+		"semver\n",            // Newline
+		"json",                // Wrong type
 		"../../../etc/passwd", // Path traversal
-		"$(whoami)",        // Command injection
+		"$(whoami)",           // Command injection
 	}
 
 	for _, format := range unknownFormats {

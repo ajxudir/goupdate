@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/display"
 	"github.com/ajxudir/goupdate/pkg/filtering"
@@ -19,6 +18,7 @@ import (
 	"github.com/ajxudir/goupdate/pkg/supervision"
 	"github.com/ajxudir/goupdate/pkg/utils"
 	"github.com/ajxudir/goupdate/pkg/warnings"
+	"github.com/spf13/cobra"
 )
 
 var (

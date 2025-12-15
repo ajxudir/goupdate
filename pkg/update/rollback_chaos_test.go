@@ -50,13 +50,13 @@ func TestChaos_RollbackRestoresPermissions(t *testing.T) {
 	}}
 
 	pkg := formats.Package{
-		Name:       "demo",
-		Rule:       "r",
+		Name:        "demo",
+		Rule:        "r",
 		PackageType: "js",
-		Type:       "prod",
-		Constraint: "^",
-		Version:    "1.0.0",
-		Source:     manifestPath,
+		Type:        "prod",
+		Constraint:  "^",
+		Version:     "1.0.0",
+		Source:      manifestPath,
 	}
 
 	// Make lock command fail to trigger rollback

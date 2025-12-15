@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/ajxudir/goupdate/pkg/config"
 )
 
 func TestRunner_HasTests(t *testing.T) {

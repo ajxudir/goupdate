@@ -595,8 +595,8 @@ var commonTypos = map[string]map[string]string{
 		"timeoutSeconds": "timeout_seconds",
 	},
 	"LockFileCfg": {
-		"file":              "files",
-		"command":           "commands",
+		"file":               "files",
+		"command":            "commands",
 		"command_extraction": "command_extraction",
 	},
 	"ExtractionCfg": {

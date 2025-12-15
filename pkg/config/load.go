@@ -239,6 +239,7 @@ func processExtendsSecure(cfg *Config, baseDir string, rootCfg *Config) (*Config
 // This enforces security policies for extends paths:
 //   - Path traversal (..) is blocked by default
 //   - Absolute paths are blocked by default
+//
 // Returns an error with helpful message if the path is not allowed.
 //
 // Parameters:

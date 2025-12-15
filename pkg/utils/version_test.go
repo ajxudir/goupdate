@@ -3,8 +3,8 @@ package utils
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/stretchr/testify/assert"
 )
 
 func strPtr(s string) *string {

@@ -26,5 +26,3 @@ func resetUpdateFlagsToDefaults() {
 	updateSkipSystemTests = false
 	updateSystemTestModeFlag = ""
 }
-
-

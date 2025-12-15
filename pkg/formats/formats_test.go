@@ -3,8 +3,8 @@ package formats
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/stretchr/testify/assert"
 )
 
 // strPtr returns a pointer to the given string.

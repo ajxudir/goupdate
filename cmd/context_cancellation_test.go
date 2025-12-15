@@ -311,8 +311,8 @@ func TestConcurrentPackageManagerDetection(t *testing.T) {
 
 	// Create various manifest files
 	manifests := map[string]string{
-		"package.json":    `{"name": "npm-test", "dependencies": {}}`,
-		"composer.json":   `{"name": "php/test", "require": {}}`,
+		"package.json":     `{"name": "npm-test", "dependencies": {}}`,
+		"composer.json":    `{"name": "php/test", "require": {}}`,
 		"requirements.txt": "requests==2.28.0\n",
 	}
 

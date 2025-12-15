@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/display"
 	"github.com/ajxudir/goupdate/pkg/filtering"
@@ -19,6 +17,8 @@ import (
 	"github.com/ajxudir/goupdate/pkg/packages"
 	"github.com/ajxudir/goupdate/pkg/supervision"
 	"github.com/ajxudir/goupdate/pkg/warnings"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestListCommand tests the behavior of the list command.

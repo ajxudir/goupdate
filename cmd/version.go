@@ -5,8 +5,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/ajxudir/goupdate/pkg/constants"
+	"github.com/spf13/cobra"
 )
 
 // Version information set at build time via ldflags.

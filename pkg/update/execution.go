@@ -810,8 +810,8 @@ func processGroupPerPackageProgress(ctx *UpdateContext, plans []*PlannedUpdate, 
 				}
 				*results = append(*results, *res)
 				if progress != nil {
-				progress.Increment()
-			}
+					progress.Increment()
+				}
 				continue
 			}
 		}

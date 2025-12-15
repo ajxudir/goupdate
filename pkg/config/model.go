@@ -161,11 +161,11 @@ type GroupCfg struct {
 type PackageManagerCfg struct {
 	// Enabled controls whether this rule is active. Defaults to true if not specified.
 	// Set to false to disable a rule inherited from extends without removing it.
-	Enabled           *bool                         `yaml:"enabled,omitempty"`
-	Manager           string                        `yaml:"manager"`
-	Include           []string                      `yaml:"include"`
-	Exclude           []string                      `yaml:"exclude,omitempty"`
-	Groups            map[string]GroupCfg           `yaml:"groups,omitempty"`
+	Enabled *bool               `yaml:"enabled,omitempty"`
+	Manager string              `yaml:"manager"`
+	Include []string            `yaml:"include"`
+	Exclude []string            `yaml:"exclude,omitempty"`
+	Groups  map[string]GroupCfg `yaml:"groups,omitempty"`
 	// Packages holds per-package settings for individual packages outside of groups.
 	// Key is the package name, value is the settings for that package.
 	Packages          map[string]PackageSettings    `yaml:"packages,omitempty"`
@@ -364,7 +364,7 @@ type ExtractionCfg struct {
 	// If a pattern has Detect, it only applies when Detect matches the content.
 	Patterns []PatternCfg `yaml:"patterns,omitempty"`
 
-	Path string `yaml:"path,omitempty"`
+	Path           string `yaml:"path,omitempty"`
 	NameAttr       string `yaml:"name_attr,omitempty"`
 	VersionAttr    string `yaml:"version_attr,omitempty"`
 	NameElement    string `yaml:"name_element,omitempty"`
