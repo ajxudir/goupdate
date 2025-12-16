@@ -1,10 +1,15 @@
-# kpas-api Battle Test Output
+# kpas-api Example Config Test Output
 
 **Date:** 2025-12-16 06:50 UTC
 **Config:** examples/kpas-api/.goupdate.yml
 
-## Test Environment
+> **Note:** This is a test of the **example configuration file**, not the actual kpas-api repository.
+> The example config only defines special handling for specific packages (with_all_dependencies, groups).
+> The real kpas-api repository has **35 packages** (22 Composer + 13 npm).
 
+## Test Environment (Mock)
+
+This mock environment contains only packages explicitly configured in the example:
 - Composer packages: laravel/framework, sentry/sentry-laravel, intervention/image, maatwebsite/excel, phpoffice/phpspreadsheet, spatie/laravel-medialibrary
 - npm packages: vite, laravel-vite-plugin, @vitejs/plugin-vue, vue
 
