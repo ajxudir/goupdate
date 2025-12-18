@@ -78,20 +78,32 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 	}
 
 	verbose.Printf("Parsed %d available versions for %s\n", len(versions), p.Name)
+	if len(versions) > 0 {
+		verbose.Printf("All retrieved tags for %s: %v\n", p.Name, versions)
+	}
 
 	beforeExclusions := len(versions)
-	versions, err = applyVersionExclusions(versions, outdatedCfg, cfg.Security)
+	versionsAfterExclusions, err := applyVersionExclusions(versions, outdatedCfg, cfg.Security)
 	if err != nil {
 		return nil, err
 	}
 
-	if beforeExclusions != len(versions) {
+	if beforeExclusions != len(versionsAfterExclusions) {
 		verbose.Printf("Excluded %d versions (before: %d, after: %d)\n",
-			beforeExclusions-len(versions), beforeExclusions, len(versions))
+			beforeExclusions-len(versionsAfterExclusions), beforeExclusions, len(versionsAfterExclusions))
+		// Show which versions were excluded
+		excluded := findExcludedVersions(versions, versionsAfterExclusions)
+		if len(excluded) > 0 {
+			verbose.Printf("Excluded versions for %s: %v\n", p.Name, excluded)
+		}
 	}
+	versions = versionsAfterExclusions
 
 	filtered := filterNewerVersionsWithStrategy(CurrentVersionForOutdated(p), versions, strategy)
 	verbose.Printf("Found %d newer versions for %s\n", len(filtered), p.Name)
+	if len(filtered) > 0 {
+		verbose.Printf("Newer versions for %s: %v\n", p.Name, filtered)
+	}
 
 	return filtered, nil
 }
@@ -976,4 +988,27 @@ func SelectTargetVersion(major, minor, patch string, flags UpdateSelectionFlags,
 		return v, nil
 	}
 	return "", fmt.Errorf("no suitable version found")
+}
+
+// findExcludedVersions returns versions that were in 'before' but not in 'after'.
+//
+// Parameters:
+//   - before: Original list of versions
+//   - after: Filtered list of versions
+//
+// Returns:
+//   - []string: Versions that were excluded (present in before but not in after)
+func findExcludedVersions(before, after []string) []string {
+	afterSet := make(map[string]struct{}, len(after))
+	for _, v := range after {
+		afterSet[v] = struct{}{}
+	}
+
+	var excluded []string
+	for _, v := range before {
+		if _, exists := afterSet[v]; !exists {
+			excluded = append(excluded, v)
+		}
+	}
+	return excluded
 }
