@@ -53,15 +53,19 @@ system_tests:
   stop_on_fail: true
   tests:
     # Install and validate PHP dependencies
+    # --no-scripts: Skip post-install hooks (artisan package:discover) that require
+    # full Laravel environment setup (.env, database, etc.) - not needed for
+    # dependency verification
     - name: composer
       commands: |
-        composer install --no-interaction --prefer-dist
+        composer install --no-interaction --prefer-dist --no-scripts
       timeout_seconds: 300
 
     # Install and build frontend assets
+    # --ignore-scripts: Skip postinstall hooks that may require environment setup
     - name: npm-build
       commands: |
-        npm install
+        npm install --ignore-scripts
         npm run build
       timeout_seconds: 300
 
