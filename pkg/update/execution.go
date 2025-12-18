@@ -90,16 +90,19 @@ func ValidateUpdatedPackage(plan *PlannedUpdate, reloadList func() ([]formats.Pa
 // RollbackPlans rolls back all applied plans to their original versions.
 // Returns a combined error if any rollbacks failed, allowing callers to know if rollback was successful.
 func RollbackPlans(plans []*PlannedUpdate, cfg *config.Config, workDir string, ctx *UpdateContext, groupErr error, updater PackageUpdater, dryRun, skipLock bool) error {
+	verbose.Printf("Rolling back %d packages due to error: %v\n", len(plans), groupErr)
 	var rollbackErrors []error
 
 	for _, plan := range plans {
+		verbose.Printf("Rolling back %s: %s → %s\n", plan.Res.Pkg.Name, plan.Res.Target, plan.Original)
 		rollbackErr := updater(plan.Res.Pkg, plan.Original, cfg, workDir, dryRun, skipLock)
 		if rollbackErr != nil {
 			wrappedErr := fmt.Errorf("%s (%s/%s) rollback failed: %w", plan.Res.Pkg.Name, plan.Res.Pkg.PackageType, plan.Res.Pkg.Rule, rollbackErr)
 			ctx.AppendFailure(wrappedErr)
 			rollbackErrors = append(rollbackErrors, wrappedErr)
+			verbose.Printf("Rollback FAILED for %s: %v\n", plan.Res.Pkg.Name, rollbackErr)
 		} else {
-			verbose.Printf("Rolled back %s to %s\n", plan.Res.Pkg.Name, plan.Original)
+			verbose.Printf("Rolled back %s to %s successfully\n", plan.Res.Pkg.Name, plan.Original)
 		}
 		if plan.Res.Status == constants.StatusUpdated {
 			plan.Res.Status = constants.StatusFailed
@@ -110,8 +113,10 @@ func RollbackPlans(plans []*PlannedUpdate, cfg *config.Config, workDir string, c
 	}
 
 	if len(rollbackErrors) > 0 {
+		verbose.Printf("Rollback completed with %d errors\n", len(rollbackErrors))
 		return stderrors.Join(rollbackErrors...)
 	}
+	verbose.Printf("Rollback completed successfully for all %d packages\n", len(plans))
 	return nil
 }
 
@@ -441,6 +446,7 @@ func processGroupPerPackage(ctx *UpdateContext, plans []*PlannedUpdate, applied 
 // Returns:
 //   - This function does not return a value; it modifies results in place
 func handleSkippedUpdate(ctx *UpdateContext, res *UpdateResult, results *[]UpdateResult, callbacks ExecutionCallbacks) {
+	verbose.Printf("Skipping %s: status=%s, target=%q\n", res.Pkg.Name, res.Status, res.Target)
 	if ShouldTrackUnsupported(res.Status) {
 		ctx.Unsupported.Add(res.Pkg, callbacks.DeriveReason(res.Pkg, ctx.Cfg, res.Err, false))
 	}
@@ -491,12 +497,14 @@ func appendResultAndPrint(ctx *UpdateContext, res *UpdateResult, results *[]Upda
 // Returns:
 //   - error: Returns error if critical tests fail and stop-on-fail is enabled; returns nil otherwise
 func runGroupSystemTests(ctx *UpdateContext, applied []*PlannedUpdate, systemTestFailures *[]SystemTestFailure) error {
+	verbose.Printf("Running system tests after group update (%d packages)\n", len(applied))
 	testResult := ctx.SystemTestRunner.RunAfterUpdate()
 	for _, plan := range applied {
 		plan.Res.SystemTestResult = testResult
 	}
 	isCritical := testResult.HasCriticalFailure() && ctx.SystemTestRunner.StopOnFail()
 	if isCritical {
+		verbose.Printf("System tests failed critically - will rollback group\n")
 		for _, plan := range applied {
 			plan.Res.Status = constants.StatusFailed
 			plan.Res.Err = fmt.Errorf("system tests failed: %s", testResult.Summary())
@@ -506,11 +514,14 @@ func runGroupSystemTests(ctx *UpdateContext, applied []*PlannedUpdate, systemTes
 		return err
 	}
 	if !testResult.Passed() {
+		verbose.Printf("System tests have non-critical failures (continue_on_fail enabled)\n")
 		*systemTestFailures = append(*systemTestFailures, SystemTestFailure{
 			PkgName:    "group",
 			Result:     testResult,
 			IsCritical: isCritical,
 		})
+	} else {
+		verbose.Printf("System tests passed for group\n")
 	}
 	return nil
 }
@@ -533,13 +544,18 @@ func runGroupSystemTests(ctx *UpdateContext, applied []*PlannedUpdate, systemTes
 // Returns:
 //   - error: Returns nil; errors are tracked via context and groupErr pointer
 func runPackageSystemTests(ctx *UpdateContext, plan *PlannedUpdate, groupErr *error, systemTestFailures *[]SystemTestFailure) error {
+	verbose.Printf("Running system tests after %s update\n", plan.Res.Pkg.Name)
 	testResult := ctx.SystemTestRunner.RunAfterUpdate()
 	plan.Res.SystemTestResult = testResult
 	isCritical := testResult.HasCriticalFailure() && ctx.SystemTestRunner.StopOnFail()
 	if isCritical {
+		verbose.Printf("System tests failed critically for %s - rolling back to %s\n", plan.Res.Pkg.Name, plan.Original)
 		rollbackErr := ctx.UpdaterFunc(plan.Res.Pkg, plan.Original, ctx.Cfg, ctx.WorkDir, ctx.DryRun, ctx.SkipLockRun)
 		if rollbackErr != nil {
+			verbose.Printf("Rollback failed for %s: %v\n", plan.Res.Pkg.Name, rollbackErr)
 			ctx.AppendFailure(fmt.Errorf("%s: rollback failed: %w", plan.Res.Pkg.Name, rollbackErr))
+		} else {
+			verbose.Printf("Rollback successful for %s\n", plan.Res.Pkg.Name)
 		}
 		plan.Res.Status = constants.StatusFailed
 		plan.Res.Err = fmt.Errorf("system tests failed: %s", testResult.Summary())
@@ -547,11 +563,14 @@ func runPackageSystemTests(ctx *UpdateContext, plan *PlannedUpdate, groupErr *er
 		*groupErr = stderrors.Join(*groupErr, plan.Res.Err)
 	}
 	if !testResult.Passed() {
+		verbose.Printf("System tests have failures for %s (critical=%v)\n", plan.Res.Pkg.Name, isCritical)
 		*systemTestFailures = append(*systemTestFailures, SystemTestFailure{
 			PkgName:    plan.Res.Pkg.Name,
 			Result:     testResult,
 			IsCritical: isCritical,
 		})
+	} else {
+		verbose.Printf("System tests passed for %s\n", plan.Res.Pkg.Name)
 	}
 	return nil
 }
