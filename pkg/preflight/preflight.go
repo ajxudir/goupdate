@@ -8,6 +8,7 @@ import (
 
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
 // CommandResolutionHints maps command names to installation instructions.
@@ -139,14 +140,17 @@ func (r *ValidateResult) ErrorMessage() string {
 // Returns:
 //   - *ValidateResult: Result containing any validation errors; never nil
 func ValidatePackages(packages []formats.Package, cfg *config.Config) *ValidateResult {
+	verbose.Printf("Preflight: validating commands for %d packages\n", len(packages))
 	result := &ValidateResult{}
 	checkedCommands := make(map[string]bool)
 
 	for _, p := range packages {
 		ruleCfg, ok := cfg.Rules[p.Rule]
 		if !ok {
+			verbose.Printf("Preflight: skipping package %q - rule %q not found in config\n", p.Name, p.Rule)
 			continue
 		}
+		verbose.Printf("Preflight: checking commands for package %q (rule: %s)\n", p.Name, p.Rule)
 
 		// Check outdated commands
 		if ruleCfg.Outdated != nil {
@@ -175,6 +179,7 @@ func ValidatePackages(packages []formats.Package, cfg *config.Config) *ValidateR
 		}
 	}
 
+	verbose.Printf("Preflight: package validation complete - %d unique commands checked, %d errors\n", len(checkedCommands), len(result.Errors))
 	return result
 }
 
@@ -192,14 +197,17 @@ func ValidatePackages(packages []formats.Package, cfg *config.Config) *ValidateR
 // Returns:
 //   - *ValidateResult: Result containing any validation errors; never nil
 func ValidateRules(rules []string, cfg *config.Config) *ValidateResult {
+	verbose.Printf("Preflight: validating commands for %d rules\n", len(rules))
 	result := &ValidateResult{}
 	checkedCommands := make(map[string]bool)
 
 	for _, ruleName := range rules {
 		ruleCfg, ok := cfg.Rules[ruleName]
 		if !ok {
+			verbose.Printf("Preflight: skipping rule %q - not found in config\n", ruleName)
 			continue
 		}
+		verbose.Printf("Preflight: checking commands for rule %q\n", ruleName)
 
 		// Check outdated commands
 		if ruleCfg.Outdated != nil {
@@ -228,6 +236,7 @@ func ValidateRules(rules []string, cfg *config.Config) *ValidateResult {
 		}
 	}
 
+	verbose.Printf("Preflight: rule validation complete - %d unique commands checked, %d errors\n", len(checkedCommands), len(result.Errors))
 	return result
 }
 
@@ -312,17 +321,27 @@ func validateCommand(cmd string) *ValidationError {
 		return nil
 	}
 
+	verbose.Printf("Preflight: checking command %q\n", cmd)
+
 	// First try exec.LookPath (faster, finds binaries)
 	if _, err := exec.LookPath(cmd); err == nil {
+		verbose.Printf("Preflight: command %q found in PATH\n", cmd)
 		return nil
 	}
 
 	// Fall back to shell-based check to support aliases
+	verbose.Printf("Preflight: command %q not in PATH, checking shell aliases\n", cmd)
 	if commandExistsInShell(cmd) {
+		verbose.Printf("Preflight: command %q found as shell alias/function\n", cmd)
 		return nil
 	}
 
 	hint := CommandResolutionHints[cmd]
+	if hint != "" {
+		verbose.Printf("Preflight ERROR: command %q not found - hint: %s\n", cmd, hint)
+	} else {
+		verbose.Printf("Preflight ERROR: command %q not found (no resolution hint available)\n", cmd)
+	}
 	return &ValidationError{
 		Command: cmd,
 		Hint:    hint,

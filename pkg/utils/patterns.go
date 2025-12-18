@@ -4,6 +4,7 @@ import (
 	"regexp"
 
 	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
 // SelectPatterns returns ALL applicable patterns for the given content.
@@ -154,18 +155,24 @@ func matchesDetect(content, detectPattern string) bool {
 func ExtractWithPatterns(content string, cfg *config.ExtractionCfg) ([]map[string]string, error) {
 	patterns := SelectPatterns(content, cfg)
 	if len(patterns) == 0 {
+		verbose.Printf("Pattern extraction: no patterns selected from config\n")
 		return nil, nil
 	}
 
+	verbose.Printf("Pattern extraction: applying %d pattern(s)\n", len(patterns))
 	var allMatches []map[string]string
-	for _, pattern := range patterns {
+	for i, pattern := range patterns {
+		verbose.Printf("Pattern extraction: applying pattern %d/%d\n", i+1, len(patterns))
 		matches, err := ExtractAllMatches(pattern, content)
 		if err != nil {
+			verbose.Printf("Pattern extraction ERROR: pattern %d failed: %v\n", i+1, err)
 			return nil, err
 		}
+		verbose.Printf("Pattern extraction: pattern %d matched %d entries\n", i+1, len(matches))
 		allMatches = append(allMatches, matches...)
 	}
 
+	verbose.Printf("Pattern extraction: total %d matches from all patterns\n", len(allMatches))
 	return allMatches, nil
 }
 
@@ -213,9 +220,13 @@ func ExtractWithPatternsIndexed(content string, cfg *config.ExtractionCfg) ([]Ma
 //   - bool: true if version matches any applicable exclusion pattern
 //   - string: The pattern name that matched (empty if no match)
 func MatchesAnyExcludePattern(version string, patterns []string, patternCfgs []config.PatternCfg, detectContent string) (bool, string) {
+	verbose.Printf("Exclude check: checking version %q against %d simple patterns, %d pattern configs\n",
+		version, len(patterns), len(patternCfgs))
+
 	// Check simple patterns first
 	for _, pattern := range patterns {
 		if matched, _ := regexp.MatchString(pattern, version); matched {
+			verbose.Printf("Exclude check: version %q matched simple pattern %q\n", version, pattern)
 			return true, pattern
 		}
 	}
@@ -228,6 +239,7 @@ func MatchesAnyExcludePattern(version string, patterns []string, patternCfgs []c
 
 		// Check detect condition if set
 		if p.Detect != "" && !matchesDetect(detectContent, p.Detect) {
+			verbose.Printf("Exclude check: pattern %q skipped (detect condition not met)\n", p.Name)
 			continue
 		}
 
@@ -236,9 +248,11 @@ func MatchesAnyExcludePattern(version string, patterns []string, patternCfgs []c
 			if name == "" {
 				name = p.Pattern
 			}
+			verbose.Printf("Exclude check: version %q matched pattern config %q\n", version, name)
 			return true, name
 		}
 	}
 
+	verbose.Printf("Exclude check: version %q not excluded\n", version)
 	return false, ""
 }
