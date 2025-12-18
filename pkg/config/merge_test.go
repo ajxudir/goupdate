@@ -645,3 +645,65 @@ func TestMergeRulesEnabled(t *testing.T) {
 		assert.Equal(t, "pnpm", result.Manager)
 	})
 }
+
+// TestMergePackageSettings tests the behavior of mergePackageSettings.
+//
+// It verifies:
+//   - Custom settings override base settings
+//   - Base settings are preserved when not overridden
+//   - Nil base results in copy of custom
+func TestMergePackageSettings(t *testing.T) {
+	t.Run("custom overrides base", func(t *testing.T) {
+		base := map[string]PackageSettings{
+			"pkg-a": {WithAllDependencies: false},
+			"pkg-b": {WithAllDependencies: true},
+		}
+		custom := map[string]PackageSettings{
+			"pkg-a": {WithAllDependencies: true}, // override
+			"pkg-c": {WithAllDependencies: true}, // new package
+		}
+
+		result := mergePackageSettings(base, custom)
+
+		assert.Len(t, result, 3)
+		assert.True(t, result["pkg-a"].WithAllDependencies, "custom should override base")
+		assert.True(t, result["pkg-b"].WithAllDependencies, "base should be preserved")
+		assert.True(t, result["pkg-c"].WithAllDependencies, "new package should be added")
+	})
+
+	t.Run("nil base returns copy of custom", func(t *testing.T) {
+		custom := map[string]PackageSettings{
+			"pkg-a": {WithAllDependencies: true},
+		}
+
+		result := mergePackageSettings(nil, custom)
+
+		assert.Len(t, result, 1)
+		assert.True(t, result["pkg-a"].WithAllDependencies)
+	})
+}
+
+// TestMergeRulesPackageSettings tests that mergeRules handles Packages field.
+//
+// It verifies:
+//   - Packages field is merged correctly from base and custom rules
+func TestMergeRulesPackageSettings(t *testing.T) {
+	base := PackageManagerCfg{
+		Manager: "composer",
+		Include: []string{"**/composer.json"},
+		Packages: map[string]PackageSettings{
+			"laravel/framework": {WithAllDependencies: true},
+		},
+	}
+	custom := PackageManagerCfg{
+		Packages: map[string]PackageSettings{
+			"monolog/monolog": {WithAllDependencies: true},
+		},
+	}
+
+	result := mergeRules(base, custom)
+
+	assert.Len(t, result.Packages, 2)
+	assert.True(t, result.Packages["laravel/framework"].WithAllDependencies)
+	assert.True(t, result.Packages["monolog/monolog"].WithAllDependencies)
+}

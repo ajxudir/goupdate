@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
 // regexCache stores compiled regex patterns to avoid recompilation.
@@ -103,6 +105,8 @@ func ValidateRegexSafety(pattern string) error {
 // Returns:
 //   - error: Returns nil if pattern is safe; returns ErrRegexTooComplex with configuration suggestions if pattern is potentially dangerous
 func ValidateRegexSafetyWithOptions(pattern string, opts RegexValidationOptions) error {
+	verbose.Printf("Regex validation: checking pattern (length=%d)\n", len(pattern))
+
 	maxLength := opts.MaxLength
 	if maxLength <= 0 {
 		maxLength = DefaultMaxRegexPatternLength
@@ -110,6 +114,7 @@ func ValidateRegexSafetyWithOptions(pattern string, opts RegexValidationOptions)
 
 	// Check pattern length
 	if len(pattern) > maxLength {
+		verbose.Printf("Regex validation ERROR: pattern length %d exceeds maximum %d\n", len(pattern), maxLength)
 		return fmt.Errorf("%w: pattern length %d exceeds maximum %d\n\n"+
 			"💡 To increase this limit, add to your root config:\n"+
 			"   security:\n"+
@@ -119,6 +124,7 @@ func ValidateRegexSafetyWithOptions(pattern string, opts RegexValidationOptions)
 
 	// Skip complexity checks if configured (dangerous but sometimes needed)
 	if opts.SkipComplexityCheck {
+		verbose.Printf("Regex validation: skipping complexity check (configured)\n")
 		return nil
 	}
 
@@ -128,6 +134,7 @@ func ValidateRegexSafetyWithOptions(pattern string, opts RegexValidationOptions)
 	// We need to be careful not to flag legitimate patterns like (?P<x>[a-z]+)?
 	nestedQuantifiers := regexp.MustCompile(`\([^)]*(?:\.\*|\.\+|\\w\*|\\w\+|\\s\*|\\s\+)[^)]*\)[+*]`)
 	if nestedQuantifiers.MatchString(pattern) {
+		verbose.Printf("Regex validation ERROR: nested quantifiers detected (potential ReDoS)\n")
 		return fmt.Errorf("%w: nested quantifiers detected - "+
 			"to allow complex regex, add security.allow_complex_regex: true to your root config",
 			ErrRegexTooComplex)
@@ -136,6 +143,7 @@ func ValidateRegexSafetyWithOptions(pattern string, opts RegexValidationOptions)
 	// Check for simple nested quantifier patterns like (a+)+, (x*)+
 	simpleNested := regexp.MustCompile(`\([a-zA-Z][+*]\)[+*]`)
 	if simpleNested.MatchString(pattern) {
+		verbose.Printf("Regex validation ERROR: simple nested quantifiers detected (potential ReDoS)\n")
 		return fmt.Errorf("%w: simple nested quantifiers detected - "+
 			"to allow complex regex, add security.allow_complex_regex: true to your root config",
 			ErrRegexTooComplex)
@@ -148,6 +156,7 @@ func ValidateRegexSafetyWithOptions(pattern string, opts RegexValidationOptions)
 		alt1, alt2 := matches[1], matches[2]
 		// Check if one is a prefix of the other
 		if strings.HasPrefix(alt1, alt2) || strings.HasPrefix(alt2, alt1) {
+			verbose.Printf("Regex validation ERROR: overlapping alternatives with quantifiers detected\n")
 			return fmt.Errorf("%w: overlapping alternatives with quantifiers detected - "+
 				"to allow complex regex, add security.allow_complex_regex: true to your root config",
 				ErrRegexTooComplex)
@@ -157,11 +166,13 @@ func ValidateRegexSafetyWithOptions(pattern string, opts RegexValidationOptions)
 	// Check for excessive quantifiers
 	quantifierCount := strings.Count(pattern, "+") + strings.Count(pattern, "*")
 	if quantifierCount > maxRegexQuantifiers {
+		verbose.Printf("Regex validation ERROR: excessive quantifiers (%d, max %d)\n", quantifierCount, maxRegexQuantifiers)
 		return fmt.Errorf("%w: excessive quantifiers (%d, max %d) - "+
 			"to allow complex regex, add security.allow_complex_regex: true to your root config",
 			ErrRegexTooComplex, quantifierCount, maxRegexQuantifiers)
 	}
 
+	verbose.Printf("Regex validation: pattern passed all safety checks\n")
 	return nil
 }
 

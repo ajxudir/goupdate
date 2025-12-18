@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/constants"
 	"github.com/ajxudir/goupdate/pkg/display"
@@ -24,6 +23,7 @@ import (
 	"github.com/ajxudir/goupdate/pkg/update"
 	"github.com/ajxudir/goupdate/pkg/verbose"
 	"github.com/ajxudir/goupdate/pkg/warnings"
+	"github.com/spf13/cobra"
 )
 
 // CLI flags

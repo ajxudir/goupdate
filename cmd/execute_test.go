@@ -5,10 +5,10 @@ import (
 	stderrors "errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/errors"
 	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestExecuteWithExitCodes tests the behavior of Execute with different exit codes.

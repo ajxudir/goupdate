@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/formats"
 	"github.com/ajxudir/goupdate/pkg/packages"
 	"github.com/ajxudir/goupdate/pkg/utils"
 	"github.com/ajxudir/goupdate/pkg/warnings"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestApplyInstalledVersionsFromConfig tests the behavior of ApplyInstalledVersions with configuration.

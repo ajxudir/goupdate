@@ -667,4 +667,3 @@ func printSystemTestResultDirect(result *systemtest.Result, indent string) {
 		}
 	}
 }
-

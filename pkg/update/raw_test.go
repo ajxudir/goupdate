@@ -3,12 +3,12 @@ package update
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/errors"
 	"github.com/ajxudir/goupdate/pkg/formats"
 	"github.com/ajxudir/goupdate/pkg/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestUpdateRawVersionCaseInsensitiveMatch tests case-insensitive package name matching.

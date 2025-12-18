@@ -4,13 +4,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/formats"
 	"github.com/ajxudir/goupdate/pkg/outdated"
 	"github.com/ajxudir/goupdate/pkg/output"
 	"github.com/ajxudir/goupdate/pkg/systemtest"
 	"github.com/ajxudir/goupdate/pkg/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
 // mockUnsupportedTracker is a simple mock for testing

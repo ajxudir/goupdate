@@ -67,6 +67,7 @@ Additional package managers can be added via configuration.
 | `VersionMissing` | ⛔ | No concrete version available |
 | `NotConfigured` | ⚪ | Lock file not supported for this rule |
 | `Floating` | ⛔ | Floating constraint cannot auto-update |
+| `Ignored` | 🚫 | Package excluded by ignore pattern or package_overrides |
 
 ### Version Constraint Recognition
 

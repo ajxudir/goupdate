@@ -91,6 +91,17 @@ rules:
   #   groups:
   #     react-ecosystem: [react, react-dom, react-router]
   #     testing: [jest, @testing-library/react]
+  #     # For composer: use with_all_dependencies for transitive deps
+  #     # laravel:
+  #     #   with_all_dependencies: true
+  #     #   packages:
+  #     #     - laravel/framework
+  #     #     - laravel/sanctum
+  #
+  #   # Per-package settings (e.g., for composer -W flag)
+  #   # packages:
+  #   #   sentry/sentry-laravel:
+  #   #     with_all_dependencies: true
   #
   #   # Version constraint mapping
   #   constraint_mapping:

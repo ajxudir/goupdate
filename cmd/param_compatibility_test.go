@@ -577,8 +577,8 @@ func TestParamCompat_Update_DryRun_SkipLock(t *testing.T) {
 
 	updateDirFlag = tmpDir
 	updateConfigFlag = ""
-	updateDryRunFlag = true   // DRY RUN
-	updateSkipLockRun = true  // SKIP LOCK (should be irrelevant)
+	updateDryRunFlag = true  // DRY RUN
+	updateSkipLockRun = true // SKIP LOCK (should be irrelevant)
 	updateYesFlag = true
 	updateSkipPreflight = true
 	updateSkipSystemTests = true
@@ -706,7 +706,7 @@ system_tests:
 	updateDryRunFlag = true
 	updateYesFlag = true
 	updateSkipPreflight = true
-	updateSkipSystemTests = true         // SKIP
+	updateSkipSystemTests = true           // SKIP
 	updateSystemTestModeFlag = "after_all" // BUT ALSO SET MODE (conflict!)
 	updateSkipLockRun = true
 	updateOutputFlag = "json"
@@ -1190,10 +1190,10 @@ func TestChaos_EmptyStringParams(t *testing.T) {
 	listDirFlag = tmpDir
 	listConfigFlag = ""
 	listOutputFlag = "json"
-	listTypeFlag = ""  // Empty
-	listPMFlag = ""    // Empty
-	listRuleFlag = ""  // Empty
-	listNameFlag = ""  // Empty
+	listTypeFlag = "" // Empty
+	listPMFlag = ""   // Empty
+	listRuleFlag = "" // Empty
+	listNameFlag = "" // Empty
 
 	output := captureStdout(t, func() {
 		err := runList(nil, nil)
@@ -1357,10 +1357,10 @@ func TestChaos_CommaSeparatedFilters(t *testing.T) {
 	require.NoError(t, err)
 
 	testCases := []struct {
-		name     string
-		typeVal  string
-		pmVal    string
-		nameVal  string
+		name    string
+		typeVal string
+		pmVal   string
+		nameVal string
 	}{
 		{"multiple_types", "prod,dev", "all", ""},
 		{"multiple_names", "all", "all", "is-odd,is-even"},

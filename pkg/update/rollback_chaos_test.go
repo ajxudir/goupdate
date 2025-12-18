@@ -50,18 +50,18 @@ func TestChaos_RollbackRestoresPermissions(t *testing.T) {
 	}}
 
 	pkg := formats.Package{
-		Name:       "demo",
-		Rule:       "r",
+		Name:        "demo",
+		Rule:        "r",
 		PackageType: "js",
-		Type:       "prod",
-		Constraint: "^",
-		Version:    "1.0.0",
-		Source:     manifestPath,
+		Type:        "prod",
+		Constraint:  "^",
+		Version:     "1.0.0",
+		Source:      manifestPath,
 	}
 
 	// Make lock command fail to trigger rollback
 	originalExec := execCommandFunc
-	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string) ([]byte, error) {
+	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string, withAllDeps bool) ([]byte, error) {
 		return nil, errors.New("lock failed - triggering rollback")
 	}
 	t.Cleanup(func() { execCommandFunc = originalExec })

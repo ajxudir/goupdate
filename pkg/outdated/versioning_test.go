@@ -865,15 +865,15 @@ func TestVersionConstraintMapping(t *testing.T) {
 			constraint    string
 			expectedScope string
 		}{
-			{"", "major"},     // No constraint = all updates
-			{"*", "major"},    // Wildcard = all updates
-			{"^", "minor"},    // Caret = minor + patch
-			{"~", "patch"},    // Tilde = patch only
-			{"=", "major"},    // Exact = falls back to major for scope determination
-			{">=", "major"},   // Greater/equal = falls back to major
-			{">", "major"},    // Greater = falls back to major
-			{"<=", "major"},   // Less/equal = falls back to major
-			{"<", "major"},    // Less = falls back to major
+			{"", "major"},   // No constraint = all updates
+			{"*", "major"},  // Wildcard = all updates
+			{"^", "minor"},  // Caret = minor + patch
+			{"~", "patch"},  // Tilde = patch only
+			{"=", "major"},  // Exact = falls back to major for scope determination
+			{">=", "major"}, // Greater/equal = falls back to major
+			{">", "major"},  // Greater = falls back to major
+			{"<=", "major"}, // Less/equal = falls back to major
+			{"<", "major"},  // Less = falls back to major
 		}
 
 		for _, tc := range testCases {

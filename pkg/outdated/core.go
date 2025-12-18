@@ -18,6 +18,7 @@ import (
 	"github.com/ajxudir/goupdate/pkg/errors"
 	"github.com/ajxudir/goupdate/pkg/formats"
 	"github.com/ajxudir/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
 var (
@@ -45,6 +46,9 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 		return nil, fmt.Errorf("configuration is required")
 	}
 
+	verbose.Printf("Checking for updates: %s (current: %s, constraint: %q)\n",
+		p.Name, CurrentVersionForOutdated(p), p.Constraint)
+
 	outdatedCfg, err := resolveOutdatedCfg(p, cfg)
 	if err != nil {
 		return nil, err
@@ -55,7 +59,14 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 		return nil, err
 	}
 
+	if outdatedCfg.Versioning != nil {
+		verbose.Printf("Versioning strategy: format=%q, sort=%q\n",
+			outdatedCfg.Versioning.Format, outdatedCfg.Versioning.Sort)
+	}
+
 	scopeDir := resolveOutdatedScope(p, cfg, baseDir)
+	verbose.Printf("Running outdated command in directory: %s\n", scopeDir)
+
 	output, err := runOutdatedCommand(ctx, outdatedCfg, p, scopeDir)
 	if err != nil {
 		return nil, err
@@ -66,12 +77,35 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 		return nil, err
 	}
 
-	versions, err = applyVersionExclusions(versions, outdatedCfg, cfg.Security)
+	verbose.Printf("Parsed %d available versions for %s\n", len(versions), p.Name)
+	if len(versions) > 0 {
+		verbose.Printf("All retrieved tags for %s: %v\n", p.Name, versions)
+	}
+
+	beforeExclusions := len(versions)
+	versionsAfterExclusions, err := applyVersionExclusions(versions, outdatedCfg, cfg.Security)
 	if err != nil {
 		return nil, err
 	}
 
-	return filterNewerVersionsWithStrategy(CurrentVersionForOutdated(p), versions, strategy), nil
+	if beforeExclusions != len(versionsAfterExclusions) {
+		verbose.Printf("Excluded %d versions (before: %d, after: %d)\n",
+			beforeExclusions-len(versionsAfterExclusions), beforeExclusions, len(versionsAfterExclusions))
+		// Show which versions were excluded
+		excluded := findExcludedVersions(versions, versionsAfterExclusions)
+		if len(excluded) > 0 {
+			verbose.Printf("Excluded versions for %s: %v\n", p.Name, excluded)
+		}
+	}
+	versions = versionsAfterExclusions
+
+	filtered := filterNewerVersionsWithStrategy(CurrentVersionForOutdated(p), versions, strategy)
+	verbose.Printf("Found %d newer versions for %s\n", len(filtered), p.Name)
+	if len(filtered) > 0 {
+		verbose.Printf("Newer versions for %s: %v\n", p.Name, filtered)
+	}
+
+	return filtered, nil
 }
 
 // resolveOutdatedCfg builds the effective outdated configuration for a package.
@@ -99,30 +133,37 @@ func resolveOutdatedCfg(p formats.Package, cfg *config.Config) (*config.Outdated
 		return nil, &errors.UnsupportedError{Reason: fmt.Sprintf("outdated configuration missing for %s", p.Rule)}
 	}
 
+	verbose.Printf("Using outdated config from rule %q for package %s\n", p.Rule, p.Name)
+
 	effective := cloneOutdatedCfg(ruleCfg.Outdated)
 
 	var overrideCfg *config.OutdatedOverrideCfg
 	if ruleCfg.PackageOverrides != nil {
 		if override, ok := ruleCfg.PackageOverrides[p.Name]; ok {
 			overrideCfg = override.Outdated
+			verbose.Printf("Package %s has package_overrides configured\n", p.Name)
 		}
 	}
 
 	if overrideCfg != nil {
 		if overrideCfg.Versioning != nil {
 			effective.Versioning = overrideCfg.Versioning
+			verbose.Printf("Package %s: using custom versioning from override\n", p.Name)
 		}
 
 		if overrideCfg.ExcludeVersions != nil {
 			effective.ExcludeVersions = cloneStringSlice(overrideCfg.ExcludeVersions)
+			verbose.Printf("Package %s: using custom exclude_versions from override\n", p.Name)
 		}
 
 		if overrideCfg.ExcludeVersionPatterns != nil {
 			effective.ExcludeVersionPatterns = cloneStringSlice(overrideCfg.ExcludeVersionPatterns)
+			verbose.Printf("Package %s: using custom exclude_version_patterns from override\n", p.Name)
 		}
 
 		if overrideCfg.TimeoutSeconds != nil {
 			effective.TimeoutSeconds = *overrideCfg.TimeoutSeconds
+			verbose.Printf("Package %s: using custom timeout %ds from override\n", p.Name, *overrideCfg.TimeoutSeconds)
 		}
 	}
 
@@ -511,8 +552,12 @@ func SummarizeAvailableVersions(current string, versions []string, cfg *config.V
 
 	base, ok := strategy.parseVersion(current)
 	if !ok {
+		verbose.Printf("Version summarization: could not parse current version %q\n", current)
 		return "#N/A", "#N/A", "#N/A", nil
 	}
+
+	verbose.Printf("Summarizing versions for current=%s (parsed: major=%d, minor=%d, patch=%d)\n",
+		current, base.major, base.minor, base.patch)
 
 	var majorCandidate, minorCandidate, patchCandidate *parsedVersion
 
@@ -578,6 +623,9 @@ func SummarizeAvailableVersions(current string, versions []string, cfg *config.V
 	if patchCandidate != nil {
 		patch = patchCandidate.raw
 	}
+
+	verbose.Printf("Version candidates: major=%s, minor=%s, patch=%s (incremental=%v)\n",
+		major, minor, patch, incremental)
 
 	return major, minor, patch, nil
 }
@@ -933,8 +981,34 @@ func SelectTargetVersion(major, minor, patch string, flags UpdateSelectionFlags,
 	scope := determineScope(flags, constraint)
 	candidates := getVersionCandidates(major, minor, patch, scope, incremental)
 
+	verbose.Printf("Target selection: scope=%s, incremental=%v, candidates=%v\n", scope, incremental, candidates)
+
 	if v, ok := selectFirstValid(candidates...); ok {
+		verbose.Printf("Selected target version: %s\n", v)
 		return v, nil
 	}
 	return "", fmt.Errorf("no suitable version found")
+}
+
+// findExcludedVersions returns versions that were in 'before' but not in 'after'.
+//
+// Parameters:
+//   - before: Original list of versions
+//   - after: Filtered list of versions
+//
+// Returns:
+//   - []string: Versions that were excluded (present in before but not in after)
+func findExcludedVersions(before, after []string) []string {
+	afterSet := make(map[string]struct{}, len(after))
+	for _, v := range after {
+		afterSet[v] = struct{}{}
+	}
+
+	var excluded []string
+	for _, v := range before {
+		if _, exists := afterSet[v]; !exists {
+			excluded = append(excluded, v)
+		}
+	}
+	return excluded
 }

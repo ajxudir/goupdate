@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/iancoleman/orderedmap"
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/iancoleman/orderedmap"
 )
 
 // jsonUnmarshalFunc is a variable that holds the json.Unmarshal function.

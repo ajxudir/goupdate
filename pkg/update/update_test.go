@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/ajxudir/goupdate/pkg/config"
 	pkgerrors "github.com/ajxudir/goupdate/pkg/errors"
 	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // writeFile is a test helper that writes content to a file.
@@ -46,7 +46,7 @@ func TestUpdatePackageDryRunSkipsLockAndWrites(t *testing.T) {
 
 	originalExec := execCommandFunc
 	called := false
-	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string) ([]byte, error) {
+	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string, withAllDeps bool) ([]byte, error) {
 		called = true
 		return nil, nil
 	}
@@ -84,7 +84,7 @@ func TestUpdatePackageRollbackOnLockFailure(t *testing.T) {
 	originalExec := execCommandFunc
 	callCount := 0
 	var versions []string
-	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string) ([]byte, error) {
+	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string, withAllDeps bool) ([]byte, error) {
 		callCount++
 		versions = append(versions, version)
 		// Lock command fails with new version
@@ -326,7 +326,7 @@ func TestUpdatePackageRunsLockCommand(t *testing.T) {
 
 	called := false
 	originalExec := execCommandFunc
-	execCommandFunc = func(updateCfg *config.UpdateCfg, pkgName, version, constraint, dir string) ([]byte, error) {
+	execCommandFunc = func(updateCfg *config.UpdateCfg, pkgName, version, constraint, dir string, withAllDeps bool) ([]byte, error) {
 		called = true
 		if !strings.Contains(version, "1.1.0") {
 			t.Fatalf("expected version 1.1.0, got %s", version)
@@ -404,7 +404,7 @@ func TestUpdatePackageWithNewCommandsFormat(t *testing.T) {
 
 	originalExec := execCommandFunc
 	var capturedVersion string
-	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string) ([]byte, error) {
+	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string, withAllDeps bool) ([]byte, error) {
 		capturedVersion = version
 		return nil, nil
 	}
@@ -420,7 +420,7 @@ func TestUpdatePackageWithNewCommandsFormat(t *testing.T) {
 // It verifies:
 //   - Nil configuration returns an error
 func TestRunGroupLockCommandNoConfig(t *testing.T) {
-	err := RunGroupLockCommand(nil, ".")
+	err := RunGroupLockCommand(nil, ".", false)
 	require.Error(t, err)
 }
 
@@ -430,7 +430,7 @@ func TestRunGroupLockCommandNoConfig(t *testing.T) {
 //   - Missing lock command returns UnsupportedError
 func TestRunGroupLockCommandNoLockCommand(t *testing.T) {
 	cfg := &config.UpdateCfg{}
-	err := RunGroupLockCommand(cfg, ".")
+	err := RunGroupLockCommand(cfg, ".", false)
 	require.Error(t, err)
 	assert.True(t, pkgerrors.IsUnsupported(err))
 }
@@ -444,31 +444,45 @@ func TestRunGroupLockCommandNoLockCommand(t *testing.T) {
 //   - Simple echo command executes successfully
 func TestExecuteUpdateCommand(t *testing.T) {
 	t.Run("nil config returns error", func(t *testing.T) {
-		_, err := executeUpdateCommand(nil, "pkg", "1.0.0", "^", ".")
+		_, err := executeUpdateCommand(nil, "pkg", "1.0.0", "^", ".", false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "update configuration is required")
 	})
 
 	t.Run("empty commands returns unsupported error", func(t *testing.T) {
 		cfg := &config.UpdateCfg{Commands: ""}
-		_, err := executeUpdateCommand(cfg, "pkg", "1.0.0", "^", ".")
+		_, err := executeUpdateCommand(cfg, "pkg", "1.0.0", "^", ".", false)
 		assert.Error(t, err)
 		assert.True(t, pkgerrors.IsUnsupported(err))
 	})
 
 	t.Run("whitespace only commands returns unsupported error", func(t *testing.T) {
 		cfg := &config.UpdateCfg{Commands: "   \n\t  "}
-		_, err := executeUpdateCommand(cfg, "pkg", "1.0.0", "^", ".")
+		_, err := executeUpdateCommand(cfg, "pkg", "1.0.0", "^", ".", false)
 		assert.Error(t, err)
 		assert.True(t, pkgerrors.IsUnsupported(err))
 	})
 
 	t.Run("executes simple echo command", func(t *testing.T) {
 		cfg := &config.UpdateCfg{Commands: "echo '{{package}} {{version}}'"}
-		output, err := executeUpdateCommand(cfg, "test-pkg", "1.2.0", "^", ".")
+		output, err := executeUpdateCommand(cfg, "test-pkg", "1.2.0", "^", ".", false)
 		require.NoError(t, err)
 		assert.Contains(t, string(output), "test-pkg")
 		assert.Contains(t, string(output), "1.2.0")
+	})
+
+	t.Run("adds -W flag when withAllDeps is true", func(t *testing.T) {
+		cfg := &config.UpdateCfg{Commands: "echo '{{with_all_deps_flag}}'"}
+		output, err := executeUpdateCommand(cfg, "test-pkg", "1.2.0", "^", ".", true)
+		require.NoError(t, err)
+		assert.Contains(t, string(output), "-W")
+	})
+
+	t.Run("empty flag when withAllDeps is false", func(t *testing.T) {
+		cfg := &config.UpdateCfg{Commands: "echo '{{with_all_deps_flag}}'"}
+		output, err := executeUpdateCommand(cfg, "test-pkg", "1.2.0", "^", ".", false)
+		require.NoError(t, err)
+		assert.NotContains(t, string(output), "-W")
 	})
 }
 
@@ -478,13 +492,13 @@ func TestExecuteUpdateCommand(t *testing.T) {
 //   - Successful command execution returns no error
 func TestRunGroupLockCommandSuccess(t *testing.T) {
 	originalExec := execCommandFunc
-	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string) ([]byte, error) {
+	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string, withAllDeps bool) ([]byte, error) {
 		return []byte("success"), nil
 	}
 	t.Cleanup(func() { execCommandFunc = originalExec })
 
 	cfg := &config.UpdateCfg{Commands: "npm install"}
-	err := RunGroupLockCommand(cfg, ".")
+	err := RunGroupLockCommand(cfg, ".", false)
 	require.NoError(t, err)
 }
 
@@ -494,13 +508,13 @@ func TestRunGroupLockCommandSuccess(t *testing.T) {
 //   - Command execution errors are properly propagated
 func TestRunGroupLockCommandFailure(t *testing.T) {
 	originalExec := execCommandFunc
-	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string) ([]byte, error) {
+	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string, withAllDeps bool) ([]byte, error) {
 		return nil, errors.New("install failed")
 	}
 	t.Cleanup(func() { execCommandFunc = originalExec })
 
 	cfg := &config.UpdateCfg{Commands: "npm install"}
-	err := RunGroupLockCommand(cfg, ".")
+	err := RunGroupLockCommand(cfg, ".", false)
 	require.Error(t, err)
 }
 
@@ -526,7 +540,7 @@ func TestResolveUpdateCfgNoOverride(t *testing.T) {
 	cfg := &config.Config{Rules: map[string]config.PackageManagerCfg{
 		"r": {
 			Update: &config.UpdateCfg{
-				Commands:   "npm install",
+				Commands:       "npm install",
 				Group:          "base-group",
 				TimeoutSeconds: 60,
 			},
@@ -548,7 +562,7 @@ func TestResolveUpdateCfgWithTimeoutOverride(t *testing.T) {
 	cfg := &config.Config{Rules: map[string]config.PackageManagerCfg{
 		"r": {
 			Update: &config.UpdateCfg{
-				Commands:   "npm install",
+				Commands:       "npm install",
 				TimeoutSeconds: 60,
 			},
 			PackageOverrides: map[string]config.PackageOverrideCfg{
@@ -590,7 +604,7 @@ func TestResolveUpdateCfgWithEnvOverride(t *testing.T) {
 		"r": {
 			Update: &config.UpdateCfg{
 				Commands: "npm install",
-				Env:          map[string]string{"DEBUG": "1"},
+				Env:      map[string]string{"DEBUG": "1"},
 			},
 			PackageOverrides: map[string]config.PackageOverrideCfg{
 				"test-pkg": {
@@ -644,7 +658,7 @@ func TestUpdatePackageLockFailureRollback(t *testing.T) {
 
 	originalExec := execCommandFunc
 	callCount := 0
-	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string) ([]byte, error) {
+	execCommandFunc = func(cfg *config.UpdateCfg, pkg, version, constraint, dir string, withAllDeps bool) ([]byte, error) {
 		callCount++
 		if callCount == 1 {
 			// First call fails (lock after manifest update)

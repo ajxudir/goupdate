@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/errors"
 	"github.com/ajxudir/goupdate/pkg/formats"
 	"github.com/ajxudir/goupdate/pkg/output"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Helper functions in update_test_helpers_test.go:
@@ -1530,8 +1530,8 @@ func TestRunUpdateAfterAllValidationFailure(t *testing.T) {
 	updateSkipSystemTests = false // Run system tests (after_all mode)
 	updateDryRunFlag = false      // Actually run updates
 	updateYesFlag = true
-	updateContinueOnFail = true   // Allow partial success to be reported
-	updateOutputFlag = ""         // Ensure table output (default)
+	updateContinueOnFail = true // Allow partial success to be reported
+	updateOutputFlag = ""       // Ensure table output (default)
 
 	out := captureStdout(t, func() {
 		err := runUpdate(nil, nil)

@@ -252,18 +252,42 @@ Each rule under `rules:` controls discovery, parsing, and lock-file handling:
 | `ignore` | `[]string` | Package names to exclude from reports | `["eslint", "prettier"]` |
 | `exclude_versions` | `[]string` | Regex patterns to filter versions | `["(?i)beta", "(?i)rc"]` |
 | `groups` | `map` | Named package groups for coordinated updates | See example below |
+| `packages` | `map` | Per-package update settings (e.g., `with_all_dependencies`) | See example below |
 | `incremental` | `[]string` | Packages requiring step-by-step updates | `["react", "service-.*"]` |
 
 **Groups example:**
+
+Groups can be defined in two formats:
+1. **Simple list format** - just package names
+2. **Map format** - when you need `with_all_dependencies` or other settings
+
 ```yaml
 groups:
+  # Simple list format (most common)
   frontend:
     - react
     - react-dom
-  backend:
-    - express
-    - mongodb
+  # Map format with settings (for composer -W flag)
+  laravel:
+    with_all_dependencies: true
+    packages:
+      - laravel/framework
+      - laravel/sanctum
 ```
+
+**Per-package settings example (Composer with_all_dependencies):**
+```yaml
+# For composer packages that need transitive dependencies updated
+packages:
+  sentry/sentry-laravel:
+    with_all_dependencies: true
+  intervention/image:
+    with_all_dependencies: true
+```
+
+The `with_all_dependencies` option adds the `-W` flag to composer update commands, which updates transitive dependencies. This is useful for:
+- Individual packages: Configure at `rules.<manager>.packages.<name>.with_all_dependencies: true`
+- All packages in a group: Configure at `rules.<manager>.groups.<name>.with_all_dependencies: true`
 
 #### Override Options
 

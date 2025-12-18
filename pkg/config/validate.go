@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ajxudir/goupdate/pkg/verbose"
 	"gopkg.in/yaml.v3"
 )
 
@@ -181,12 +182,15 @@ type schemaInfo struct {
 func ValidateConfigFile(data []byte) *ValidationResult {
 	result := &ValidationResult{}
 
+	verbose.Printf("Config validation: starting YAML parsing with strict field checking\n")
+
 	// First, check for unknown fields using strict YAML parsing
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	decoder.KnownFields(true)
 
 	var cfg Config
 	if err := decoder.Decode(&cfg); err != nil {
+		verbose.Printf("Config validation FAILED: YAML decode error: %v\n", err)
 		// Parse the error to provide better messages
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "field") && strings.Contains(errMsg, "not found") {
@@ -235,7 +239,17 @@ func ValidateConfigFile(data []byte) *ValidationResult {
 	}
 
 	// Validate required fields and constraints
+	verbose.Printf("Config validation: YAML parsed successfully, validating structure\n")
 	validateConfigStruct(&cfg, result)
+
+	if len(result.Errors) == 0 {
+		verbose.Printf("Config validation PASSED: no errors found\n")
+	} else {
+		verbose.Printf("Config validation FAILED: %d errors found\n", len(result.Errors))
+	}
+	if len(result.Warnings) > 0 {
+		verbose.Printf("Config validation: %d warnings\n", len(result.Warnings))
+	}
 
 	return result
 }
@@ -263,13 +277,17 @@ func (c *Config) Validate() *ValidationResult {
 //   - result: validation result to append errors and warnings to
 func validateConfigStruct(cfg *Config, result *ValidationResult) {
 	// Validate rules
+	verbose.Printf("Config validation: checking %d rules\n", len(cfg.Rules))
 	for ruleName, rule := range cfg.Rules {
+		verbose.Printf("Config validation: validating rule %q\n", ruleName)
 		validateRule(ruleName, &rule, result)
 	}
 
 	// Validate groups reference valid rules
+	verbose.Printf("Config validation: checking %d top-level groups\n", len(cfg.Groups))
 	for groupName := range cfg.Groups {
 		if groupName == "" {
+			verbose.Printf("Config validation ERROR: empty group name detected\n")
 			result.Errors = append(result.Errors, ValidationError{
 				Field:   "groups",
 				Message: "group name cannot be empty",
@@ -278,8 +296,12 @@ func validateConfigStruct(cfg *Config, result *ValidationResult) {
 	}
 
 	// Validate incremental packages are not empty strings
+	if len(cfg.Incremental) > 0 {
+		verbose.Printf("Config validation: checking %d incremental packages\n", len(cfg.Incremental))
+	}
 	for i, pkg := range cfg.Incremental {
 		if pkg == "" {
+			verbose.Printf("Config validation ERROR: empty incremental package at index %d\n", i)
 			result.Errors = append(result.Errors, ValidationError{
 				Field:   fmt.Sprintf("incremental[%d]", i),
 				Message: "incremental package name cannot be empty",
@@ -289,6 +311,7 @@ func validateConfigStruct(cfg *Config, result *ValidationResult) {
 
 	// Validate system_tests configuration
 	if cfg.SystemTests != nil {
+		verbose.Printf("Config validation: checking system_tests configuration\n")
 		validateSystemTests(cfg.SystemTests, result)
 	}
 }
@@ -304,6 +327,7 @@ func validateConfigStruct(cfg *Config, result *ValidationResult) {
 func validateSystemTests(st *SystemTestsCfg, result *ValidationResult) {
 	// Validate run_mode if specified
 	if st.RunMode != "" {
+		verbose.Printf("Config validation: checking system_tests.run_mode=%q\n", st.RunMode)
 		validModes := []string{SystemTestRunModeAfterEach, SystemTestRunModeAfterAll, SystemTestRunModeNone}
 		isValid := false
 		for _, m := range validModes {
@@ -313,34 +337,43 @@ func validateSystemTests(st *SystemTestsCfg, result *ValidationResult) {
 			}
 		}
 		if !isValid {
+			verbose.Printf("Config validation ERROR: invalid run_mode %q (valid: %v)\n", st.RunMode, validModes)
 			result.Errors = append(result.Errors, ValidationError{
 				Field:      "system_tests.run_mode",
 				Message:    fmt.Sprintf("invalid run_mode '%s'", st.RunMode),
 				Expected:   "after_each, after_all, or none",
 				DocSection: "system-tests",
 			})
+		} else {
+			verbose.Printf("Config validation: run_mode %q is valid\n", st.RunMode)
 		}
 	}
 
 	// Validate tests
 	if len(st.Tests) == 0 && (st.IsRunPreflight() || st.GetRunMode() != SystemTestRunModeNone) {
+		verbose.Printf("Config validation WARNING: no tests defined but system tests are enabled\n")
 		result.Warnings = append(result.Warnings, "system_tests: no tests defined but system tests are enabled")
 	}
 
+	verbose.Printf("Config validation: checking %d system tests\n", len(st.Tests))
 	for i, test := range st.Tests {
 		prefix := fmt.Sprintf("system_tests.tests[%d]", i)
 
 		// Name is required
 		if test.Name == "" {
+			verbose.Printf("Config validation ERROR: %s.name is empty\n", prefix)
 			result.Errors = append(result.Errors, ValidationError{
 				Field:      prefix + ".name",
 				Message:    "test name is required",
 				DocSection: "system-tests",
 			})
+		} else {
+			verbose.Printf("Config validation: validating test %q\n", test.Name)
 		}
 
 		// Commands is required
 		if strings.TrimSpace(test.Commands) == "" {
+			verbose.Printf("Config validation ERROR: %s.commands is empty\n", prefix)
 			result.Errors = append(result.Errors, ValidationError{
 				Field:      prefix + ".commands",
 				Message:    "test commands cannot be empty",
@@ -350,6 +383,7 @@ func validateSystemTests(st *SystemTestsCfg, result *ValidationResult) {
 
 		// Timeout should be positive if specified
 		if test.TimeoutSeconds < 0 {
+			verbose.Printf("Config validation ERROR: %s.timeout_seconds=%d is negative\n", prefix, test.TimeoutSeconds)
 			result.Errors = append(result.Errors, ValidationError{
 				Field:    prefix + ".timeout_seconds",
 				Message:  "timeout must be positive",
@@ -378,8 +412,12 @@ func validateRule(name string, rule *PackageManagerCfg, result *ValidationResult
 	// Similar to manager, may be inherited
 
 	// Validate include patterns if specified
+	if len(rule.Include) > 0 {
+		verbose.Printf("Config validation: rule %q has %d include patterns\n", name, len(rule.Include))
+	}
 	for i, pattern := range rule.Include {
 		if pattern == "" {
+			verbose.Printf("Config validation ERROR: rule %q include[%d] is empty\n", name, i)
 			result.Errors = append(result.Errors, ValidationError{
 				Field:   fmt.Sprintf("%s.include[%d]", prefix, i),
 				Message: "include pattern cannot be empty",
@@ -388,28 +426,40 @@ func validateRule(name string, rule *PackageManagerCfg, result *ValidationResult
 	}
 
 	// Validate groups
+	if len(rule.Groups) > 0 {
+		verbose.Printf("Config validation: rule %q has %d groups\n", name, len(rule.Groups))
+	}
 	for groupName, group := range rule.Groups {
 		if groupName == "" {
+			verbose.Printf("Config validation ERROR: rule %q has empty group name\n", name)
 			result.Errors = append(result.Errors, ValidationError{
 				Field:   fmt.Sprintf("%s.groups", prefix),
 				Message: "group name cannot be empty",
 			})
 		}
 		if len(group.Packages) == 0 {
+			verbose.Printf("Config validation WARNING: rule %q group %q has no packages\n", name, groupName)
 			result.Warnings = append(result.Warnings, fmt.Sprintf("%s.groups.%s: group has no packages", prefix, groupName))
+		} else {
+			verbose.Printf("Config validation: rule %q group %q has %d packages\n", name, groupName, len(group.Packages))
 		}
 	}
 
 	// Validate lock files
+	if len(rule.LockFiles) > 0 {
+		verbose.Printf("Config validation: rule %q has %d lock file configs\n", name, len(rule.LockFiles))
+	}
 	for i, lf := range rule.LockFiles {
 		lfPrefix := fmt.Sprintf("%s.lock_files[%d]", prefix, i)
 		if len(lf.Files) == 0 {
+			verbose.Printf("Config validation ERROR: %s.files is empty\n", lfPrefix)
 			result.Errors = append(result.Errors, ValidationError{
 				Field:   lfPrefix + ".files",
 				Message: "lock file must specify at least one file pattern",
 			})
 		}
 		if lf.Format == "" && lf.Extraction == nil {
+			verbose.Printf("Config validation ERROR: %s has no format or extraction\n", lfPrefix)
 			result.Errors = append(result.Errors, ValidationError{
 				Field:   lfPrefix,
 				Message: "lock file must specify format or extraction",
@@ -419,12 +469,17 @@ func validateRule(name string, rule *PackageManagerCfg, result *ValidationResult
 
 	// Validate outdated config
 	if rule.Outdated != nil {
+		verbose.Printf("Config validation: rule %q has outdated config\n", name)
 		validateOutdated(prefix+".outdated", rule.Outdated, result)
 	}
 
 	// Validate package overrides
+	if len(rule.PackageOverrides) > 0 {
+		verbose.Printf("Config validation: rule %q has %d package overrides\n", name, len(rule.PackageOverrides))
+	}
 	for pkgName, override := range rule.PackageOverrides {
 		if pkgName == "" {
+			verbose.Printf("Config validation ERROR: rule %q has empty package_overrides key\n", name)
 			result.Errors = append(result.Errors, ValidationError{
 				Field:   prefix + ".package_overrides",
 				Message: "package override key cannot be empty",
@@ -448,7 +503,10 @@ func validateOutdated(prefix string, outdated *OutdatedCfg, result *ValidationRe
 	if outdated.Commands != "" {
 		// Check for required placeholders
 		if !strings.Contains(outdated.Commands, "{{package}}") {
+			verbose.Printf("Config validation WARNING: %s.commands missing {{package}} placeholder\n", prefix)
 			result.Warnings = append(result.Warnings, fmt.Sprintf("%s.commands: missing {{package}} placeholder", prefix))
+		} else {
+			verbose.Printf("Config validation: %s.commands has required placeholders\n", prefix)
 		}
 	}
 }
@@ -595,8 +653,8 @@ var commonTypos = map[string]map[string]string{
 		"timeoutSeconds": "timeout_seconds",
 	},
 	"LockFileCfg": {
-		"file":              "files",
-		"command":           "commands",
+		"file":               "files",
+		"command":            "commands",
 		"command_extraction": "command_extraction",
 	},
 	"ExtractionCfg": {

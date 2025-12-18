@@ -150,7 +150,8 @@ func writeFilePreservingPermissions(path string, content []byte, defaultMode os.
 // RunGroupLockCommand runs the lock command once for a group of packages.
 // This is used when packages are in a named group to run the lock command after all
 // packages in the group have their declared versions updated.
-func RunGroupLockCommand(cfg *config.UpdateCfg, workDir string) error {
+// The withAllDeps parameter enables the -W flag for composer (or equivalent for other managers).
+func RunGroupLockCommand(cfg *config.UpdateCfg, workDir string, withAllDeps bool) error {
 	if cfg == nil {
 		return fmt.Errorf("update configuration is required")
 	}
@@ -159,8 +160,15 @@ func RunGroupLockCommand(cfg *config.UpdateCfg, workDir string) error {
 		return &errors.UnsupportedError{Reason: "no lock command configured"}
 	}
 
+	verbose.Printf("Lock command: running group lock (withAllDeps=%v)\n", withAllDeps)
+
 	// Run lock command without package-specific replacements (group-level)
-	_, err := execCommandFunc(cfg, "", "", "", workDir)
+	_, err := execCommandFunc(cfg, "", "", "", workDir, withAllDeps)
+	if err != nil {
+		verbose.Printf("Lock command FAILED: %v\n", err)
+	} else {
+		verbose.Printf("Lock command completed successfully\n")
+	}
 	return err
 }
 
@@ -332,13 +340,19 @@ func UpdatePackage(p formats.Package, target string, cfg *config.Config, workDir
 		}
 	}
 
+	// Check if this package needs -W flag (with all dependencies)
+	withAllDeps := ruleCfg.ShouldUpdateWithAllDependencies(p.Name)
+	if withAllDeps {
+		verbose.Printf("Package %s configured with with_all_dependencies\n", p.Name)
+	}
+
 	runLockCommand := func(version string) error {
 		if strings.TrimSpace(effectiveCfg.Commands) == "" {
 			return &errors.UnsupportedError{Reason: fmt.Sprintf("lock update missing for %s", p.Rule)}
 		}
 
 		verbose.Printf("Running lock command for %s in %s\n", p.Name, scopeDir)
-		if _, err := execCommandFunc(effectiveCfg, p.Name, version, p.Constraint, scopeDir); err != nil {
+		if _, err := execCommandFunc(effectiveCfg, p.Name, version, p.Constraint, scopeDir, withAllDeps); err != nil {
 			verbose.Printf("Lock command failed for %s: %v\n", p.Name, err)
 			return err
 		}

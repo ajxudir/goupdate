@@ -129,19 +129,19 @@ func TestChaos_Security_PathTraversal(t *testing.T) {
 	t.Cleanup(func() { _ = os.Remove(parentConfig) })
 
 	testCases := []struct {
-		name        string
-		extends     []string
+		name           string
+		extends        []string
 		allowTraversal bool
-		expectError bool
-		errorContain string
+		expectError    bool
+		errorContain   string
 	}{
 		{"single_dotdot", []string{"../parent-test-config.yml"}, false, true, "path traversal not allowed"},
 		{"double_dotdot", []string{"../../parent-test-config.yml"}, false, true, "path traversal not allowed"},
 		{"dotdot_with_dir", []string{"subdir/../parent-test-config.yml"}, false, true, "path traversal not allowed"},
 		{"dotdot_in_middle", []string{"dir/../parent-test-config.yml"}, false, true, "path traversal not allowed"},
 		{"hidden_dotdot", []string{"./subdir/../../parent-test-config.yml"}, false, true, "path traversal not allowed"},
-		{"urlencoded_dotdot", []string{"%2e%2e/parent-test-config.yml"}, false, false, ""},  // Not URL-decoded
-		{"unicode_dotdot", []string{"\u002e\u002e/parent-test-config.yml"}, false, true, "path traversal not allowed"},  // Unicode periods
+		{"urlencoded_dotdot", []string{"%2e%2e/parent-test-config.yml"}, false, false, ""},                             // Not URL-decoded
+		{"unicode_dotdot", []string{"\u002e\u002e/parent-test-config.yml"}, false, true, "path traversal not allowed"}, // Unicode periods
 		{"allowed_with_flag", []string{"../parent-test-config.yml"}, true, false, ""},
 	}
 
@@ -313,7 +313,7 @@ func TestChaos_RegexPatterns_Malformed(t *testing.T) {
 		pattern string
 		valid   bool
 	}{
-		{"valid_simple", `\.json$`, true},    // Escaped dot for literal match
+		{"valid_simple", `\.json$`, true},      // Escaped dot for literal match
 		{"glob_star_invalid", "*.json", false}, // Glob pattern, not valid regex (unanchored *)
 		{"valid_regex", `^package\.json$`, true},
 		{"unclosed_bracket", "[a-z", false},
@@ -727,10 +727,10 @@ rules: {}`,
 // TestChaos_Validation_UnknownFields tests handling of unknown fields.
 func TestChaos_Validation_UnknownFields(t *testing.T) {
 	testCases := []struct {
-		name            string
-		yaml            string
-		expectError     bool
-		expectWarning   bool
+		name          string
+		yaml          string
+		expectError   bool
+		expectWarning bool
 	}{
 		{
 			name: "unknown_root_field",

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/stretchr/testify/assert"
 )
 
 // These tests ensure the test utility functions are covered.

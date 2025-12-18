@@ -5,13 +5,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/constants"
 	pkgerrors "github.com/ajxudir/goupdate/pkg/errors"
 	"github.com/ajxudir/goupdate/pkg/formats"
 	"github.com/ajxudir/goupdate/pkg/lock"
 	"github.com/ajxudir/goupdate/pkg/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCompareGroups(t *testing.T) {

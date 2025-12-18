@@ -10,8 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/constants"
 	"github.com/ajxudir/goupdate/pkg/display"
@@ -19,6 +17,8 @@ import (
 	"github.com/ajxudir/goupdate/pkg/formats"
 	"github.com/ajxudir/goupdate/pkg/lock"
 	"github.com/ajxudir/goupdate/pkg/output"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestOutdatedCommand tests the behavior of the outdated command.

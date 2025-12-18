@@ -1,5 +1,7 @@
 package config
 
+import "github.com/ajxudir/goupdate/pkg/verbose"
+
 // mergeConfigs merges two configurations with custom taking precedence.
 //
 // This performs a deep merge of two Config structures, where custom settings
@@ -37,8 +39,10 @@ func mergeConfigs(base, custom *Config) *Config {
 		if existingRule, exists := merged.Rules[key]; exists {
 			mergedRule := mergeRules(existingRule, rule)
 			merged.Rules[key] = mergedRule
+			verbose.Printf("Rule %q: merged with existing rule\n", key)
 		} else {
 			merged.Rules[key] = rule
+			verbose.Printf("Rule %q: added new rule (include=%v)\n", key, rule.Include)
 		}
 	}
 
@@ -247,6 +251,9 @@ func mergeRules(base, custom PackageManagerCfg) PackageManagerCfg {
 	if len(custom.Groups) > 0 {
 		merged.Groups = mergeGroupMaps(merged.Groups, custom.Groups)
 	}
+	if len(custom.Packages) > 0 {
+		merged.Packages = mergePackageSettings(merged.Packages, custom.Packages)
+	}
 	if custom.Format != "" {
 		merged.Format = custom.Format
 	}
@@ -344,4 +351,32 @@ func mergeLockFiles(base, override []LockFileCfg) []LockFileCfg {
 	}
 
 	return merged
+}
+
+// mergePackageSettings merges package settings maps.
+// Custom settings override base settings for the same package.
+//
+// Parameters:
+//   - base: the base package settings
+//   - custom: the custom package settings that override base
+//
+// Returns:
+//   - map[string]PackageSettings: the merged package settings
+func mergePackageSettings(base, custom map[string]PackageSettings) map[string]PackageSettings {
+	if base == nil {
+		result := make(map[string]PackageSettings, len(custom))
+		for k, v := range custom {
+			result[k] = v
+		}
+		return result
+	}
+
+	result := make(map[string]PackageSettings, len(base)+len(custom))
+	for k, v := range base {
+		result[k] = v
+	}
+	for k, v := range custom {
+		result[k] = v
+	}
+	return result
 }

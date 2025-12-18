@@ -5,15 +5,15 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ajxudir/goupdate/pkg/verbose"
 	"gopkg.in/yaml.v3"
 )
 
 // UnmarshalYAML implements custom YAML unmarshaling for GroupCfg.
 //
-// This allows groups to be specified either as a simple list of package names
-// or as a map with "packages" or "members" key. Supports both formats:
-//   - ["pkg1", "pkg2"]
-//   - {packages: ["pkg1", "pkg2"]}
+// This allows groups to be specified in two formats:
+//   - Simple list: ["pkg1", "pkg2"]
+//   - Map with settings: {with_all_dependencies: true, packages: ["pkg1", "pkg2"]}
 //
 // Parameters:
 //   - value: the YAML node to unmarshal
@@ -49,6 +49,10 @@ func (g *GroupCfg) UnmarshalYAML(value *yaml.Node) error {
 					return err
 				}
 				packages = append(packages, parsed...)
+			case "with_all_dependencies":
+				if node.Kind == yaml.ScalarNode {
+					g.WithAllDependencies = node.Value == "true"
+				}
 			default:
 				return fmt.Errorf("unsupported group key %q", key)
 			}
@@ -118,13 +122,16 @@ func parseGroupSequence(nodes []*yaml.Node) ([]string, error) {
 // Returns:
 //   - error: error if any package is assigned to multiple groups
 func validateGroupMembership(cfg *Config) error {
+	verbose.Printf("Group validation: checking for packages in multiple groups\n")
 	for ruleName, rule := range cfg.Rules {
 		if len(rule.Groups) == 0 {
 			continue
 		}
 
+		verbose.Printf("Group validation: rule %q has %d groups\n", ruleName, len(rule.Groups))
 		packages := make(map[string]map[string]struct{})
 		for groupName, group := range rule.Groups {
+			verbose.Printf("Group validation: group %q has %d packages\n", groupName, len(group.Packages))
 			for _, pkg := range group.Packages {
 				name := strings.TrimSpace(pkg)
 				if name == "" {
@@ -151,6 +158,7 @@ func validateGroupMembership(cfg *Config) error {
 			}
 			sort.Strings(groupNames)
 
+			verbose.Printf("Group validation ERROR: package %q is in multiple groups: %v\n", pkg, groupNames)
 			conflicts = append(conflicts, fmt.Sprintf("%s (%s)", pkg, strings.Join(groupNames, ", ")))
 		}
 
@@ -160,5 +168,6 @@ func validateGroupMembership(cfg *Config) error {
 		}
 	}
 
+	verbose.Printf("Group validation: passed - no conflicts found\n")
 	return nil
 }

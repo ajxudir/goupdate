@@ -2,12 +2,13 @@ package systemtest
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/ajxudir/goupdate/pkg/config"
 )
 
 func TestRunner_HasTests(t *testing.T) {
@@ -604,6 +605,111 @@ func TestResult_FormatResultsQuiet_WithFailures(t *testing.T) {
 	assert.Contains(t, output, "failing-test")    // Failing tests should be shown
 	assert.Contains(t, output, "✗")
 	assert.Contains(t, output, "test failed")
+}
+
+func TestResult_FormatResults_MultilineError(t *testing.T) {
+	// Test that multi-line errors are fully shown (not truncated to first line)
+	multilineError := fmt.Errorf("composer: exit status 2: Installing dependencies from lock file\nYour PHP version (8.2.0) does not satisfy requirement\nPackage laravel/framework requires PHP ^8.1")
+
+	result := &Result{
+		Phase: PhasePreflight,
+		Tests: []TestResult{
+			{
+				Name:     "composer",
+				Passed:   false,
+				Duration: 500 * time.Millisecond,
+				Error:    multilineError,
+			},
+		},
+	}
+
+	output := result.FormatResults()
+
+	// All error lines should be present
+	assert.Contains(t, output, "composer: exit status 2")
+	assert.Contains(t, output, "Your PHP version")
+	assert.Contains(t, output, "laravel/framework requires PHP")
+}
+
+func TestResult_FormatResults_WithOutput(t *testing.T) {
+	// Test that Output field is displayed when test fails and output differs from error
+	result := &Result{
+		Phase: PhasePreflight,
+		Tests: []TestResult{
+			{
+				Name:     "npm-build",
+				Passed:   false,
+				Duration: 2 * time.Second,
+				Error:    fmt.Errorf("npm-build: exit status 1"),
+				Output:   "Error: Cannot find module 'react'\nCheck your package.json\nRun npm install",
+			},
+		},
+	}
+
+	output := result.FormatResults()
+
+	// Error should be shown
+	assert.Contains(t, output, "exit status 1")
+	// Output content should also be shown
+	assert.Contains(t, output, "Cannot find module")
+	assert.Contains(t, output, "Run npm install")
+}
+
+func TestResult_FormatResults_OutputTruncation(t *testing.T) {
+	// Test that output is truncated to last 10 lines when there are more
+	var lines []string
+	for i := 1; i <= 15; i++ {
+		lines = append(lines, fmt.Sprintf("Line %d of output", i))
+	}
+	longOutput := strings.Join(lines, "\n")
+
+	result := &Result{
+		Phase: PhasePreflight,
+		Tests: []TestResult{
+			{
+				Name:     "verbose-test",
+				Passed:   false,
+				Duration: 1 * time.Second,
+				Error:    fmt.Errorf("test failed"),
+				Output:   longOutput,
+			},
+		},
+	}
+
+	output := result.FormatResults()
+
+	// Should show truncation message
+	assert.Contains(t, output, "... (5 lines truncated)")
+	// Should show last 10 lines (lines 6-15)
+	assert.Contains(t, output, "Line 6 of output")
+	assert.Contains(t, output, "Line 15 of output")
+	// Should NOT show first 5 lines
+	assert.NotContains(t, output, "Line 1 of output")
+	assert.NotContains(t, output, "Line 5 of output")
+}
+
+func TestResult_FormatResults_OutputNotDuplicated(t *testing.T) {
+	// Test that output is NOT shown if it's already contained in the error message
+	result := &Result{
+		Phase: PhasePreflight,
+		Tests: []TestResult{
+			{
+				Name:     "test",
+				Passed:   false,
+				Duration: 100 * time.Millisecond,
+				Error:    fmt.Errorf("test failed: %s", "exact output content here"),
+				Output:   "exact output content here",
+			},
+		},
+	}
+
+	output := result.FormatResults()
+
+	// Error should be shown
+	assert.Contains(t, output, "test failed")
+	// Count occurrences - should only appear once (in error, not duplicated from output)
+	count := strings.Count(output, "exact output content here")
+	assert.Equal(t, 1, count, "Output should not be duplicated when already in error message")
 }
 
 func TestFormatDuration(t *testing.T) {

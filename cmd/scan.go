@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/spf13/cobra"
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/constants"
 	"github.com/ajxudir/goupdate/pkg/filtering"
 	"github.com/ajxudir/goupdate/pkg/output"
 	"github.com/ajxudir/goupdate/pkg/packages"
+	"github.com/spf13/cobra"
 )
 
 var (

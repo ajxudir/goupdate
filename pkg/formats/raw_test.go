@@ -3,9 +3,9 @@ package formats
 import (
 	"testing"
 
+	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/ajxudir/goupdate/pkg/config"
 )
 
 // TestRawParser tests the behavior of RawParser.Parse.

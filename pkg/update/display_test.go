@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/ajxudir/goupdate/pkg/constants"
 	"github.com/ajxudir/goupdate/pkg/formats"
 	"github.com/ajxudir/goupdate/pkg/lock"
@@ -14,6 +13,7 @@ import (
 	"github.com/ajxudir/goupdate/pkg/output"
 	"github.com/ajxudir/goupdate/pkg/systemtest"
 	"github.com/ajxudir/goupdate/pkg/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
 // Note: We use lock.InstallStatusNotConfigured and lock.InstallStatusFloating in tests
@@ -771,10 +771,10 @@ type mockTestInfo struct {
 	output   string
 }
 
-func (m *mockTestInfo) GetName() string         { return m.name }
-func (m *mockTestInfo) GetPassed() bool         { return m.passed }
+func (m *mockTestInfo) GetName() string            { return m.name }
+func (m *mockTestInfo) GetPassed() bool            { return m.passed }
 func (m *mockTestInfo) GetDuration() time.Duration { return m.duration }
-func (m *mockTestInfo) GetOutput() string       { return m.output }
+func (m *mockTestInfo) GetOutput() string          { return m.output }
 
 // mockSystemTestResult implements SystemTestResultFormatter for testing
 type mockSystemTestResult struct {
@@ -783,8 +783,8 @@ type mockSystemTestResult struct {
 	duration time.Duration
 }
 
-func (m *mockSystemTestResult) TestCount() int             { return len(m.tests) }
-func (m *mockSystemTestResult) PassedCount() int           {
+func (m *mockSystemTestResult) TestCount() int { return len(m.tests) }
+func (m *mockSystemTestResult) PassedCount() int {
 	count := 0
 	for _, t := range m.tests {
 		if t.GetPassed() {
@@ -793,9 +793,9 @@ func (m *mockSystemTestResult) PassedCount() int           {
 	}
 	return count
 }
-func (m *mockSystemTestResult) Passed() bool               { return m.passed }
+func (m *mockSystemTestResult) Passed() bool                 { return m.passed }
 func (m *mockSystemTestResult) TotalDuration() time.Duration { return m.duration }
-func (m *mockSystemTestResult) Tests() []SystemTestInfo { return m.tests }
+func (m *mockSystemTestResult) Tests() []SystemTestInfo      { return m.tests }
 
 func TestPrintSystemTestSummary(t *testing.T) {
 	t.Run("prints summary with all passed", func(t *testing.T) {
