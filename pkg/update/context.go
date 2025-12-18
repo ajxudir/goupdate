@@ -6,6 +6,7 @@ import (
 	"github.com/ajxudir/goupdate/pkg/outdated"
 	"github.com/ajxudir/goupdate/pkg/output"
 	"github.com/ajxudir/goupdate/pkg/systemtest"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
 // VersionSnapshot stores the version state of a package for validation.
@@ -147,11 +148,16 @@ func (ctx *UpdateContext) AppendFailure(err error) {
 }
 
 // SnapshotVersions creates a map of package keys to their version snapshots.
+// This captures the baseline state before updates for drift detection.
 func SnapshotVersions(packages []formats.Package) map[string]VersionSnapshot {
+	verbose.Printf("Capturing baseline snapshot for %d packages\n", len(packages))
 	snapshots := make(map[string]VersionSnapshot)
 	for _, p := range packages {
-		snapshots[PackageKey(p)] = VersionSnapshot{Version: p.Version, Installed: p.InstalledVersion}
+		key := PackageKey(p)
+		snapshots[key] = VersionSnapshot{Version: p.Version, Installed: p.InstalledVersion}
+		verbose.Printf("  Baseline: %s = declared:%s, installed:%s\n", p.Name, p.Version, p.InstalledVersion)
 	}
+	verbose.Printf("Baseline snapshot complete: %d packages recorded\n", len(snapshots))
 	return snapshots
 }
 

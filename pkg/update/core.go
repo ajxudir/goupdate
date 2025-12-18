@@ -160,8 +160,15 @@ func RunGroupLockCommand(cfg *config.UpdateCfg, workDir string, withAllDeps bool
 		return &errors.UnsupportedError{Reason: "no lock command configured"}
 	}
 
+	verbose.Printf("Lock command: running group lock (withAllDeps=%v)\n", withAllDeps)
+
 	// Run lock command without package-specific replacements (group-level)
 	_, err := execCommandFunc(cfg, "", "", "", workDir, withAllDeps)
+	if err != nil {
+		verbose.Printf("Lock command FAILED: %v\n", err)
+	} else {
+		verbose.Printf("Lock command completed successfully\n")
+	}
 	return err
 }
 
