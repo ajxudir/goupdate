@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ajxudir/goupdate/pkg/verbose"
 	"github.com/ajxudir/goupdate/pkg/warnings"
 )
 
@@ -498,6 +499,12 @@ func executeCommand(ctx context.Context, cmdStr string, environ []string, dir st
 
 	shell, shellArgs := getShell()
 	args := append(shellArgs, cmdStr)
+
+	// Log the actual command being executed
+	verbose.Printf("Executing shell command: %s %s %q\n", shell, strings.Join(shellArgs, " "), cmdStr)
+	if dir != "" {
+		verbose.Printf("Working directory: %s\n", dir)
+	}
 
 	cmd := exec.CommandContext(ctx, shell, args...)
 	cmd.Env = environ

@@ -7,6 +7,7 @@ import (
 	"github.com/ajxudir/goupdate/pkg/cmdexec"
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/errors"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
 // ExecuteUpdateFunc is the function signature for executing update commands.
@@ -49,9 +50,15 @@ func executeUpdateCommand(cfg *config.UpdateCfg, pkg, version, constraint, dir s
 	// Add with_all_deps_flag placeholder (used by composer -W flag)
 	if withAllDeps {
 		replacements["with_all_deps_flag"] = "-W"
+		verbose.Printf("Using -W (with-all-dependencies) flag for %s\n", pkg)
 	} else {
 		replacements["with_all_deps_flag"] = ""
 	}
+
+	// Log the command template and replacements for debugging
+	verbose.Printf("Lock command template:\n%s\n", cfg.Commands)
+	verbose.Printf("Replacements: package=%q, version=%q, constraint=%q, with_all_deps_flag=%q\n",
+		pkg, version, constraint, replacements["with_all_deps_flag"])
 
 	return cmdexec.Execute(cfg.Commands, cfg.Env, dir, cfg.TimeoutSeconds, replacements)
 }

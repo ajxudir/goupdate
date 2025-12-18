@@ -9,6 +9,7 @@ import (
 
 	"github.com/ajxudir/goupdate/pkg/cmdexec"
 	"github.com/ajxudir/goupdate/pkg/config"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
 // DefaultTimeoutSeconds is the default timeout for system tests (5 minutes).
@@ -181,6 +182,9 @@ func (r *Runner) runSingleTest(test *config.SystemTestCfg) TestResult {
 		timeout = 0
 	}
 
+	// Log the system test command being executed
+	verbose.Printf("Running system test %q:\n%s\n", test.Name, test.Commands)
+
 	output, err := cmdexec.Execute(test.Commands, test.Env, r.workDir, timeout, nil)
 
 	duration := time.Since(startTime)
@@ -195,8 +199,14 @@ func (r *Runner) runSingleTest(test *config.SystemTestCfg) TestResult {
 	if err != nil {
 		testResult.Passed = false
 		testResult.Error = fmt.Errorf("%s: %w", test.Name, err)
+		// Log full output on failure for debugging
+		verbose.Printf("System test %q failed with error: %v\n", test.Name, err)
+		if len(output) > 0 {
+			verbose.Printf("System test %q output:\n%s\n", test.Name, string(output))
+		}
 	} else {
 		testResult.Passed = true
+		verbose.Printf("System test %q passed in %v\n", test.Name, duration)
 	}
 
 	return testResult

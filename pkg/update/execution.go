@@ -187,6 +187,13 @@ func ProcessGroupedPlansLive(ctx *UpdateContext, plans []*PlannedUpdate, results
 		return
 	}
 
+	// Log the processing order for debugging
+	verbose.Printf("Package processing order (%d packages):\n", len(plans))
+	for i, plan := range plans {
+		verbose.Printf("  [%d] %s: %s → %s (group: %s)\n",
+			i+1, plan.Res.Pkg.Name, plan.Original, plan.Res.Target, plan.GroupKey)
+	}
+
 	start := 0
 	for start < len(plans) {
 		end := start + 1
@@ -570,6 +577,13 @@ func DisplaySystemTestFailures(failures []SystemTestFailure) {
 func ProcessGroupedPlansWithProgress(ctx *UpdateContext, plans []*PlannedUpdate, results *[]UpdateResult, progress ProgressReporter, callbacks ExecutionCallbacks) {
 	if len(plans) == 0 {
 		return
+	}
+
+	// Log the processing order for debugging
+	verbose.Printf("Package processing order (%d packages):\n", len(plans))
+	for i, plan := range plans {
+		verbose.Printf("  [%d] %s: %s → %s (group: %s)\n",
+			i+1, plan.Res.Pkg.Name, plan.Original, plan.Res.Target, plan.GroupKey)
 	}
 
 	start := 0
