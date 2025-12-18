@@ -14,6 +14,7 @@ import (
 	"github.com/ajxudir/goupdate/pkg/outdated"
 	"github.com/ajxudir/goupdate/pkg/systemtest"
 	"github.com/ajxudir/goupdate/pkg/utils"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
 // UpdateResult holds the result of an update operation for a single package.
@@ -362,6 +363,9 @@ func planVersionUpdate(
 	// opts.IncrementalMode flag forces incremental mode for all packages
 	incremental := opts.IncrementalMode || configIncremental
 
+	verbose.Printf("Planning update for %s: incremental=%v (flag=%v, config=%v)\n",
+		p.Name, incremental, opts.IncrementalMode, configIncremental)
+
 	if err != nil {
 		if errors.IsUnsupported(err) {
 			res.Status = lock.InstallStatusNotConfigured
@@ -406,6 +410,11 @@ func planVersionUpdate(
 	filteredMajor, filteredMinor, filteredPatch, _ := outdated.SummarizeAvailableVersions(outdated.CurrentVersionForOutdated(p), filtered, versioning, incremental)
 	target, _ := outdated.SelectTargetVersion(filteredMajor, filteredMinor, filteredPatch, selection, p.Constraint, incremental)
 	res.Target = target
+
+	if target != "" {
+		verbose.Printf("Package %s: update planned %s → %s (constraint: %q)\n",
+			p.Name, outdated.CurrentVersionForOutdated(p), target, p.Constraint)
+	}
 
 	return &PlannedUpdate{
 		Cfg:                  updateCfg,

@@ -10,6 +10,7 @@ import (
 
 	"github.com/ajxudir/goupdate/pkg/config"
 	"github.com/ajxudir/goupdate/pkg/formats"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 )
 
 // DynamicParser coordinates parsing of files using the configured formats.
@@ -59,10 +60,19 @@ func (dp *DynamicParser) ParseFile(filePath string, cfg *config.PackageManagerCf
 		return nil, fmt.Errorf("fields configuration missing for %s", filePath)
 	}
 
+	verbose.Printf("Parsing file: %s\n", filePath)
+	verbose.Printf("Format: %s, Fields config: name=%q, version=%q\n",
+		cfg.Format, cfg.Fields["name"], cfg.Fields["version"])
+	if root, ok := cfg.Fields["root"]; ok && root != "" {
+		verbose.Printf("Root path: %s\n", root)
+	}
+
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
+
+	verbose.Printf("File size: %d bytes\n", len(content))
 
 	parser, err := formats.GetFormatParser(cfg.Format)
 	if err != nil {
@@ -71,7 +81,13 @@ func (dp *DynamicParser) ParseFile(filePath string, cfg *config.PackageManagerCf
 
 	packages, err := parser.Parse(content, cfg)
 	if err != nil {
+		verbose.Printf("Parse error for %s: %v\n", filePath, err)
 		return nil, err
+	}
+
+	verbose.Printf("Parsed %d packages from %s\n", len(packages), filePath)
+	for _, pkg := range packages {
+		verbose.Printf("  - %s @ %s\n", pkg.Name, pkg.Version)
 	}
 
 	return &formats.PackageList{
