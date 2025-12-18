@@ -103,6 +103,14 @@ func RollbackPlans(plans []*PlannedUpdate, cfg *config.Config, workDir string, c
 			verbose.Printf("Rollback FAILED for %s: %v\n", plan.Res.Pkg.Name, rollbackErr)
 		} else {
 			verbose.Printf("Rolled back %s to %s successfully\n", plan.Res.Pkg.Name, plan.Original)
+			// Verify rollback with drift check
+			if ctx.ReloadList != nil && !dryRun {
+				driftErr := verifyRollbackDrift(plan, ctx.ReloadList)
+				if driftErr != nil {
+					verbose.Printf("DRIFT CHECK FAILED for %s: %v\n", plan.Res.Pkg.Name, driftErr)
+					rollbackErrors = append(rollbackErrors, driftErr)
+				}
+			}
 		}
 		if plan.Res.Status == constants.StatusUpdated {
 			plan.Res.Status = constants.StatusFailed
@@ -117,6 +125,50 @@ func RollbackPlans(plans []*PlannedUpdate, cfg *config.Config, workDir string, c
 		return stderrors.Join(rollbackErrors...)
 	}
 	verbose.Printf("Rollback completed successfully for all %d packages\n", len(plans))
+	return nil
+}
+
+// verifyRollbackDrift verifies that a rollback actually restored the package to its original version.
+// This drift check helps detect cases where the rollback command succeeded but the manifest wasn't updated.
+func verifyRollbackDrift(plan *PlannedUpdate, reloadList func() ([]formats.Package, error)) error {
+	if reloadList == nil {
+		return nil
+	}
+
+	verbose.Printf("Drift check: verifying %s rolled back to %s\n", plan.Res.Pkg.Name, plan.Original)
+
+	packages, err := reloadList()
+	if err != nil {
+		verbose.Printf("Drift check: failed to reload packages: %v\n", err)
+		return fmt.Errorf("drift check failed: could not reload packages: %w", err)
+	}
+
+	key := PackageKey(plan.Res.Pkg)
+	var found *formats.Package
+	for idx := range packages {
+		p := packages[idx]
+		if PackageKey(p) == key {
+			found = &p
+			break
+		}
+	}
+
+	if found == nil {
+		verbose.Printf("Drift check: package %s not found after reload\n", plan.Res.Pkg.Name)
+		return fmt.Errorf("drift check failed: package %s missing after rollback", plan.Res.Pkg.Name)
+	}
+
+	verbose.Printf("Drift check: %s - current declared=%s, expected=%s\n",
+		plan.Res.Pkg.Name, found.Version, plan.Original)
+
+	if !versionsMatch(found.Version, plan.Original) {
+		verbose.Printf("Drift check MISMATCH: %s expected %s but found %s\n",
+			plan.Res.Pkg.Name, plan.Original, found.Version)
+		return fmt.Errorf("drift check failed: %s version mismatch after rollback (expected %s, found %s)",
+			plan.Res.Pkg.Name, plan.Original, found.Version)
+	}
+
+	verbose.Printf("Drift check PASSED: %s correctly at %s\n", plan.Res.Pkg.Name, plan.Original)
 	return nil
 }
 
@@ -556,6 +608,14 @@ func runPackageSystemTests(ctx *UpdateContext, plan *PlannedUpdate, groupErr *er
 			ctx.AppendFailure(fmt.Errorf("%s: rollback failed: %w", plan.Res.Pkg.Name, rollbackErr))
 		} else {
 			verbose.Printf("Rollback successful for %s\n", plan.Res.Pkg.Name)
+			// Verify rollback with drift check
+			if ctx.ReloadList != nil && !ctx.DryRun {
+				driftErr := verifyRollbackDrift(plan, ctx.ReloadList)
+				if driftErr != nil {
+					verbose.Printf("DRIFT CHECK FAILED for %s: %v\n", plan.Res.Pkg.Name, driftErr)
+					ctx.AppendFailure(driftErr)
+				}
+			}
 		}
 		plan.Res.Status = constants.StatusFailed
 		plan.Res.Err = fmt.Errorf("system tests failed: %s", testResult.Summary())
