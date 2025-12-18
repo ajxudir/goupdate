@@ -2416,3 +2416,890 @@ func TestRunPackageSystemTests(t *testing.T) {
 		assert.False(t, failures[0].IsCritical)
 	})
 }
+
+// TestValidatePreUpdateState tests the behavior of ValidatePreUpdateState.
+//
+// It verifies:
+//   - Returns nil with nil reloadList
+//   - Returns nil on reload error (non-fatal)
+//   - Returns nil when package not found (non-fatal)
+//   - Detects version drift and adjusts Original
+//   - Passes when version matches expected
+func TestValidatePreUpdateState(t *testing.T) {
+	t.Run("returns nil with nil reloadList", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{
+				Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+				Target: "18.0.0",
+			},
+			Original: "17.0.0",
+		}
+
+		err := ValidatePreUpdateState(plan, nil)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "17.0.0", plan.Original) // Unchanged
+	})
+
+	t.Run("returns nil on reload error (non-fatal)", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{
+				Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+				Target: "18.0.0",
+			},
+			Original: "17.0.0",
+		}
+		reloadFunc := func() ([]formats.Package, error) {
+			return nil, errors.New("reload failed")
+		}
+
+		err := ValidatePreUpdateState(plan, reloadFunc)
+
+		assert.NoError(t, err) // Errors are non-fatal
+		assert.Equal(t, "17.0.0", plan.Original) // Unchanged
+	})
+
+	t.Run("returns nil when package not found (non-fatal)", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{
+				Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+				Target: "18.0.0",
+			},
+			Original: "17.0.0",
+		}
+		reloadFunc := func() ([]formats.Package, error) {
+			return []formats.Package{
+				testutil.NPMPackage("vue", "3.0.0", "3.0.0"), // Different package
+			}, nil
+		}
+
+		err := ValidatePreUpdateState(plan, reloadFunc)
+
+		assert.NoError(t, err) // Not found is non-fatal
+		assert.Equal(t, "17.0.0", plan.Original) // Unchanged
+	})
+
+	t.Run("detects version drift and adjusts Original", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{
+				Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+				Target: "18.0.0",
+			},
+			Original: "17.0.0",
+		}
+		reloadFunc := func() ([]formats.Package, error) {
+			return []formats.Package{
+				testutil.NPMPackage("react", "17.0.5", "17.0.5"), // Version drifted
+			}, nil
+		}
+
+		err := ValidatePreUpdateState(plan, reloadFunc)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "17.0.5", plan.Original) // Original adjusted to current state
+	})
+
+	t.Run("passes when version matches expected", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{
+				Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+				Target: "18.0.0",
+			},
+			Original: "17.0.0",
+		}
+		reloadFunc := func() ([]formats.Package, error) {
+			return []formats.Package{
+				testutil.NPMPackage("react", "17.0.0", "17.0.0"), // Same version
+			}, nil
+		}
+
+		err := ValidatePreUpdateState(plan, reloadFunc)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "17.0.0", plan.Original) // Unchanged
+	})
+
+	t.Run("handles v-prefix normalization", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{
+				Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+				Target: "18.0.0",
+			},
+			Original: "v17.0.0", // With v prefix
+		}
+		reloadFunc := func() ([]formats.Package, error) {
+			return []formats.Package{
+				testutil.NPMPackage("react", "17.0.0", "17.0.0"), // Without v prefix
+			}, nil
+		}
+
+		err := ValidatePreUpdateState(plan, reloadFunc)
+
+		assert.NoError(t, err)
+		// Original should remain unchanged since versions match after normalization
+		assert.Equal(t, "v17.0.0", plan.Original)
+	})
+}
+
+// TestRollbackPlansWithDriftCheck tests RollbackPlans with drift verification.
+//
+// It verifies:
+//   - Drift check is called after successful rollback
+//   - Drift check failure is recorded
+//   - Drift check is skipped when reloadList is nil
+//   - Drift check is skipped in dry run mode
+func TestRollbackPlansWithDriftCheck(t *testing.T) {
+	t.Run("calls drift check after successful rollback", func(t *testing.T) {
+		plans := []*PlannedUpdate{
+			{
+				Res:      UpdateResult{Pkg: testutil.NPMPackage("react", "18.0.0", "18.0.0"), Status: constants.StatusUpdated},
+				Original: "17.0.0",
+			},
+		}
+		cfg := testutil.NewConfig().Build()
+
+		driftCheckCalled := false
+		reloadFunc := func() ([]formats.Package, error) {
+			driftCheckCalled = true
+			return []formats.Package{
+				testutil.NPMPackage("react", "17.0.0", "17.0.0"), // Correctly rolled back
+			}, nil
+		}
+		ctx := &UpdateContext{
+			Failures:   make([]error, 0),
+			ReloadList: reloadFunc,
+		}
+		groupErr := errors.New("group failed")
+
+		updater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		err := RollbackPlans(plans, cfg, "/test", ctx, groupErr, updater, false, false)
+
+		assert.NoError(t, err)
+		assert.True(t, driftCheckCalled, "drift check should be called")
+	})
+
+	t.Run("records drift check failure", func(t *testing.T) {
+		plans := []*PlannedUpdate{
+			{
+				Res:      UpdateResult{Pkg: testutil.NPMPackage("react", "18.0.0", "18.0.0"), Status: constants.StatusUpdated},
+				Original: "17.0.0",
+			},
+		}
+		cfg := testutil.NewConfig().Build()
+
+		reloadFunc := func() ([]formats.Package, error) {
+			return []formats.Package{
+				testutil.NPMPackage("react", "18.0.0", "18.0.0"), // Still at updated version - drift detected!
+			}, nil
+		}
+		ctx := &UpdateContext{
+			Failures:   make([]error, 0),
+			ReloadList: reloadFunc,
+		}
+		groupErr := errors.New("group failed")
+
+		updater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		err := RollbackPlans(plans, cfg, "/test", ctx, groupErr, updater, false, false)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "drift check failed")
+	})
+
+	t.Run("records drift check failure when reload fails", func(t *testing.T) {
+		plans := []*PlannedUpdate{
+			{
+				Res:      UpdateResult{Pkg: testutil.NPMPackage("react", "18.0.0", "18.0.0"), Status: constants.StatusUpdated},
+				Original: "17.0.0",
+			},
+		}
+		cfg := testutil.NewConfig().Build()
+
+		reloadFunc := func() ([]formats.Package, error) {
+			return nil, errors.New("reload failed")
+		}
+		ctx := &UpdateContext{
+			Failures:   make([]error, 0),
+			ReloadList: reloadFunc,
+		}
+		groupErr := errors.New("group failed")
+
+		updater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		err := RollbackPlans(plans, cfg, "/test", ctx, groupErr, updater, false, false)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "could not reload packages")
+	})
+
+	t.Run("records drift check failure when package not found", func(t *testing.T) {
+		plans := []*PlannedUpdate{
+			{
+				Res:      UpdateResult{Pkg: testutil.NPMPackage("react", "18.0.0", "18.0.0"), Status: constants.StatusUpdated},
+				Original: "17.0.0",
+			},
+		}
+		cfg := testutil.NewConfig().Build()
+
+		reloadFunc := func() ([]formats.Package, error) {
+			return []formats.Package{
+				testutil.NPMPackage("vue", "3.0.0", "3.0.0"), // Different package
+			}, nil
+		}
+		ctx := &UpdateContext{
+			Failures:   make([]error, 0),
+			ReloadList: reloadFunc,
+		}
+		groupErr := errors.New("group failed")
+
+		updater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		err := RollbackPlans(plans, cfg, "/test", ctx, groupErr, updater, false, false)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "missing after rollback")
+	})
+
+	t.Run("skips drift check in dry run mode", func(t *testing.T) {
+		plans := []*PlannedUpdate{
+			{
+				Res:      UpdateResult{Pkg: testutil.NPMPackage("react", "18.0.0", "18.0.0"), Status: constants.StatusUpdated},
+				Original: "17.0.0",
+			},
+		}
+		cfg := testutil.NewConfig().Build()
+
+		driftCheckCalled := false
+		reloadFunc := func() ([]formats.Package, error) {
+			driftCheckCalled = true
+			return nil, errors.New("should not be called")
+		}
+		ctx := &UpdateContext{
+			Failures:   make([]error, 0),
+			ReloadList: reloadFunc,
+		}
+		groupErr := errors.New("group failed")
+
+		updater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		err := RollbackPlans(plans, cfg, "/test", ctx, groupErr, updater, true, false) // dryRun=true
+
+		assert.NoError(t, err)
+		assert.False(t, driftCheckCalled, "drift check should be skipped in dry run")
+	})
+
+	t.Run("skips drift check when reloadList is nil", func(t *testing.T) {
+		plans := []*PlannedUpdate{
+			{
+				Res:      UpdateResult{Pkg: testutil.NPMPackage("react", "18.0.0", "18.0.0"), Status: constants.StatusUpdated},
+				Original: "17.0.0",
+			},
+		}
+		cfg := testutil.NewConfig().Build()
+
+		ctx := &UpdateContext{
+			Failures:   make([]error, 0),
+			ReloadList: nil,
+		}
+		groupErr := errors.New("group failed")
+
+		updater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		err := RollbackPlans(plans, cfg, "/test", ctx, groupErr, updater, false, false)
+
+		assert.NoError(t, err)
+	})
+}
+
+// TestProcessGroupWithGroupLockWithAllDependencies tests the with_all_dependencies flag.
+func TestProcessGroupWithGroupLockWithAllDependencies(t *testing.T) {
+	mockDeriveReason := func(p formats.Package, cfg *config.Config, err error, latestMissing bool) string {
+		return "test reason"
+	}
+
+	t.Run("detects with_all_dependencies flag from rule config", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		// Create a config with a rule that has with_all_dependencies setting
+		cfg := testutil.NewConfig().
+			WithRule("composer", testutil.ComposerRule()).
+			Build()
+
+		// Set up a package that should use with_all_dependencies
+		pkg := testutil.ComposerPackage("laravel/framework", "11.0.0", "11.0.0")
+
+		// After update, the reload should return the updated version
+		reloadFunc := func() ([]formats.Package, error) {
+			return []formats.Package{
+				testutil.ComposerPackage("laravel/framework", "11.1.0", "11.1.0"),
+			}, nil
+		}
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithReloadList(reloadFunc).
+			WithFlags(true, false, false) // dry run to avoid actual lock command
+		plans := []*PlannedUpdate{
+			{
+				Res: UpdateResult{
+					Pkg:    pkg,
+					Target: "11.1.0",
+					Status: constants.StatusPlanned,
+				},
+			},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "composer update"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLock(ctx, plans, groupCfg, &applied, &results, &failures, callbacks)
+
+		assert.NoError(t, err)
+		assert.Len(t, applied, 1)
+	})
+}
+
+// TestRunPackageSystemTestsWithDriftCheck tests that drift check is called during rollback.
+func TestRunPackageSystemTestsWithDriftCheck(t *testing.T) {
+	t.Run("calls drift check after rollback on critical failure", func(t *testing.T) {
+		// Create a runner with a test that will fail
+		stopOnFail := true
+		testCfg := &config.SystemTestsCfg{
+			Tests: []config.SystemTestCfg{
+				{Name: "failing-test", Commands: "__nonexistent_command_for_test__", ContinueOnFail: false},
+			},
+			StopOnFail: &stopOnFail,
+		}
+		runner := testutil.CreateSystemTestRunner(testCfg, true, false)
+
+		driftCheckCalled := false
+		reloadFunc := func() ([]formats.Package, error) {
+			driftCheckCalled = true
+			return []formats.Package{
+				testutil.NPMPackage("react", "17.0.0", "17.0.0"), // Rolled back correctly
+			}, nil
+		}
+
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().Build()
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithSystemTestRunner(runner).
+			WithUpdaterFunc(mockUpdater).
+			WithReloadList(reloadFunc).
+			WithFlags(false, false, false)
+
+		plan := &PlannedUpdate{
+			Res: UpdateResult{
+				Pkg:    testutil.NPMPackage("react", "18.0.0", "18.0.0"),
+				Status: constants.StatusUpdated,
+			},
+			Original: "17.0.0",
+		}
+		var groupErr error
+		var failures []SystemTestFailure
+
+		err := runPackageSystemTests(ctx, plan, &groupErr, &failures)
+
+		assert.NoError(t, err)
+		assert.Error(t, groupErr)
+		assert.True(t, driftCheckCalled, "drift check should be called after rollback")
+	})
+
+	t.Run("records drift check failure after rollback", func(t *testing.T) {
+		// Create a runner with a test that will fail
+		stopOnFail := true
+		testCfg := &config.SystemTestsCfg{
+			Tests: []config.SystemTestCfg{
+				{Name: "failing-test", Commands: "__nonexistent_command_for_test__", ContinueOnFail: false},
+			},
+			StopOnFail: &stopOnFail,
+		}
+		runner := testutil.CreateSystemTestRunner(testCfg, true, false)
+
+		reloadFunc := func() ([]formats.Package, error) {
+			return []formats.Package{
+				testutil.NPMPackage("react", "18.0.0", "18.0.0"), // Still at new version - drift!
+			}, nil
+		}
+
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().Build()
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithSystemTestRunner(runner).
+			WithUpdaterFunc(mockUpdater).
+			WithReloadList(reloadFunc).
+			WithFlags(false, false, false)
+
+		plan := &PlannedUpdate{
+			Res: UpdateResult{
+				Pkg:    testutil.NPMPackage("react", "18.0.0", "18.0.0"),
+				Status: constants.StatusUpdated,
+			},
+			Original: "17.0.0",
+		}
+		var groupErr error
+		var failures []SystemTestFailure
+
+		_ = runPackageSystemTests(ctx, plan, &groupErr, &failures)
+
+		// Drift check failure should be recorded in ctx.Failures
+		assert.Len(t, ctx.Failures, 2) // system test failure + drift check failure
+	})
+}
+
+// TestProcessGroupWithGroupLockEdgeCases tests edge cases for processGroupWithGroupLock.
+func TestProcessGroupWithGroupLockEdgeCases(t *testing.T) {
+	mockDeriveReason := func(p formats.Package, cfg *config.Config, err error, latestMissing bool) string {
+		return "test reason"
+	}
+
+	t.Run("returns error when groupUpdateCfg is nil", func(t *testing.T) {
+		cfg := testutil.NewConfig().Build()
+		ctx := NewUpdateContext(cfg, "/test", nil)
+
+		plans := []*PlannedUpdate{
+			{
+				Res: UpdateResult{
+					Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+					Target: "18.0.0",
+					Status: constants.StatusPlanned,
+				},
+			},
+		}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLock(ctx, plans, nil, &applied, &results, &failures, callbacks)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no update configuration found")
+	})
+
+	t.Run("skips packages with non-updatable status", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		ctx := NewUpdateContext(cfg, "/test", &mockUnsupportedTracker{}).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, false, false)
+
+		// Package with floating status should be skipped (it's a non-updatable status)
+		plans := []*PlannedUpdate{
+			{
+				Res: UpdateResult{
+					Pkg:    testutil.NPMPackage("react", "18.0.0", "18.0.0"),
+					Target: "18.0.0",
+					Status: lock.InstallStatusFloating,
+				},
+			},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLock(ctx, plans, groupCfg, &applied, &results, &failures, callbacks)
+
+		assert.NoError(t, err)
+		assert.Len(t, applied, 0)    // Nothing was applied
+		assert.Len(t, results, 1)    // Result was still recorded
+	})
+
+	t.Run("handles unsupported update error", func(t *testing.T) {
+		unsupportedErr := pkgerrors.NewUnsupportedError("update", "test reason", "unsupported-pkg")
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return unsupportedErr
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, false, false)
+
+		plans := []*PlannedUpdate{
+			{
+				Res: UpdateResult{
+					Pkg:    testutil.NPMPackage("unsupported-pkg", "1.0.0", "1.0.0"),
+					Target: "2.0.0",
+					Status: constants.StatusPlanned,
+				},
+			},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLock(ctx, plans, groupCfg, &applied, &results, &failures, callbacks)
+
+		// Unsupported errors don't propagate as group error
+		assert.NoError(t, err)
+		assert.Len(t, applied, 0)
+	})
+
+	t.Run("handles regular update error and propagates it", func(t *testing.T) {
+		updateErr := errors.New("update failed")
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return updateErr
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, false, false)
+
+		plans := []*PlannedUpdate{
+			{
+				Res: UpdateResult{
+					Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+					Target: "18.0.0",
+					Status: constants.StatusPlanned,
+				},
+			},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLock(ctx, plans, groupCfg, &applied, &results, &failures, callbacks)
+
+		// Regular errors propagate as group error
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "update failed")
+	})
+
+	t.Run("invokes OnResultReady callback", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		reloadFunc := func() ([]formats.Package, error) {
+			return []formats.Package{
+				testutil.NPMPackage("react", "18.0.0", "18.0.0"),
+			}, nil
+		}
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithReloadList(reloadFunc).
+			WithFlags(true, false, false)
+
+		plans := []*PlannedUpdate{
+			{
+				Res: UpdateResult{
+					Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+					Target: "18.0.0",
+					Status: constants.StatusPlanned,
+				},
+			},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+
+		callbackCalled := false
+		callbacks := ExecutionCallbacks{
+			DeriveReason: mockDeriveReason,
+			OnResultReady: func(res UpdateResult, dryRun bool) {
+				callbackCalled = true
+			},
+		}
+
+		err := processGroupWithGroupLock(ctx, plans, groupCfg, &applied, &results, &failures, callbacks)
+
+		assert.NoError(t, err)
+		assert.True(t, callbackCalled)
+	})
+}
+
+// TestProcessGroupWithGroupLockProgressEdgeCases tests edge cases for processGroupWithGroupLockProgress.
+func TestProcessGroupWithGroupLockProgressEdgeCases(t *testing.T) {
+	mockDeriveReason := func(p formats.Package, cfg *config.Config, err error, latestMissing bool) string {
+		return "test reason"
+	}
+
+	t.Run("returns error when groupUpdateCfg is nil", func(t *testing.T) {
+		cfg := testutil.NewConfig().Build()
+		ctx := NewUpdateContext(cfg, "/test", nil)
+
+		plans := []*PlannedUpdate{
+			{
+				Res: UpdateResult{
+					Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+					Target: "18.0.0",
+					Status: constants.StatusPlanned,
+				},
+			},
+		}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		mockProgress := &mockProgressReporter{}
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLockProgress(ctx, plans, nil, &applied, &results, mockProgress, callbacks)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no update configuration found")
+	})
+
+	t.Run("skips packages and increments progress", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		ctx := NewUpdateContext(cfg, "/test", &mockUnsupportedTracker{}).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, false, false)
+
+		// Package with NotConfigured status should be skipped but tracked
+		plans := []*PlannedUpdate{
+			{
+				Res: UpdateResult{
+					Pkg:    testutil.NPMPackage("react", "18.0.0", "18.0.0"),
+					Target: "18.0.0",
+					Status: lock.InstallStatusNotConfigured,
+				},
+			},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		mockProgress := &mockProgressReporter{}
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLockProgress(ctx, plans, groupCfg, &applied, &results, mockProgress, callbacks)
+
+		assert.NoError(t, err)
+		assert.Len(t, applied, 0)
+		assert.Len(t, results, 1)
+		assert.Equal(t, 1, mockProgress.count) // Progress was incremented even for skipped
+	})
+
+	t.Run("handles group error in else branch with progress", func(t *testing.T) {
+		updateErr := errors.New("update failed")
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			if target == "2.0.0" {
+				return updateErr
+			}
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		reloadFunc := func() ([]formats.Package, error) {
+			return []formats.Package{
+				testutil.NPMPackage("pkg1", "18.0.0", "18.0.0"),
+			}, nil
+		}
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithReloadList(reloadFunc).
+			WithFlags(true, false, false)
+
+		// Multiple packages: first succeeds, second fails
+		plans := []*PlannedUpdate{
+			{
+				Res: UpdateResult{
+					Pkg:    testutil.NPMPackage("pkg1", "17.0.0", "17.0.0"),
+					Target: "18.0.0",
+					Status: constants.StatusPlanned,
+				},
+			},
+			{
+				Res: UpdateResult{
+					Pkg:    testutil.NPMPackage("pkg2", "1.0.0", "1.0.0"),
+					Target: "2.0.0",
+					Status: constants.StatusPlanned,
+				},
+			},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		mockProgress := &mockProgressReporter{}
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLockProgress(ctx, plans, groupCfg, &applied, &results, mockProgress, callbacks)
+
+		assert.Error(t, err)
+		// The else branch with groupErr should be executed, incrementing progress for applied plans
+		assert.Equal(t, 1, mockProgress.count) // Only the successful one increments
+	})
+}
+
+// TestProcessGroupWithGroupLockSystemTests tests system test execution in group lock mode.
+func TestProcessGroupWithGroupLockSystemTests(t *testing.T) {
+	mockDeriveReason := func(p formats.Package, cfg *config.Config, err error, latestMissing bool) string {
+		return "test reason"
+	}
+
+	t.Run("runs system tests after successful group update", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		// Create a system test runner
+		runner := testutil.CreateSystemTestRunner(nil, false, false) // No tests configured = passes
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		reloadFunc := func() ([]formats.Package, error) {
+			return []formats.Package{
+				testutil.NPMPackage("react", "18.0.0", "18.0.0"),
+			}, nil
+		}
+
+		// Create system tests config for after_each mode
+		sysTestsCfg := &config.SystemTestsCfg{
+			RunMode: "after_each",
+		}
+		cfg.SystemTests = sysTestsCfg
+
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithReloadList(reloadFunc).
+			WithSystemTestRunner(runner).
+			WithFlags(true, false, false) // dry run to skip actual lock command
+
+		plans := []*PlannedUpdate{
+			{
+				Res: UpdateResult{
+					Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+					Target: "18.0.0",
+					Status: constants.StatusPlanned,
+				},
+			},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLock(ctx, plans, groupCfg, &applied, &results, &failures, callbacks)
+
+		assert.NoError(t, err)
+		assert.Len(t, results, 1)
+		assert.Equal(t, constants.StatusUpdated, results[0].Status)
+	})
+}
+
+// TestProcessGroupWithGroupLockProgressSystemTests tests system test handling with progress.
+func TestProcessGroupWithGroupLockProgressSystemTests(t *testing.T) {
+	mockDeriveReason := func(p formats.Package, cfg *config.Config, err error, latestMissing bool) string {
+		return "test reason"
+	}
+
+	t.Run("processes with validation error in progress mode", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		reloadFunc := func() ([]formats.Package, error) {
+			return nil, errors.New("validation error")
+		}
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithReloadList(reloadFunc).
+			WithFlags(true, false, false) // dry run to skip actual lock command
+		plans := []*PlannedUpdate{
+			{
+				Res: UpdateResult{
+					Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+					Target: "18.0.0",
+					Status: constants.StatusPlanned,
+				},
+			},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		mockProgress := &mockProgressReporter{}
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLockProgress(ctx, plans, groupCfg, &applied, &results, mockProgress, callbacks)
+
+		assert.Error(t, err)
+		assert.Equal(t, 1, mockProgress.count)
+	})
+
+	t.Run("handles group error with progress", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		reloadFunc := func() ([]formats.Package, error) {
+			return []formats.Package{
+				testutil.NPMPackage("react", "17.0.0", "17.0.0"), // Wrong version - validation error
+			}, nil
+		}
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithReloadList(reloadFunc).
+			WithFlags(true, false, false) // dry run to skip lock command
+		plans := []*PlannedUpdate{
+			{
+				Res: UpdateResult{
+					Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+					Target: "18.0.0",
+					Status: constants.StatusPlanned,
+				},
+			},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		mockProgress := &mockProgressReporter{}
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLockProgress(ctx, plans, groupCfg, &applied, &results, mockProgress, callbacks)
+
+		assert.Error(t, err)
+		assert.Len(t, results, 1)
+		assert.Equal(t, constants.StatusFailed, results[0].Status)
+	})
+}

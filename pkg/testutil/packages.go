@@ -224,6 +224,28 @@ func PythonPackage(name, version, installed string) formats.Package {
 		Build()
 }
 
+// ComposerPackage creates a typical Composer (PHP) package for testing.
+//
+// Creates a Composer package with standard PHP defaults.
+//
+// Parameters:
+//   - name: Composer package name (e.g., "vendor/package")
+//   - version: Declared version
+//   - installed: Installed version from composer.lock
+//
+// Returns:
+//   - formats.Package: Configured Composer package
+func ComposerPackage(name, version, installed string) formats.Package {
+	return NewPackage(name).
+		WithRule("composer").
+		WithPackageType("php").
+		WithType("prod").
+		WithVersion(version).
+		WithInstalledVersion(installed).
+		WithConstraint("^").
+		Build()
+}
+
 // CreateSystemTestRunner creates a system test runner for testing.
 //
 // If cfg is nil, returns a runner with no tests configured which will
