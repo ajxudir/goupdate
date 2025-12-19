@@ -244,17 +244,16 @@ func TestCommandResult(t *testing.T) {
 
 	// When disabled, no output
 	Disable()
-	CommandResult("npm install", 0, "output")
+	CommandResult("npm install", 1, "output")
 	assert.Empty(t, buf.String())
 
-	// Success case
+	// Success case - now silent (only failures are logged)
 	Enable()
 	CommandResult("npm install", 0, "success output")
 	output := buf.String()
 	Disable()
 
-	assert.Contains(t, output, "Command succeeded: npm install")
-	assert.Contains(t, output, "success output")
+	assert.Empty(t, output, "Success should not produce output")
 
 	// Failure case
 	buf.Reset()
@@ -266,29 +265,31 @@ func TestCommandResult(t *testing.T) {
 	assert.Contains(t, output, "Command failed (exit 1): npm install")
 	assert.Contains(t, output, "error output")
 
-	// Empty output
+	// Empty output on failure
 	buf.Reset()
 	Enable()
-	CommandResult("npm install", 0, "")
+	CommandResult("npm install", 1, "")
 	output = buf.String()
 	Disable()
 
-	assert.Contains(t, output, "Command succeeded")
+	assert.Contains(t, output, "Command failed")
 	assert.NotContains(t, output, "|")
 
-	// Multi-line output (more than 5 lines)
+	// Multi-line output on failure (more than 5 lines should be truncated)
 	buf.Reset()
 	Enable()
 	multiLine := strings.Join([]string{"line1", "line2", "line3", "line4", "line5", "line6", "line7"}, "\n")
-	CommandResult("npm install", 0, multiLine)
+	CommandResult("npm install", 1, multiLine)
 	output = buf.String()
 	Disable()
 
 	assert.Contains(t, output, "line1")
 	assert.Contains(t, output, "line2")
 	assert.Contains(t, output, "line3")
-	assert.Contains(t, output, "more lines")
+	assert.Contains(t, output, "line4")
+	assert.Contains(t, output, "line5")
 	assert.NotContains(t, output, "line6") // Should be truncated
+	assert.NotContains(t, output, "line7") // Should be truncated
 }
 
 func TestConfigLoaded(t *testing.T) {

@@ -46,8 +46,6 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 		return nil, fmt.Errorf("configuration is required")
 	}
 
-	verbose.VersionCheck(p.Name, CurrentVersionForOutdated(p), p.Constraint)
-
 	outdatedCfg, err := resolveOutdatedCfg(p, cfg)
 	if err != nil {
 		return nil, err
@@ -58,12 +56,7 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 		return nil, err
 	}
 
-	if outdatedCfg.Versioning != nil {
-		verbose.VersionStrategy(outdatedCfg.Versioning.Format, outdatedCfg.Versioning.Sort)
-	}
-
 	scopeDir := resolveOutdatedScope(p, cfg, baseDir)
-	verbose.Printf("Running outdated command in directory: %s", scopeDir)
 
 	output, err := runOutdatedCommand(ctx, outdatedCfg, p, scopeDir)
 	if err != nil {
@@ -75,22 +68,19 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 		return nil, err
 	}
 
-	verbose.VersionsRetrieved(p.Name, versions)
-
-	beforeExclusions := len(versions)
 	versionsAfterExclusions, err := applyVersionExclusions(versions, outdatedCfg, cfg.Security)
 	if err != nil {
 		return nil, err
 	}
 
-	if beforeExclusions != len(versionsAfterExclusions) {
+	if len(versions) != len(versionsAfterExclusions) {
 		excluded := findExcludedVersions(versions, versionsAfterExclusions)
-		verbose.VersionsExcluded(p.Name, beforeExclusions, len(versionsAfterExclusions), excluded)
+		verbose.VersionsExcluded(p.Name, excluded)
 	}
 	versions = versionsAfterExclusions
 
 	filtered := filterNewerVersionsWithStrategy(CurrentVersionForOutdated(p), versions, strategy)
-	verbose.VersionsFiltered(p.Name, CurrentVersionForOutdated(p), filtered)
+	verbose.VersionsFiltered(p.Name, filtered)
 
 	return filtered, nil
 }
@@ -120,37 +110,30 @@ func resolveOutdatedCfg(p formats.Package, cfg *config.Config) (*config.Outdated
 		return nil, &errors.UnsupportedError{Reason: fmt.Sprintf("outdated configuration missing for %s", p.Rule)}
 	}
 
-	verbose.Printf("Using outdated config from rule %q for package %s", p.Rule, p.Name)
-
 	effective := cloneOutdatedCfg(ruleCfg.Outdated)
 
 	var overrideCfg *config.OutdatedOverrideCfg
 	if ruleCfg.PackageOverrides != nil {
 		if override, ok := ruleCfg.PackageOverrides[p.Name]; ok {
 			overrideCfg = override.Outdated
-			verbose.Printf("Package %s has package_overrides configured", p.Name)
 		}
 	}
 
 	if overrideCfg != nil {
 		if overrideCfg.Versioning != nil {
 			effective.Versioning = overrideCfg.Versioning
-			verbose.Printf("Package %s: using custom versioning from override", p.Name)
 		}
 
 		if overrideCfg.ExcludeVersions != nil {
 			effective.ExcludeVersions = cloneStringSlice(overrideCfg.ExcludeVersions)
-			verbose.Printf("Package %s: using custom exclude_versions from override", p.Name)
 		}
 
 		if overrideCfg.ExcludeVersionPatterns != nil {
 			effective.ExcludeVersionPatterns = cloneStringSlice(overrideCfg.ExcludeVersionPatterns)
-			verbose.Printf("Package %s: using custom exclude_version_patterns from override", p.Name)
 		}
 
 		if overrideCfg.TimeoutSeconds != nil {
 			effective.TimeoutSeconds = *overrideCfg.TimeoutSeconds
-			verbose.Printf("Package %s: using custom timeout %ds from override", p.Name, *overrideCfg.TimeoutSeconds)
 		}
 	}
 
@@ -539,7 +522,6 @@ func SummarizeAvailableVersions(current string, versions []string, cfg *config.V
 
 	base, ok := strategy.parseVersion(current)
 	if !ok {
-		verbose.Printf("Version summarization: could not parse current version %q", current)
 		return "#N/A", "#N/A", "#N/A", nil
 	}
 
@@ -607,9 +589,6 @@ func SummarizeAvailableVersions(current string, versions []string, cfg *config.V
 	if patchCandidate != nil {
 		patch = patchCandidate.raw
 	}
-
-	verbose.Printf("Version candidates: major=%s, minor=%s, patch=%s (incremental=%v)",
-		major, minor, patch, incremental)
 
 	return major, minor, patch, nil
 }
@@ -716,7 +695,6 @@ func FilterVersionsByConstraint(p formats.Package, versions []string, flags Upda
 	constraint := NormalizeConstraint(p.Constraint)
 	constraintSegments := countConstraintSegments(p.Version)
 
-	originalConstraint := constraint
 	switch {
 	case flags.Major:
 		constraint = ""
@@ -743,9 +721,6 @@ func FilterVersionsByConstraint(p formats.Package, versions []string, flags Upda
 	if constraint == "*" {
 		constraint = ""
 	}
-
-	// Log constraint filtering details
-	verbose.ConstraintFilter(p.Name, len(versions), constraint, originalConstraint, reference, flags.Major, flags.Minor, flags.Patch)
 
 	allowed := make([]string, 0, len(versions))
 
@@ -805,9 +780,6 @@ func FilterVersionsByConstraint(p formats.Package, versions []string, flags Upda
 			allowed = append(allowed, raw)
 		}
 	}
-
-	// Log filtering results
-	verbose.ConstraintFilterResult(p.Name, len(versions), len(allowed))
 
 	return allowed
 }
@@ -972,10 +944,7 @@ func SelectTargetVersion(major, minor, patch string, flags UpdateSelectionFlags,
 	scope := determineScope(flags, constraint)
 	candidates := getVersionCandidates(major, minor, patch, scope, incremental)
 
-	verbose.Printf("Target selection: scope=%s, incremental=%v, candidates=%v", scope, incremental, candidates)
-
 	if v, ok := selectFirstValid(candidates...); ok {
-		verbose.Printf("Selected target version: %s", v)
 		return v, nil
 	}
 	return "", fmt.Errorf("no suitable version found")

@@ -443,42 +443,21 @@ func CommandExec(cmd, workDir string) {
 }
 
 // CommandResult logs command execution results if enabled.
-//
-// It performs the following operations:
-//   - Checks if verbose logging is enabled
-//   - Prints the command status (succeeded or failed) with exit code
-//   - Truncates long command strings to 60 characters for readability
-//   - If output is provided, prints up to 5 lines with truncation
-//   - Does nothing if verbose logging is disabled
-//
-// Parameters:
-//   - cmd: The command string that was executed
-//   - exitCode: The exit code returned by the command (0 for success)
-//   - output: The command output (stdout/stderr)
-//
-// Returns:
-//   - None
+// Only logs failures with output for debugging.
 func CommandResult(cmd string, exitCode int, output string) {
-	if !isEnabled() {
+	if !isEnabled() || exitCode == 0 {
 		return
 	}
 	w := getWriter()
-	if exitCode == 0 {
-		_, _ = fmt.Fprintf(w, "[DEBUG] Command succeeded: %s\n", truncate(cmd, 60))
-	} else {
-		_, _ = fmt.Fprintf(w, "[DEBUG] Command failed (exit %d): %s\n", exitCode, truncate(cmd, 60))
-	}
-	if output != "" && len(output) > 0 {
+	_, _ = fmt.Fprintf(w, "[DEBUG] Command failed (exit %d): %s\n", exitCode, truncate(cmd, 80))
+	if output != "" {
 		lines := strings.Split(strings.TrimSpace(output), "\n")
-		if len(lines) > 5 {
-			for _, line := range lines[:3] {
-				_, _ = fmt.Fprintf(w, "        | %s\n", truncate(line, 100))
-			}
-			_, _ = fmt.Fprintf(w, "        | ... (%d more lines)\n", len(lines)-3)
-		} else {
-			for _, line := range lines {
-				_, _ = fmt.Fprintf(w, "        | %s\n", truncate(line, 100))
-			}
+		maxLines := 5
+		if len(lines) > maxLines {
+			lines = lines[:maxLines]
+		}
+		for _, line := range lines {
+			_, _ = fmt.Fprintf(w, "        | %s\n", truncate(line, 100))
 		}
 	}
 }
@@ -548,88 +527,23 @@ func VersionSelected(pkg, current, target, reason string) {
 	}
 }
 
-// VersionCheck logs that a package is being checked for updates.
-func VersionCheck(pkg, current, constraint string) {
-	if isEnabled() {
-		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] Checking for updates: %s (current: %s, constraint: %q)\n", pkg, current, constraint)
-	}
-}
-
-// VersionStrategy logs the versioning strategy being used.
-func VersionStrategy(format, sort string) {
-	if isEnabled() {
-		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] Versioning strategy: format=%q, sort=%q\n", format, sort)
-	}
-}
-
-// VersionsRetrieved logs the raw versions retrieved from a registry.
-func VersionsRetrieved(pkg string, versions []string) {
-	if !isEnabled() {
-		return
-	}
-	w := getWriter()
-	_, _ = fmt.Fprintf(w, "[DEBUG] Parsed %d available versions for %s\n", len(versions), pkg)
-	if len(versions) > 0 {
-		if len(versions) <= 10 {
-			_, _ = fmt.Fprintf(w, "[DEBUG] Raw versions for %s: %v\n", pkg, versions)
-		} else {
-			_, _ = fmt.Fprintf(w, "[DEBUG] Raw versions for %s: %v... (%d more)\n", pkg, versions[:10], len(versions)-10)
-		}
-	}
-}
 
 // VersionsExcluded logs versions that were excluded by patterns.
-func VersionsExcluded(pkg string, before, after int, excluded []string) {
-	if !isEnabled() || before == after {
+func VersionsExcluded(pkg string, excluded []string) {
+	if !isEnabled() || len(excluded) == 0 {
 		return
 	}
-	w := getWriter()
-	_, _ = fmt.Fprintf(w, "[DEBUG] Excluded %d versions (before: %d, after: %d)\n", before-after, before, after)
-	if len(excluded) > 0 {
-		if len(excluded) <= 10 {
-			_, _ = fmt.Fprintf(w, "[DEBUG] Excluded versions for %s: %v\n", pkg, excluded)
-		} else {
-			_, _ = fmt.Fprintf(w, "[DEBUG] Excluded versions for %s: %v... (%d more)\n", pkg, excluded[:10], len(excluded)-10)
-		}
-	}
+	_, _ = fmt.Fprintf(getWriter(), "[DEBUG] Excluded versions for %s: %v\n", pkg, excluded)
 }
 
 // VersionsFiltered logs the newer versions found after filtering.
-func VersionsFiltered(pkg, current string, filtered []string) {
-	if !isEnabled() {
+func VersionsFiltered(pkg string, filtered []string) {
+	if !isEnabled() || len(filtered) == 0 {
 		return
 	}
-	w := getWriter()
-	_, _ = fmt.Fprintf(w, "[DEBUG] Found %d newer versions for %s (current: %s)\n", len(filtered), pkg, current)
-	if len(filtered) > 0 {
-		if len(filtered) <= 10 {
-			_, _ = fmt.Fprintf(w, "[DEBUG] Newer versions for %s: %v\n", pkg, filtered)
-		} else {
-			_, _ = fmt.Fprintf(w, "[DEBUG] Newer versions for %s: %v... (%d more)\n", pkg, filtered[:10], len(filtered)-10)
-		}
-	}
+	_, _ = fmt.Fprintf(getWriter(), "[DEBUG] Newer versions for %s: %v\n", pkg, filtered)
 }
 
-// ConstraintFilter logs constraint filtering details.
-func ConstraintFilter(pkg string, inputCount int, constraint, originalConstraint, reference string, major, minor, patch bool) {
-	if isEnabled() {
-		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] FilterVersionsByConstraint for %s: input=%d versions, constraint=%q (original=%q), reference=%s, flags={major=%v, minor=%v, patch=%v}\n",
-			pkg, inputCount, constraint, originalConstraint, reference, major, minor, patch)
-	}
-}
-
-// ConstraintFilterResult logs the result of constraint filtering.
-func ConstraintFilterResult(pkg string, inputCount, outputCount int) {
-	if !isEnabled() {
-		return
-	}
-	filtered := inputCount - outputCount
-	if filtered > 0 {
-		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] FilterVersionsByConstraint for %s: filtered out %d versions, %d remaining\n", pkg, filtered, outputCount)
-	} else {
-		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] FilterVersionsByConstraint for %s: all %d versions allowed\n", pkg, outputCount)
-	}
-}
 
 // truncate shortens a string to the specified maximum length.
 //
