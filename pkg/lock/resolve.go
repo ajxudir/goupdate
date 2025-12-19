@@ -170,6 +170,7 @@ func ApplyInstalledVersions(packages []formats.Package, cfg *config.Config, base
 	for idx := range packages {
 		if packages[idx].Version == "*" && packages[idx].InstalledVersion == "#N/A" {
 			packages[idx].InstallStatus = InstallStatusVersionMissing
+			verbose.Printf("VersionMissing: %s has wildcard %q with no installed version", packages[idx].Name, packages[idx].Version)
 		}
 	}
 
@@ -178,6 +179,7 @@ func ApplyInstalledVersions(packages []formats.Package, cfg *config.Config, base
 	for idx := range packages {
 		if utils.IsFloatingConstraint(packages[idx].Version) {
 			packages[idx].InstallStatus = InstallStatusFloating
+			verbose.Printf("Floating: %s has constraint %q - manual update required", packages[idx].Name, packages[idx].Version)
 		}
 	}
 
@@ -186,6 +188,7 @@ func ApplyInstalledVersions(packages []formats.Package, cfg *config.Config, base
 	for idx := range packages {
 		if packages[idx].IgnoreReason != "" {
 			packages[idx].InstallStatus = InstallStatusIgnored
+			verbose.Printf("Ignored: %s - %s", packages[idx].Name, packages[idx].IgnoreReason)
 		}
 	}
 
