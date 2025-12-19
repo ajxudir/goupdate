@@ -388,10 +388,8 @@ func UpdatePackage(p formats.Package, target string, cfg *config.Config, workDir
 		verbose.Printf("Failed to update declared version for %s: %v\n", p.Name, applyErr)
 		return applyErr
 	}
-	verbose.Tracef("Updated declared version for %s in manifest", p.Name)
 
 	if dryRun || skipLock {
-		verbose.Tracef("Skipping lock command for %s (dryRun=%v, skipLock=%v)", p.Name, dryRun, skipLock)
 		return nil
 	}
 
@@ -399,8 +397,6 @@ func UpdatePackage(p formats.Package, target string, cfg *config.Config, workDir
 	if err := runLockCommand(target); err != nil {
 		return performRollback(err)
 	}
-
-	verbose.Debugf("Successfully updated %s to %s", p.Name, target)
 	return nil
 }
 

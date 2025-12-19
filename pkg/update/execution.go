@@ -601,14 +601,14 @@ func appendResultAndPrint(ctx *UpdateContext, res *UpdateResult, results *[]Upda
 // Returns:
 //   - error: Returns error if critical tests fail and stop-on-fail is enabled; returns nil otherwise
 func runGroupSystemTests(ctx *UpdateContext, applied []*PlannedUpdate, systemTestFailures *[]SystemTestFailure) error {
-	verbose.Debugf("Running system tests after group update (%d packages)", len(applied))
 	testResult := ctx.SystemTestRunner.RunAfterUpdate()
 	for _, plan := range applied {
 		plan.Res.SystemTestResult = testResult
 	}
 	isCritical := testResult.HasCriticalFailure() && ctx.SystemTestRunner.StopOnFail()
 	if isCritical {
-		verbose.Printf("System tests failed critically - will rollback group\n")
+		verbose.Printf("System tests FAILED for group (%d/%d, %v)\n",
+			testResult.PassedCount(), len(testResult.Tests), testResult.TotalDuration)
 		for _, plan := range applied {
 			plan.Res.Status = constants.StatusFailed
 			plan.Res.Err = fmt.Errorf("system tests failed: %s", testResult.Summary())
@@ -618,14 +618,16 @@ func runGroupSystemTests(ctx *UpdateContext, applied []*PlannedUpdate, systemTes
 		return err
 	}
 	if !testResult.Passed() {
-		verbose.Debugf("System tests have non-critical failures (continue_on_fail enabled)")
+		verbose.Debugf("System tests: %d/%d passed for group (%v)",
+			testResult.PassedCount(), len(testResult.Tests), testResult.TotalDuration)
 		*systemTestFailures = append(*systemTestFailures, SystemTestFailure{
 			PkgName:    "group",
 			Result:     testResult,
 			IsCritical: isCritical,
 		})
 	} else {
-		verbose.Debugf("System tests passed for group")
+		verbose.Debugf("System tests passed for group (%d/%d, %v)",
+			testResult.PassedCount(), len(testResult.Tests), testResult.TotalDuration)
 	}
 	return nil
 }
@@ -648,18 +650,17 @@ func runGroupSystemTests(ctx *UpdateContext, applied []*PlannedUpdate, systemTes
 // Returns:
 //   - error: Returns nil; errors are tracked via context and groupErr pointer
 func runPackageSystemTests(ctx *UpdateContext, plan *PlannedUpdate, groupErr *error, systemTestFailures *[]SystemTestFailure) error {
-	verbose.Debugf("Running system tests after %s update", plan.Res.Pkg.Name)
 	testResult := ctx.SystemTestRunner.RunAfterUpdate()
 	plan.Res.SystemTestResult = testResult
 	isCritical := testResult.HasCriticalFailure() && ctx.SystemTestRunner.StopOnFail()
 	if isCritical {
-		verbose.Printf("System tests failed critically for %s - rolling back to %s\n", plan.Res.Pkg.Name, plan.Original)
+		verbose.Printf("System tests FAILED for %s (%d/%d, %v) - rolling back\n",
+			plan.Res.Pkg.Name, testResult.PassedCount(), len(testResult.Tests), testResult.TotalDuration)
 		rollbackErr := ctx.UpdaterFunc(plan.Res.Pkg, plan.Original, ctx.Cfg, ctx.WorkDir, ctx.DryRun, ctx.SkipLockRun)
 		if rollbackErr != nil {
 			verbose.Printf("Rollback failed for %s: %v\n", plan.Res.Pkg.Name, rollbackErr)
 			ctx.AppendFailure(fmt.Errorf("%s: rollback failed: %w", plan.Res.Pkg.Name, rollbackErr))
 		} else {
-			verbose.Debugf("Rollback successful for %s", plan.Res.Pkg.Name)
 			// Verify rollback with drift check
 			if ctx.ReloadList != nil && !ctx.DryRun {
 				driftErr := verifyRollbackDrift(plan, ctx.ReloadList)
@@ -675,14 +676,16 @@ func runPackageSystemTests(ctx *UpdateContext, plan *PlannedUpdate, groupErr *er
 		*groupErr = stderrors.Join(*groupErr, plan.Res.Err)
 	}
 	if !testResult.Passed() {
-		verbose.Debugf("System tests have failures for %s (critical=%v)", plan.Res.Pkg.Name, isCritical)
+		verbose.Debugf("System tests: %d/%d passed for %s (%v)",
+			testResult.PassedCount(), len(testResult.Tests), plan.Res.Pkg.Name, testResult.TotalDuration)
 		*systemTestFailures = append(*systemTestFailures, SystemTestFailure{
 			PkgName:    plan.Res.Pkg.Name,
 			Result:     testResult,
 			IsCritical: isCritical,
 		})
 	} else {
-		verbose.Debugf("System tests passed for %s", plan.Res.Pkg.Name)
+		verbose.Debugf("System tests passed for %s (%d/%d, %v)",
+			plan.Res.Pkg.Name, testResult.PassedCount(), len(testResult.Tests), testResult.TotalDuration)
 	}
 	return nil
 }

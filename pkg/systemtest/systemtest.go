@@ -202,7 +202,7 @@ func (r *Runner) runSingleTest(test *config.SystemTestCfg) TestResult {
 		verbose.Printf("System test %q FAILED: %v\n", test.Name, err)
 	} else {
 		testResult.Passed = true
-		verbose.Debugf("System test %q passed (%v)", test.Name, duration)
+		// Success is logged as a summary by the caller, not per-test
 	}
 
 	return testResult

@@ -385,9 +385,6 @@ func planVersionUpdate(
 	// opts.IncrementalMode flag forces incremental mode for all packages
 	incremental := opts.IncrementalMode || configIncremental
 
-	verbose.Tracef("Planning update for %s: incremental=%v (flag=%v, config=%v)",
-		p.Name, incremental, opts.IncrementalMode, configIncremental)
-
 	if err != nil {
 		if errors.IsUnsupported(err) {
 			res.Status = lock.InstallStatusNotConfigured
