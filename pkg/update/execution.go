@@ -44,7 +44,11 @@ func ValidateUpdatedPackage(plan *PlannedUpdate, reloadList func() ([]formats.Pa
 
 	verbose.Printf("Post-update drift check: verifying %s updated to %s\n", plan.Res.Pkg.Name, plan.Res.Target)
 
+	// Suppress verbose output during reload to reduce noise
+	verbose.Suppress()
 	packages, err := reloadList()
+	verbose.Unsuppress()
+
 	if err != nil {
 		verbose.Printf("Drift check: failed to reload packages: %v\n", err)
 		return err
@@ -97,7 +101,11 @@ func ValidatePreUpdateState(plan *PlannedUpdate, reloadList func() ([]formats.Pa
 
 	verbose.Printf("Pre-update drift check: verifying %s is still at %s\n", plan.Res.Pkg.Name, plan.Original)
 
+	// Suppress verbose output during reload to reduce noise
+	verbose.Suppress()
 	packages, err := reloadList()
+	verbose.Unsuppress()
+
 	if err != nil {
 		verbose.Printf("Drift check: failed to reload packages: %v\n", err)
 		return nil // Non-fatal - continue with update
@@ -184,7 +192,11 @@ func verifyRollbackDrift(plan *PlannedUpdate, reloadList func() ([]formats.Packa
 
 	verbose.Printf("Drift check: verifying %s rolled back to %s\n", plan.Res.Pkg.Name, plan.Original)
 
+	// Suppress verbose output during reload to reduce noise
+	verbose.Suppress()
 	packages, err := reloadList()
+	verbose.Unsuppress()
+
 	if err != nil {
 		verbose.Printf("Drift check: failed to reload packages: %v\n", err)
 		return fmt.Errorf("drift check failed: could not reload packages: %w", err)

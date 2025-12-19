@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	mu      sync.RWMutex
-	enabled bool
-	writer  io.Writer = os.Stderr
+	mu         sync.RWMutex
+	enabled    bool
+	suppressed bool // Temporarily suppress verbose output (for drift checks, etc.)
+	writer     io.Writer = os.Stderr
 )
 
 // Enable turns on verbose logging and allows debug messages to be printed.
@@ -43,6 +44,29 @@ func Disable() {
 	mu.Lock()
 	defer mu.Unlock()
 	enabled = false
+}
+
+// Suppress temporarily suppresses verbose output without disabling it.
+// Use this for operations that would produce excessive noise (e.g., drift checks).
+// Call Unsuppress() when done to restore normal verbose output.
+func Suppress() {
+	mu.Lock()
+	defer mu.Unlock()
+	suppressed = true
+}
+
+// Unsuppress restores verbose output after a Suppress() call.
+func Unsuppress() {
+	mu.Lock()
+	defer mu.Unlock()
+	suppressed = false
+}
+
+// IsSuppressed returns whether verbose output is currently suppressed.
+func IsSuppressed() bool {
+	mu.RLock()
+	defer mu.RUnlock()
+	return suppressed
 }
 
 // IsEnabled returns whether verbose logging is currently enabled.
@@ -95,19 +119,19 @@ func getWriter() io.Writer {
 	return writer
 }
 
-// isEnabled returns whether verbose is enabled with proper locking for internal use.
+// isEnabled returns whether verbose is enabled and not suppressed.
 //
 // It performs the following operations:
 //   - Acquires a read lock to ensure thread-safe access
-//   - Reads the enabled flag value
+//   - Checks both enabled and suppressed flags
 //   - Releases the read lock
 //
 // Returns:
-//   - bool: true if verbose logging is enabled, false otherwise
+//   - bool: true if verbose logging is enabled and not suppressed, false otherwise
 func isEnabled() bool {
 	mu.RLock()
 	defer mu.RUnlock()
-	return enabled
+	return enabled && !suppressed
 }
 
 // Printf prints a formatted verbose message if enabled.

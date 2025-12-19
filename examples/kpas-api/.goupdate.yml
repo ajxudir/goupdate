@@ -11,17 +11,21 @@ rules:
   # Some packages need --with-all-dependencies (-W) flag to update transitive dependencies
   # This is required when composer.lock has sub-dependencies that need updating together
   composer:
-    packages:
-      # Laravel framework and core packages - require transitive dependency updates
-      laravel/framework:
+    groups:
+      # Laravel core packages that must be updated together due to version constraints
+      # collision requires specific laravel/framework versions, so they must update atomically
+      laravel-core:
         with_all_dependencies: true
+        packages:
+          - laravel/framework
+          - nunomaduro/collision
+
+    packages:
       guzzlehttp/guzzle:
         with_all_dependencies: true
 
       # Dev dependencies with complex sub-dependencies
       barryvdh/laravel-debugbar:
-        with_all_dependencies: true
-      nunomaduro/collision:
         with_all_dependencies: true
 
       # Packages with complex transitive dependencies that require -W flag
