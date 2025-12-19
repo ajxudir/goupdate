@@ -57,7 +57,8 @@ type PlanningOptions struct {
 	IncrementalMode bool
 	// OnPackageChecked is called after each package's versions are checked
 	// Used for progress feedback during the planning phase
-	OnPackageChecked func(pkg formats.Package, current, total int)
+	// The PlannedUpdate contains the result with Major/Minor/Patch info
+	OnPackageChecked func(plan *PlannedUpdate, current, total int)
 }
 
 // VersionLister is a function type for listing newer versions of a package.
@@ -174,7 +175,7 @@ func BuildGroupedPlans(
 			planned := handleIgnoredPackage(p, originalVersion)
 			groupedPlans = append(groupedPlans, planned)
 			if opts.OnPackageChecked != nil {
-				opts.OnPackageChecked(p, i+1, total)
+				opts.OnPackageChecked(planned, i+1, total)
 			}
 			continue
 		}
@@ -184,7 +185,7 @@ func BuildGroupedPlans(
 			planned := handleConfigError(p, cfgErr, updateCtx, originalVersion, deriveReason)
 			groupedPlans = append(groupedPlans, planned)
 			if opts.OnPackageChecked != nil {
-				opts.OnPackageChecked(p, i+1, total)
+				opts.OnPackageChecked(planned, i+1, total)
 			}
 			continue
 		}
@@ -194,7 +195,7 @@ func BuildGroupedPlans(
 			planned := handleFloatingConstraint(p, updateCfg, updateCtx, originalVersion)
 			groupedPlans = append(groupedPlans, planned)
 			if opts.OnPackageChecked != nil {
-				opts.OnPackageChecked(p, i+1, total)
+				opts.OnPackageChecked(planned, i+1, total)
 			}
 			continue
 		}
@@ -205,7 +206,7 @@ func BuildGroupedPlans(
 			planned := handleExactConstraint(p, updateCfg, originalVersion)
 			groupedPlans = append(groupedPlans, planned)
 			if opts.OnPackageChecked != nil {
-				opts.OnPackageChecked(p, i+1, total)
+				opts.OnPackageChecked(planned, i+1, total)
 			}
 			continue
 		}
@@ -216,7 +217,7 @@ func BuildGroupedPlans(
 
 		// Call progress callback after package is checked
 		if opts.OnPackageChecked != nil {
-			opts.OnPackageChecked(p, i+1, total)
+			opts.OnPackageChecked(planned, i+1, total)
 		}
 	}
 

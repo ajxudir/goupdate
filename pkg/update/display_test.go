@@ -428,6 +428,22 @@ func TestFormatSummaryStrings(t *testing.T) {
 		assert.Contains(t, available, "0 minor")
 		assert.Contains(t, available, "0 patch")
 	})
+
+	t.Run("zero outdated and up-to-date always shown", func(t *testing.T) {
+		// Even with all zeros, counts should be shown for regex-friendly parsing
+		counts := UpdateSummaryCounts{ToUpdate: 0, UpToDate: 0}
+		summary, _ := FormatSummaryStrings(counts, SummaryModeOutdated)
+		assert.Contains(t, summary, "0 outdated")
+		assert.Contains(t, summary, "0 up-to-date")
+	})
+
+	t.Run("result mode always shows up-to-date count", func(t *testing.T) {
+		// Even with zero up-to-date, it should still be shown
+		counts := UpdateSummaryCounts{ToUpdate: 5, UpToDate: 0}
+		summary, _ := FormatSummaryStrings(counts, SummaryModeResult)
+		assert.Contains(t, summary, "5 updated")
+		assert.Contains(t, summary, "0 up-to-date")
+	})
 }
 
 func TestBuildUpdateTableFromPackages(t *testing.T) {

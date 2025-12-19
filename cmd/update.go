@@ -210,21 +210,39 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	opts := update.PlanningOptions{IncrementalMode: updateIncrementalFlag}
 	useStructuredOutput := output.IsStructuredFormat(outputFormat)
 
+	// Build outdated-style table for progress display during planning phase
+	var outdatedCheckTable *output.Table
 	if !useStructuredOutput && len(resolvedPkgs) > 0 {
 		fmt.Println()
 		fmt.Println("Checking for available updates...")
-		fmt.Println(strings.Repeat("─", 50))
+		fmt.Println(strings.Repeat("═", 70))
 
-		opts.OnPackageChecked = func(pkg formats.Package, current, total int) {
-			fmt.Printf("  [%d/%d] %s\n", current, total, pkg.Name)
-			_ = os.Stdout.Sync()
+		outdatedCheckTable = update.BuildOutdatedCheckTable(resolvedPkgs, selection)
+		fmt.Println(outdatedCheckTable.HeaderRow())
+		fmt.Println(outdatedCheckTable.SeparatorRow())
+
+		opts.OnPackageChecked = func(plan *update.PlannedUpdate, current, total int) {
+			update.PrintOutdatedCheckRow(plan, outdatedCheckTable, selection)
 		}
 	}
 
 	groupedPlans := update.BuildGroupedPlans(cmdCtx, resolved, updateCtx, opts, listNewerVersionsFunc, supervision.DeriveUnsupportedReason)
 
 	if !useStructuredOutput && len(resolvedPkgs) > 0 {
-		fmt.Println()
+		// Print summary for the outdated checking phase
+		summaryData := make([]update.OutdatedResultData, len(groupedPlans))
+		for i, plan := range groupedPlans {
+			summaryData[i] = update.OutdatedResultData{
+				Status: update.DeriveOutdatedStatus(plan),
+				Major:  plan.Res.Major,
+				Minor:  plan.Res.Minor,
+				Patch:  plan.Res.Patch,
+				Err:    plan.Res.Err,
+			}
+		}
+		fmt.Printf("\nTotal packages: %d\n", len(groupedPlans))
+		counts := update.ComputeSummaryFromOutdatedResults(summaryData)
+		update.PrintUpdateSummaryLines(counts, update.SummaryModeOutdated)
 	}
 
 	// Calculate column widths
