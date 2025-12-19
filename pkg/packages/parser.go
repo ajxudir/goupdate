@@ -60,8 +60,6 @@ func (dp *DynamicParser) ParseFile(filePath string, cfg *config.PackageManagerCf
 		return nil, fmt.Errorf("fields configuration missing for %s", filePath)
 	}
 
-	verbose.Printf("Parsing file: %s\n", filePath)
-
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)

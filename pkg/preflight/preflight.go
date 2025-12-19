@@ -147,10 +147,8 @@ func ValidatePackages(packages []formats.Package, cfg *config.Config) *ValidateR
 	for _, p := range packages {
 		ruleCfg, ok := cfg.Rules[p.Rule]
 		if !ok {
-			verbose.Tracef("Preflight: skipping package %q - rule %q not found in config", p.Name, p.Rule)
 			continue
 		}
-		verbose.Tracef("Preflight: checking commands for package %q (rule: %s)", p.Name, p.Rule)
 
 		// Check outdated commands
 		if ruleCfg.Outdated != nil {
@@ -204,10 +202,8 @@ func ValidateRules(rules []string, cfg *config.Config) *ValidateResult {
 	for _, ruleName := range rules {
 		ruleCfg, ok := cfg.Rules[ruleName]
 		if !ok {
-			verbose.Tracef("Preflight: skipping rule %q - not found in config", ruleName)
 			continue
 		}
-		verbose.Tracef("Preflight: checking commands for rule %q", ruleName)
 
 		// Check outdated commands
 		if ruleCfg.Outdated != nil {
@@ -321,18 +317,13 @@ func validateCommand(cmd string) *ValidationError {
 		return nil
 	}
 
-	verbose.Tracef("Preflight: checking command %q", cmd)
-
 	// First try exec.LookPath (faster, finds binaries)
 	if _, err := exec.LookPath(cmd); err == nil {
-		verbose.Tracef("Preflight: command %q found in PATH", cmd)
 		return nil
 	}
 
 	// Fall back to shell-based check to support aliases
-	verbose.Tracef("Preflight: command %q not in PATH, checking shell aliases", cmd)
 	if commandExistsInShell(cmd) {
-		verbose.Tracef("Preflight: command %q found as shell alias/function", cmd)
 		return nil
 	}
 
