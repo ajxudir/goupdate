@@ -105,8 +105,6 @@ func ValidateRegexSafety(pattern string) error {
 // Returns:
 //   - error: Returns nil if pattern is safe; returns ErrRegexTooComplex with configuration suggestions if pattern is potentially dangerous
 func ValidateRegexSafetyWithOptions(pattern string, opts RegexValidationOptions) error {
-	verbose.Printf("Regex validation: checking pattern (length=%d)\n", len(pattern))
-
 	maxLength := opts.MaxLength
 	if maxLength <= 0 {
 		maxLength = DefaultMaxRegexPatternLength
@@ -124,7 +122,6 @@ func ValidateRegexSafetyWithOptions(pattern string, opts RegexValidationOptions)
 
 	// Skip complexity checks if configured (dangerous but sometimes needed)
 	if opts.SkipComplexityCheck {
-		verbose.Printf("Regex validation: skipping complexity check (configured)\n")
 		return nil
 	}
 
@@ -172,7 +169,6 @@ func ValidateRegexSafetyWithOptions(pattern string, opts RegexValidationOptions)
 			ErrRegexTooComplex, quantifierCount, maxRegexQuantifiers)
 	}
 
-	verbose.Printf("Regex validation: pattern passed all safety checks\n")
 	return nil
 }
 

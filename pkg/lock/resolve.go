@@ -52,9 +52,9 @@ var (
 //   - []formats.Package: Enriched packages with InstalledVersion and InstallStatus set
 //   - error: When lock file resolution fails, returns error; otherwise returns nil
 func ApplyInstalledVersions(packages []formats.Package, cfg *config.Config, baseDir string) ([]formats.Package, error) {
-	verbose.Printf("Lock resolution: applying installed versions for %d packages (baseDir: %s)\n", len(packages), baseDir)
+	verbose.Printf("Lock resolution: applying installed versions for %d packages\n", len(packages))
 	if len(packages) == 0 || cfg == nil {
-		verbose.Printf("Lock resolution: skipping - packages=%d, cfg=%v\n", len(packages), cfg != nil)
+		verbose.Debugf("Lock resolution: skipping - packages=%d, cfg=%v", len(packages), cfg != nil)
 		return packages, nil
 	}
 
@@ -81,16 +81,16 @@ func ApplyInstalledVersions(packages []formats.Package, cfg *config.Config, base
 		if len(ruleCfg.LockFiles) == 0 {
 			// Check if this rule uses self-pinning (manifest is its own lock)
 			if ruleCfg.SelfPinning {
-				verbose.Printf("Lock resolution: rule %q uses self-pinning (manifest is its own lock)\n", ruleKey)
+				verbose.Debugf("Lock resolution: rule %q uses self-pinning (manifest is its own lock)", ruleKey)
 				for _, idx := range indexes {
 					version := strings.TrimSpace(packages[idx].Version)
 					if version == "" || version == "*" {
 						// Wildcard versions can't be self-pinned
-						verbose.Printf("Lock resolution: %q has wildcard version, cannot self-pin\n", packages[idx].Name)
+						verbose.Tracef("Lock resolution: %q has wildcard version, cannot self-pin", packages[idx].Name)
 						packages[idx].InstalledVersion = "#N/A"
 						packages[idx].InstallStatus = InstallStatusVersionMissing
 					} else {
-						verbose.Printf("Lock resolution: %q self-pinned to %q\n", packages[idx].Name, version)
+						verbose.Tracef("Lock resolution: %q self-pinned to %q", packages[idx].Name, version)
 						packages[idx].InstalledVersion = version
 						packages[idx].InstallStatus = InstallStatusSelfPinned
 					}
@@ -98,7 +98,7 @@ func ApplyInstalledVersions(packages []formats.Package, cfg *config.Config, base
 				continue
 			}
 
-			verbose.Printf("Lock resolution: rule %q has no lock files configured\n", ruleKey)
+			verbose.Debugf("Lock resolution: rule %q has no lock files configured", ruleKey)
 			for _, idx := range indexes {
 				packages[idx].InstalledVersion = "#N/A"
 				packages[idx].InstallStatus = InstallStatusNotConfigured
@@ -131,7 +131,7 @@ func ApplyInstalledVersions(packages []formats.Package, cfg *config.Config, base
 			continue
 		}
 
-		verbose.Printf("Lock resolution: resolving versions for rule %q in scope %q (%d packages)\n", key.rule, key.dir, len(indexes))
+		verbose.Debugf("Lock resolution: resolving versions for rule %q in scope %q (%d packages)", key.rule, key.dir, len(indexes))
 		installed, foundLock, err := resolveInstalledVersions(key.dir, ruleCfg.LockFiles)
 		if err != nil {
 			verbose.Printf("Lock resolution ERROR: failed to resolve lock files for %s: %v\n", key.rule, err)
@@ -139,7 +139,7 @@ func ApplyInstalledVersions(packages []formats.Package, cfg *config.Config, base
 		}
 
 		if !foundLock {
-			verbose.Printf("Lock resolution: no lock files found for rule %q in %q\n", key.rule, key.dir)
+			verbose.Debugf("Lock resolution: no lock files found for rule %q in %q", key.rule, key.dir)
 			for _, idx := range indexes {
 				packages[idx].InstalledVersion = "#N/A"
 				packages[idx].InstallStatus = InstallStatusLockMissing
@@ -149,17 +149,17 @@ func ApplyInstalledVersions(packages []formats.Package, cfg *config.Config, base
 			continue
 		}
 
-		verbose.Printf("Lock resolution: found %d installed versions from lock files\n", len(installed))
+		verbose.Debugf("Lock resolution: found %d installed versions from lock files", len(installed))
 		for _, idx := range indexes {
 			name := packages[idx].Name
 			if version, ok := installed[name]; ok && version != "" {
-				verbose.Printf("Lock resolution: %q installed version is %q\n", name, version)
+				verbose.Tracef("Lock resolution: %q installed version is %q", name, version)
 				packages[idx].InstalledVersion = version
 				packages[idx].InstallStatus = InstallStatusLockFound
 				continue
 			}
 
-			verbose.Printf("Lock resolution: %q not found in lock file\n", name)
+			verbose.Tracef("Lock resolution: %q not found in lock file", name)
 			packages[idx].InstalledVersion = "#N/A"
 			packages[idx].InstallStatus = InstallStatusNotInLock
 
@@ -170,6 +170,7 @@ func ApplyInstalledVersions(packages []formats.Package, cfg *config.Config, base
 	for idx := range packages {
 		if packages[idx].Version == "*" && packages[idx].InstalledVersion == "#N/A" {
 			packages[idx].InstallStatus = InstallStatusVersionMissing
+			verbose.Printf("VersionMissing: %s has wildcard %q with no installed version", packages[idx].Name, packages[idx].Version)
 		}
 	}
 
@@ -178,6 +179,7 @@ func ApplyInstalledVersions(packages []formats.Package, cfg *config.Config, base
 	for idx := range packages {
 		if utils.IsFloatingConstraint(packages[idx].Version) {
 			packages[idx].InstallStatus = InstallStatusFloating
+			verbose.Printf("Floating: %s has constraint %q - manual update required", packages[idx].Name, packages[idx].Version)
 		}
 	}
 
@@ -186,6 +188,7 @@ func ApplyInstalledVersions(packages []formats.Package, cfg *config.Config, base
 	for idx := range packages {
 		if packages[idx].IgnoreReason != "" {
 			packages[idx].InstallStatus = InstallStatusIgnored
+			verbose.Printf("Ignored: %s - %s", packages[idx].Name, packages[idx].IgnoreReason)
 		}
 	}
 
@@ -242,17 +245,17 @@ func issueLatestWarning(pkg formats.Package, ruleCfg config.PackageManagerCfg, s
 //   - bool: True if any lock files were found, false otherwise
 //   - error: When file search or version extraction fails, returns error; otherwise returns nil
 func resolveInstalledVersions(baseDir string, lockCfgs []config.LockFileCfg) (map[string]string, bool, error) {
-	verbose.Printf("Lock resolution: searching for lock files in %q (%d lock configs)\n", baseDir, len(lockCfgs))
+	verbose.Debugf("Lock resolution: searching for lock files in %q (%d lock configs)", baseDir, len(lockCfgs))
 	installed := make(map[string]string)
 	foundAny := false
 
 	for i, lockCfg := range lockCfgs {
 		if len(lockCfg.Files) == 0 {
-			verbose.Printf("Lock resolution: config %d has no file patterns, skipping\n", i)
+			verbose.Tracef("Lock resolution: config %d has no file patterns, skipping", i)
 			continue
 		}
 
-		verbose.Printf("Lock resolution: searching for patterns %v\n", lockCfg.Files)
+		verbose.Tracef("Lock resolution: searching for patterns %v", lockCfg.Files)
 		files, err := findFilesByPatterns(baseDir, lockCfg.Files)
 		if err != nil {
 			verbose.Printf("Lock resolution ERROR: failed to find lock files: %v\n", err)
@@ -260,21 +263,20 @@ func resolveInstalledVersions(baseDir string, lockCfgs []config.LockFileCfg) (ma
 		}
 
 		if len(files) == 0 {
-			verbose.Printf("Lock resolution: no files matched patterns %v\n", lockCfg.Files)
+			verbose.Tracef("Lock resolution: no files matched patterns %v", lockCfg.Files)
 			continue
 		}
 
-		verbose.Printf("Lock resolution: found %d lock files: %v\n", len(files), files)
+		verbose.Debugf("Lock resolution: found %d lock files: %v", len(files), files)
 		foundAny = true
 		for _, file := range files {
-			verbose.Printf("Lock resolution: extracting versions from %s\n", file)
 			matches, err := extractVersionsFromFn(file, &lockCfg)
 			if err != nil {
 				verbose.Printf("Lock resolution ERROR: failed to extract versions from %s: %v\n", file, err)
 				return nil, false, fmt.Errorf("failed to extract versions from %s: %w", file, err)
 			}
 
-			verbose.Printf("Lock resolution: extracted %d packages from %s\n", len(matches), filepath.Base(file))
+			verbose.Debugf("Lock extraction: %s → %d packages", filepath.Base(file), len(matches))
 
 			// Note: If len(matches) == 0 with a configured extraction pattern,
 			// this could indicate a misconfigured pattern. Consumers can check
@@ -289,7 +291,7 @@ func resolveInstalledVersions(baseDir string, lockCfgs []config.LockFileCfg) (ma
 		}
 	}
 
-	verbose.Printf("Lock resolution: total %d installed versions resolved (foundAny=%v)\n", len(installed), foundAny)
+	verbose.Debugf("Lock resolution: total %d installed versions resolved", len(installed))
 	return installed, foundAny, nil
 }
 
@@ -310,7 +312,7 @@ func resolveInstalledVersions(baseDir string, lockCfgs []config.LockFileCfg) (ma
 //   - map[string]string: Map of package names to versions extracted from the lock file
 //   - error: When cfg is nil, file read fails, or pattern parsing fails, returns error; otherwise returns nil
 func extractVersionsFromLock(path string, cfg *config.LockFileCfg) (map[string]string, error) {
-	verbose.Printf("Lock extraction: processing %s\n", path)
+	verbose.Tracef("Lock extraction: processing %s", path)
 
 	// Handle nil config
 	if cfg == nil {
@@ -320,17 +322,15 @@ func extractVersionsFromLock(path string, cfg *config.LockFileCfg) (map[string]s
 
 	// Check if custom commands are configured for this lock file
 	if cfg.Commands != "" {
-		verbose.Printf("Lock extraction: using custom commands for %s\n", path)
+		verbose.Tracef("Lock extraction: using custom commands for %s", path)
 		return extractVersionsFromCommand(path, cfg)
 	}
 
-	verbose.Printf("Lock extraction: reading file content\n")
 	content, err := os.ReadFile(path)
 	if err != nil {
 		verbose.Printf("Lock extraction ERROR: failed to read %s: %v\n", path, err)
 		return nil, err
 	}
-	verbose.Printf("Lock extraction: read %d bytes from %s\n", len(content), filepath.Base(path))
 
 	// Validate extraction configuration - must have either Pattern or Patterns
 	if cfg.Extraction == nil || (cfg.Extraction.Pattern == "" && len(cfg.Extraction.Patterns) == 0) {
@@ -338,14 +338,13 @@ func extractVersionsFromLock(path string, cfg *config.LockFileCfg) (map[string]s
 		return nil, fmt.Errorf("lock file extraction pattern missing for %s", path)
 	}
 
-	verbose.Printf("Lock extraction: applying extraction pattern(s) to %s\n", filepath.Base(path))
 	// Use multi-pattern extraction for maximum flexibility across lock file versions
 	matches, err := utils.ExtractWithPatterns(string(content), cfg.Extraction)
 	if err != nil {
 		verbose.Printf("Lock extraction ERROR: pattern matching failed for %s: %v\n", filepath.Base(path), err)
 		return nil, fmt.Errorf("failed to parse lock file %s: %w", filepath.Base(path), err)
 	}
-	verbose.Printf("Lock extraction: pattern matched %d entries\n", len(matches))
+	verbose.Tracef("Lock extraction: pattern matched %d entries from %s", len(matches), filepath.Base(path))
 
 	results := make(map[string]string)
 	for _, match := range matches {
@@ -409,12 +408,10 @@ func extractVersionsFromCommand(path string, cfg *config.LockFileCfg) (map[strin
 		"base_dir":  baseDir,
 	}
 
-	verbose.Infof("Executing lock file command in %s: %s", baseDir, cfg.Commands)
+	verbose.Debugf("Executing lock file command in %s: %s", baseDir, cfg.Commands)
 
 	// Execute the command
 	output, cmdErr := cmdexec.Execute(cfg.Commands, cfg.Env, baseDir, cfg.GetTimeoutSeconds(), replacements)
-
-	verbose.Infof("Lock file command output length: %d bytes", len(output))
 
 	// Try to parse output even if command failed (e.g., npm ls returns exit 1 when
 	// packages are missing but still outputs valid JSON with version info).
@@ -423,7 +420,7 @@ func extractVersionsFromCommand(path string, cfg *config.LockFileCfg) (map[strin
 		if parseErr == nil && len(results) > 0 {
 			// Successfully parsed versions from output
 			if cmdErr != nil {
-				verbose.Infof("Lock command exited with error but output contained %d packages", len(results))
+				verbose.Debugf("Lock command exited with error but output contained %d packages", len(results))
 			}
 			return results, nil
 		}

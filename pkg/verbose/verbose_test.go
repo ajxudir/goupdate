@@ -227,8 +227,9 @@ func TestCommandExec(t *testing.T) {
 	CommandExec("npm install", "/path/to/dir")
 	assert.Empty(t, buf.String())
 
-	// When enabled, output appears
+	// When enabled at Debug level, output appears
 	Enable()
+	SetLevel(2) // Debug level
 	CommandExec("npm install", "/path/to/dir")
 	output := buf.String()
 	Disable()

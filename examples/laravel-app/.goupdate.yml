@@ -25,8 +25,10 @@ system_tests:
   stop_on_fail: true
   tests:
     # Install dependencies
+    # --no-scripts: Skip post-install hooks (artisan package:discover) that require
+    # full Laravel environment setup (.env, database, etc.)
     - name: composer-install
-      commands: composer install --no-interaction --prefer-dist
+      commands: composer install --no-interaction --prefer-dist --no-scripts
       timeout_seconds: 300
       continue_on_fail: true  # Skip if composer not available
 

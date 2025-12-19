@@ -360,7 +360,7 @@ func processExtendsWithStackSecure(cfg *Config, baseDir string, stack map[string
 		}
 
 		base = mergeConfigs(base, extendCfg)
-		verbose.Printf("Extended from %q: merged %d rules\n", extend, len(extendCfg.Rules))
+		verbose.Debugf("Extended from %q: merged %d rules", extend, len(extendCfg.Rules))
 
 		if cleanupKey {
 			delete(stack, extendKey)

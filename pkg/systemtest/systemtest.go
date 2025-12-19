@@ -183,7 +183,7 @@ func (r *Runner) runSingleTest(test *config.SystemTestCfg) TestResult {
 	}
 
 	// Log the system test command being executed
-	verbose.Printf("Running system test %q:\n%s\n", test.Name, test.Commands)
+	verbose.Debugf("Running system test %q: %s", test.Name, test.Commands)
 
 	output, err := cmdexec.Execute(test.Commands, test.Env, r.workDir, timeout, nil)
 
@@ -201,12 +201,12 @@ func (r *Runner) runSingleTest(test *config.SystemTestCfg) TestResult {
 		testResult.Error = fmt.Errorf("%s: %w", test.Name, err)
 		// Log full output on failure for debugging
 		verbose.Printf("System test %q failed with error: %v\n", test.Name, err)
-		if len(output) > 0 {
-			verbose.Printf("System test %q output:\n%s\n", test.Name, string(output))
+		if verbose.IsTrace() && len(output) > 0 {
+			verbose.Tracef("System test %q output:\n%s", test.Name, string(output))
 		}
 	} else {
 		testResult.Passed = true
-		verbose.Printf("System test %q passed in %v\n", test.Name, duration)
+		verbose.Debugf("System test %q passed (%v)", test.Name, duration)
 	}
 
 	return testResult

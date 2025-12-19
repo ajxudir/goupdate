@@ -151,25 +151,25 @@ func IsFloatingConstraint(version string) bool {
 
 	// Pure wildcard "*" is floating (means "latest")
 	if version == "*" {
-		verbose.Printf("Floating check: %q is pure wildcard (floating)\n", version)
+		verbose.Tracef("Floating check: %q is pure wildcard (floating)", version)
 		return true
 	}
 
 	// Wildcards embedded in version: "5.*", "5.4.*", "8.x", "1.x.x"
 	if strings.Contains(version, ".*") || strings.Contains(version, ".x") {
-		verbose.Printf("Floating check: %q contains embedded wildcard (floating)\n", version)
+		verbose.Tracef("Floating check: %q contains embedded wildcard (floating)", version)
 		return true
 	}
 
 	// Trailing wildcard without dot: "5*" (rare but possible)
 	if strings.HasSuffix(version, "*") && version != "*" {
-		verbose.Printf("Floating check: %q has trailing wildcard (floating)\n", version)
+		verbose.Tracef("Floating check: %q has trailing wildcard (floating)", version)
 		return true
 	}
 
 	// NuGet/MSBuild ranges: "[8.0.0,9.0.0)", "(1.0,2.0]", etc.
 	if strings.HasPrefix(version, "[") || strings.HasPrefix(version, "(") {
-		verbose.Printf("Floating check: %q is version range (floating)\n", version)
+		verbose.Tracef("Floating check: %q is version range (floating)", version)
 		return true
 	}
 
@@ -178,13 +178,13 @@ func IsFloatingConstraint(version string) bool {
 	hasMin := strings.Contains(version, ">=") || strings.Contains(version, ">")
 	hasMax := strings.Contains(version, "<=") || strings.Contains(version, "<")
 	if hasMin && hasMax {
-		verbose.Printf("Floating check: %q is compound constraint (floating)\n", version)
+		verbose.Tracef("Floating check: %q is compound constraint (floating)", version)
 		return true
 	}
 
 	// OR constraints: "^2.0|^3.0", ">=1.0 || <0.5"
 	if strings.Contains(version, "|") {
-		verbose.Printf("Floating check: %q contains OR constraint (floating)\n", version)
+		verbose.Tracef("Floating check: %q contains OR constraint (floating)", version)
 		return true
 	}
 

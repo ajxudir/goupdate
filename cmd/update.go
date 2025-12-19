@@ -449,7 +449,7 @@ func runAfterAllValidation(runner ValidationRunner, results []update.UpdateResul
 // Returns:
 //   - []formats.Package: Refreshed package list
 //   - error: Returns error on parsing failure
-func reloadPackages(cfg *config.Config, args []string, workDir string, unsupported *supervision.UnsupportedTracker) ([]formats.Package, error) {
+func reloadPackages(cfg *config.Config, args []string, workDir string, _ *supervision.UnsupportedTracker) ([]formats.Package, error) {
 	refreshed, err := getPackagesFunc(cfg, args, workDir)
 	if err != nil {
 		return nil, err
@@ -463,11 +463,9 @@ func reloadPackages(cfg *config.Config, args []string, workDir string, unsupport
 	refreshed = filtering.ApplyPackageGroups(refreshed, cfg)
 	refreshed = filtering.FilterByGroup(refreshed, updateGroupFlag)
 
-	for _, p := range refreshed {
-		if update.ShouldTrackUnsupported(p.InstallStatus) {
-			unsupported.Add(p, supervision.DeriveUnsupportedReason(p, cfg, nil, false))
-		}
-	}
+	// NOTE: Do not add to unsupported tracker here - it's already done during
+	// initial package loading. Reloading packages after updates should not
+	// re-count unsupported packages (would cause inflated counts).
 
 	return refreshed, nil
 }

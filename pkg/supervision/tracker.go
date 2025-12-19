@@ -209,7 +209,7 @@ func DeriveUnsupportedReason(p formats.Package, _ *config.Config, _ error, lates
 
 	// Floating constraints (5.*, >=8.0.0, [8.0.0,9.0.0), etc.) cannot be updated automatically
 	if utils.IsFloatingConstraint(p.Version) {
-		verbose.Infof("Package '%s' has floating constraint '%s' - cannot auto-update", p.Name, p.Version)
+		verbose.Debugf("Package '%s' has floating constraint '%s' - cannot auto-update", p.Name, p.Version)
 		return fmt.Sprintf("Floating constraint '%s' - update manually or remove constraint.", p.Version)
 	}
 

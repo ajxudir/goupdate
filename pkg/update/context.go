@@ -150,14 +150,14 @@ func (ctx *UpdateContext) AppendFailure(err error) {
 // SnapshotVersions creates a map of package keys to their version snapshots.
 // This captures the baseline state before updates for drift detection.
 func SnapshotVersions(packages []formats.Package) map[string]VersionSnapshot {
-	verbose.Printf("Capturing baseline snapshot for %d packages\n", len(packages))
+	verbose.Debugf("Capturing baseline snapshot for %d packages", len(packages))
 	snapshots := make(map[string]VersionSnapshot)
 	for _, p := range packages {
 		key := PackageKey(p)
 		snapshots[key] = VersionSnapshot{Version: p.Version, Installed: p.InstalledVersion}
-		verbose.Printf("  Baseline: %s = declared:%s, installed:%s\n", p.Name, p.Version, p.InstalledVersion)
+		verbose.Tracef("  Baseline: %s = declared:%s, installed:%s", p.Name, p.Version, p.InstalledVersion)
 	}
-	verbose.Printf("Baseline snapshot complete: %d packages recorded\n", len(snapshots))
+	verbose.Debugf("Baseline snapshot complete: %d packages recorded", len(snapshots))
 	return snapshots
 }
 

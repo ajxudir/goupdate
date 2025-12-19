@@ -105,35 +105,27 @@ var ExecuteWithContext ExecuteWithContextFunc = executeCommandsWithContext
 //   - []byte: Output from the last executed command group
 //   - error: Error from the first failed command, or nil if all succeeded
 func executeCommands(commands string, env map[string]string, dir string, timeoutSeconds int, replacements map[string]string) ([]byte, error) {
-	verbose.Printf("Command execution: starting (timeout=%ds, dir=%s)\n", timeoutSeconds, dir)
 	if strings.TrimSpace(commands) == "" {
-		verbose.Printf("Command execution ERROR: no commands provided\n")
+		verbose.Debugf("Command execution ERROR: no commands provided")
 		return nil, fmt.Errorf("no commands provided")
 	}
 
 	// Apply template replacements
 	cmd := applyReplacements(commands, replacements)
-	if len(replacements) > 0 {
-		verbose.Printf("Command execution: applied %d template replacements\n", len(replacements))
-	}
 
 	// Parse into command groups (piped commands are one group, sequential are separate)
 	groups := parseCommandGroups(cmd)
-	verbose.Printf("Command execution: parsed %d command group(s)\n", len(groups))
 
 	var lastOutput []byte
 	for i, group := range groups {
-		verbose.Printf("Command execution: running group %d/%d (%d commands)\n", i+1, len(groups), len(group))
 		output, err := executePipedCommands(group, env, dir, timeoutSeconds)
 		if err != nil {
-			verbose.Printf("Command execution ERROR: group %d failed: %v\n", i+1, err)
+			verbose.Debugf("Command execution ERROR: group %d failed: %v", i+1, err)
 			return output, err
 		}
-		verbose.Printf("Command execution: group %d completed, output=%d bytes\n", i+1, len(output))
 		lastOutput = output
 	}
 
-	verbose.Printf("Command execution: completed successfully\n")
 	return lastOutput, nil
 }
 
@@ -159,54 +151,47 @@ func executeCommands(commands string, env map[string]string, dir string, timeout
 //   - []byte: Output from the last executed command group
 //   - error: Error from the first failed command or context cancellation, nil if all succeeded
 func executeCommandsWithContext(ctx context.Context, commands string, env map[string]string, dir string, timeoutSeconds int, replacements map[string]string) ([]byte, error) {
-	verbose.Printf("Command execution (ctx): starting (timeout=%ds, dir=%s)\n", timeoutSeconds, dir)
 	if strings.TrimSpace(commands) == "" {
-		verbose.Printf("Command execution (ctx) ERROR: no commands provided\n")
+		verbose.Debugf("Command execution ERROR: no commands provided")
 		return nil, fmt.Errorf("no commands provided")
 	}
 
 	// Check if context is already cancelled
 	if ctx.Err() != nil {
-		verbose.Printf("Command execution (ctx): context already cancelled: %v\n", ctx.Err())
+		verbose.Debugf("Command execution ERROR: context already cancelled: %v", ctx.Err())
 		return nil, ctx.Err()
 	}
 
 	// Apply template replacements
 	cmd := applyReplacements(commands, replacements)
-	if len(replacements) > 0 {
-		verbose.Printf("Command execution (ctx): applied %d template replacements\n", len(replacements))
-	}
 
 	// Parse into command groups (piped commands are one group, sequential are separate)
 	groups := parseCommandGroups(cmd)
-	verbose.Printf("Command execution (ctx): parsed %d command group(s)\n", len(groups))
 
 	var lastOutput []byte
 	for i, group := range groups {
 		// Check context before each command group
 		if ctx.Err() != nil {
-			verbose.Printf("Command execution (ctx): context cancelled before group %d: %v\n", i+1, ctx.Err())
+			verbose.Debugf("Command execution ERROR: context cancelled before group %d: %v", i+1, ctx.Err())
 			return lastOutput, ctx.Err()
 		}
-		verbose.Printf("Command execution (ctx): running group %d/%d (%d commands)\n", i+1, len(groups), len(group))
 		output, err := executePipedCommandsWithContext(ctx, group, env, dir, timeoutSeconds)
 		if err != nil {
-			verbose.Printf("Command execution (ctx) ERROR: group %d failed: %v\n", i+1, err)
+			verbose.Debugf("Command execution ERROR: group %d failed: %v", i+1, err)
 			return output, err
 		}
-		verbose.Printf("Command execution (ctx): group %d completed, output=%d bytes\n", i+1, len(output))
 		lastOutput = output
 	}
 
-	verbose.Printf("Command execution (ctx): completed successfully\n")
 	return lastOutput, nil
 }
 
 // applyReplacements applies template replacements to the command string.
 //
 // Template placeholders in the format {{key}} are replaced with their corresponding
-// values from the replacements map. All values are shell-escaped to prevent command
-// injection vulnerabilities.
+// values from the replacements map. Non-empty values are shell-escaped to prevent
+// command injection. Empty values are removed entirely (not quoted as '') to avoid
+// passing empty arguments to commands.
 //
 // Parameters:
 //   - commands: Command string containing template placeholders
@@ -218,9 +203,15 @@ func applyReplacements(commands string, replacements map[string]string) string {
 	result := commands
 	for key, value := range replacements {
 		placeholder := "{{" + key + "}}"
-		// Shell escape the value to prevent injection
-		escapedValue := shellEscape(value)
-		result = strings.ReplaceAll(result, placeholder, escapedValue)
+		// Empty values should be removed entirely, not turned into ''
+		// This prevents passing empty arguments to commands like composer
+		if value == "" {
+			result = strings.ReplaceAll(result, placeholder, "")
+		} else {
+			// Shell escape non-empty values to prevent injection
+			escapedValue := shellEscape(value)
+			result = strings.ReplaceAll(result, placeholder, escapedValue)
+		}
 	}
 	return result
 }
@@ -523,10 +514,7 @@ func executeCommand(ctx context.Context, cmdStr string, environ []string, dir st
 	args := append(shellArgs, cmdStr)
 
 	// Log the actual command being executed
-	verbose.Printf("Executing shell command: %s %s %q\n", shell, strings.Join(shellArgs, " "), cmdStr)
-	if dir != "" {
-		verbose.Printf("Working directory: %s\n", dir)
-	}
+	verbose.CommandExec(cmdStr, dir)
 
 	cmd := exec.CommandContext(ctx, shell, args...)
 	cmd.Env = environ

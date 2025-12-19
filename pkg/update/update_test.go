@@ -163,6 +163,11 @@ func TestNormalizeUpdateGroup(t *testing.T) {
 	assert.Equal(t, "fallback", UpdateGroupKey(nil, formats.Package{Name: "fallback"}))
 	assert.Equal(t, "r-g", UpdateGroupKey(&config.UpdateCfg{Group: "{{rule}}-g"}, formats.Package{Name: "pkg", Rule: "r"}))
 	assert.Equal(t, "explicit", UpdateGroupKey(nil, formats.Package{Name: "pkg", Group: "explicit"}))
+
+	// Test that NormalizeUpdateGroup preserves existing pkg.Group from ApplyPackageGroups
+	// This ensures packages in rule-level groups are processed together
+	assert.Equal(t, "laravel-core", NormalizeUpdateGroup(nil, formats.Package{Name: "collision", Group: "laravel-core"}))
+	assert.Equal(t, "laravel-core", NormalizeUpdateGroup(&config.UpdateCfg{Group: "other-group"}, formats.Package{Name: "collision", Group: "laravel-core"}))
 }
 
 // TestResolveUpdateCfgOverride tests the behavior of ResolveUpdateCfg with package overrides.

@@ -39,10 +39,10 @@ func mergeConfigs(base, custom *Config) *Config {
 		if existingRule, exists := merged.Rules[key]; exists {
 			mergedRule := mergeRules(existingRule, rule)
 			merged.Rules[key] = mergedRule
-			verbose.Printf("Rule %q: merged with existing rule\n", key)
+			verbose.Tracef("Rule %q: merged with existing rule", key)
 		} else {
 			merged.Rules[key] = rule
-			verbose.Printf("Rule %q: added new rule (include=%v)\n", key, rule.Include)
+			verbose.Tracef("Rule %q: added new rule (include=%v)", key, rule.Include)
 		}
 	}
 

@@ -169,3 +169,24 @@ func RuleWithGroup(updateCmd, group string) config.PackageManagerCfg {
 		},
 	}
 }
+
+// ComposerRule creates a typical Composer (PHP) rule configuration.
+//
+// Returns a pre-configured rule for Composer/PHP packages with
+// standard fields, update commands, and outdated commands.
+//
+// Returns:
+//   - config.PackageManagerCfg: Composer rule configuration
+func ComposerRule() config.PackageManagerCfg {
+	return config.PackageManagerCfg{
+		Manager: "php",
+		Format:  "json",
+		Fields:  map[string]string{"require": "prod", "require-dev": "dev"},
+		Update: &config.UpdateCfg{
+			Commands: "composer require {{package}}:{{version}}",
+		},
+		Outdated: &config.OutdatedCfg{
+			Commands: "composer show {{package}} --all --format=json",
+		},
+	}
+}

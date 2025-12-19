@@ -140,17 +140,17 @@ func (r *ValidateResult) ErrorMessage() string {
 // Returns:
 //   - *ValidateResult: Result containing any validation errors; never nil
 func ValidatePackages(packages []formats.Package, cfg *config.Config) *ValidateResult {
-	verbose.Printf("Preflight: validating commands for %d packages\n", len(packages))
+	verbose.Debugf("Preflight: validating commands for %d packages", len(packages))
 	result := &ValidateResult{}
 	checkedCommands := make(map[string]bool)
 
 	for _, p := range packages {
 		ruleCfg, ok := cfg.Rules[p.Rule]
 		if !ok {
-			verbose.Printf("Preflight: skipping package %q - rule %q not found in config\n", p.Name, p.Rule)
+			verbose.Tracef("Preflight: skipping package %q - rule %q not found in config", p.Name, p.Rule)
 			continue
 		}
-		verbose.Printf("Preflight: checking commands for package %q (rule: %s)\n", p.Name, p.Rule)
+		verbose.Tracef("Preflight: checking commands for package %q (rule: %s)", p.Name, p.Rule)
 
 		// Check outdated commands
 		if ruleCfg.Outdated != nil {
@@ -179,7 +179,7 @@ func ValidatePackages(packages []formats.Package, cfg *config.Config) *ValidateR
 		}
 	}
 
-	verbose.Printf("Preflight: package validation complete - %d unique commands checked, %d errors\n", len(checkedCommands), len(result.Errors))
+	verbose.Debugf("Preflight: package validation complete - %d unique commands checked, %d errors", len(checkedCommands), len(result.Errors))
 	return result
 }
 
@@ -197,17 +197,17 @@ func ValidatePackages(packages []formats.Package, cfg *config.Config) *ValidateR
 // Returns:
 //   - *ValidateResult: Result containing any validation errors; never nil
 func ValidateRules(rules []string, cfg *config.Config) *ValidateResult {
-	verbose.Printf("Preflight: validating commands for %d rules\n", len(rules))
+	verbose.Debugf("Preflight: validating commands for %d rules", len(rules))
 	result := &ValidateResult{}
 	checkedCommands := make(map[string]bool)
 
 	for _, ruleName := range rules {
 		ruleCfg, ok := cfg.Rules[ruleName]
 		if !ok {
-			verbose.Printf("Preflight: skipping rule %q - not found in config\n", ruleName)
+			verbose.Tracef("Preflight: skipping rule %q - not found in config", ruleName)
 			continue
 		}
-		verbose.Printf("Preflight: checking commands for rule %q\n", ruleName)
+		verbose.Tracef("Preflight: checking commands for rule %q", ruleName)
 
 		// Check outdated commands
 		if ruleCfg.Outdated != nil {
@@ -236,7 +236,7 @@ func ValidateRules(rules []string, cfg *config.Config) *ValidateResult {
 		}
 	}
 
-	verbose.Printf("Preflight: rule validation complete - %d unique commands checked, %d errors\n", len(checkedCommands), len(result.Errors))
+	verbose.Debugf("Preflight: rule validation complete - %d unique commands checked, %d errors", len(checkedCommands), len(result.Errors))
 	return result
 }
 
@@ -321,18 +321,18 @@ func validateCommand(cmd string) *ValidationError {
 		return nil
 	}
 
-	verbose.Printf("Preflight: checking command %q\n", cmd)
+	verbose.Tracef("Preflight: checking command %q", cmd)
 
 	// First try exec.LookPath (faster, finds binaries)
 	if _, err := exec.LookPath(cmd); err == nil {
-		verbose.Printf("Preflight: command %q found in PATH\n", cmd)
+		verbose.Tracef("Preflight: command %q found in PATH", cmd)
 		return nil
 	}
 
 	// Fall back to shell-based check to support aliases
-	verbose.Printf("Preflight: command %q not in PATH, checking shell aliases\n", cmd)
+	verbose.Tracef("Preflight: command %q not in PATH, checking shell aliases", cmd)
 	if commandExistsInShell(cmd) {
-		verbose.Printf("Preflight: command %q found as shell alias/function\n", cmd)
+		verbose.Tracef("Preflight: command %q found as shell alias/function", cmd)
 		return nil
 	}
 
