@@ -55,6 +55,9 @@ type ResolvedUpdatePlan struct {
 type PlanningOptions struct {
 	// IncrementalMode forces incremental updates for all packages
 	IncrementalMode bool
+	// OnPackageChecked is called after each package's versions are checked
+	// Used for progress feedback during the planning phase
+	OnPackageChecked func(pkg formats.Package, current, total int)
 }
 
 // VersionLister is a function type for listing newer versions of a package.
@@ -148,8 +151,9 @@ func BuildGroupedPlans(
 	deriveReason UnsupportedReasonDeriver,
 ) []*PlannedUpdate {
 	var groupedPlans []*PlannedUpdate
+	total := len(resolved)
 
-	for _, plan := range resolved {
+	for i, plan := range resolved {
 		// Check for context cancellation to allow early termination
 		if ctx.Err() != nil {
 			break
@@ -169,6 +173,9 @@ func BuildGroupedPlans(
 		if p.InstallStatus == lock.InstallStatusIgnored {
 			planned := handleIgnoredPackage(p, originalVersion)
 			groupedPlans = append(groupedPlans, planned)
+			if opts.OnPackageChecked != nil {
+				opts.OnPackageChecked(p, i+1, total)
+			}
 			continue
 		}
 
@@ -176,6 +183,9 @@ func BuildGroupedPlans(
 		if cfgErr != nil {
 			planned := handleConfigError(p, cfgErr, updateCtx, originalVersion, deriveReason)
 			groupedPlans = append(groupedPlans, planned)
+			if opts.OnPackageChecked != nil {
+				opts.OnPackageChecked(p, i+1, total)
+			}
 			continue
 		}
 
@@ -183,6 +193,9 @@ func BuildGroupedPlans(
 		if IsFloatingConstraint(p) {
 			planned := handleFloatingConstraint(p, updateCfg, updateCtx, originalVersion)
 			groupedPlans = append(groupedPlans, planned)
+			if opts.OnPackageChecked != nil {
+				opts.OnPackageChecked(p, i+1, total)
+			}
 			continue
 		}
 
@@ -191,12 +204,20 @@ func BuildGroupedPlans(
 		if outdated.IsExactConstraint(p.Constraint) && outdated.IsFullyPinnedVersion(p.Version) {
 			planned := handleExactConstraint(p, updateCfg, originalVersion)
 			groupedPlans = append(groupedPlans, planned)
+			if opts.OnPackageChecked != nil {
+				opts.OnPackageChecked(p, i+1, total)
+			}
 			continue
 		}
 
 		// Get available versions and plan update
 		planned := planVersionUpdate(ctx, p, res, updateCfg, updateCtx, originalVersion, opts, listVersions, deriveReason)
 		groupedPlans = append(groupedPlans, planned)
+
+		// Call progress callback after package is checked
+		if opts.OnPackageChecked != nil {
+			opts.OnPackageChecked(p, i+1, total)
+		}
 	}
 
 	return groupedPlans

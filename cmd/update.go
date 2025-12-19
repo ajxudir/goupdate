@@ -206,15 +206,30 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 			return reloadPackages(cfg, args, workDir, unsupported)
 		})
 
-	// Build grouped plans
+	// Build grouped plans with progress feedback for table mode
 	opts := update.PlanningOptions{IncrementalMode: updateIncrementalFlag}
+	useStructuredOutput := output.IsStructuredFormat(outputFormat)
+
+	if !useStructuredOutput && len(resolvedPkgs) > 0 {
+		fmt.Println()
+		fmt.Println("Checking for available updates...")
+		fmt.Println(strings.Repeat("─", 50))
+
+		opts.OnPackageChecked = func(pkg formats.Package, current, total int) {
+			fmt.Printf("  [%d/%d] %s\n", current, total, pkg.Name)
+			_ = os.Stdout.Sync()
+		}
+	}
+
 	groupedPlans := update.BuildGroupedPlans(cmdCtx, resolved, updateCtx, opts, listNewerVersionsFunc, supervision.DeriveUnsupportedReason)
+
+	if !useStructuredOutput && len(resolvedPkgs) > 0 {
+		fmt.Println()
+	}
 
 	// Calculate column widths
 	table := update.BuildUpdateTableFromPackages(resolvedPkgs, selection)
 	pendingUpdates := update.CountPendingUpdates(groupedPlans)
-
-	useStructuredOutput := output.IsStructuredFormat(outputFormat)
 
 	// Show preview and confirm for non-dry-run updates
 	if !updateDryRunFlag && !useStructuredOutput && pendingUpdates > 0 {

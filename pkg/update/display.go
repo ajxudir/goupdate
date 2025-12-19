@@ -32,9 +32,10 @@ type UpdateSummaryCounts struct {
 type UpdateSummaryMode int
 
 const (
-	SummaryModePreview UpdateSummaryMode = iota // Before updates (preview)
-	SummaryModeResult                           // After updates (actual results)
-	SummaryModeDryRun                           // Dry-run mode (planned, not executed)
+	SummaryModePreview  UpdateSummaryMode = iota // Before updates (preview)
+	SummaryModeResult                            // After updates (actual results)
+	SummaryModeDryRun                            // Dry-run mode (planned, not executed)
+	SummaryModeOutdated                          // Outdated command (checking for updates)
 )
 
 // FormatConstraintDisplay formats the constraint for display, showing scope override if applicable.
@@ -154,6 +155,8 @@ func FormatUpdateSummary(counts UpdateSummaryCounts, mode UpdateSummaryMode) (up
 		if counts.ToUpdate > 0 {
 			updated = fmt.Sprintf("%d planned", counts.ToUpdate)
 		}
+	case SummaryModeOutdated:
+		updated = fmt.Sprintf("%d outdated", counts.ToUpdate)
 	}
 
 	if counts.UpToDate > 0 {
@@ -170,6 +173,48 @@ func FormatUpdateSummary(counts UpdateSummaryCounts, mode UpdateSummaryMode) (up
 	}
 
 	return
+}
+
+// OutdatedResultData holds simplified data for computing outdated summary counts.
+type OutdatedResultData struct {
+	Status string
+	Major  string
+	Minor  string
+	Patch  string
+	Err    error
+}
+
+// ComputeSummaryFromOutdatedResults computes summary counts from outdated results.
+// This is used by the outdated command to display consistent summary formatting.
+func ComputeSummaryFromOutdatedResults(results []OutdatedResultData) UpdateSummaryCounts {
+	var counts UpdateSummaryCounts
+
+	for _, res := range results {
+		// Count by status
+		switch res.Status {
+		case constants.StatusOutdated:
+			counts.ToUpdate++
+		case constants.StatusUpToDate:
+			counts.UpToDate++
+		default:
+			if res.Err != nil || strings.HasPrefix(res.Status, constants.StatusFailed) {
+				counts.Failed++
+			}
+		}
+
+		// Count available updates by type
+		if res.Major != "" && res.Major != constants.PlaceholderNA {
+			counts.HasMajor++
+		}
+		if res.Minor != "" && res.Minor != constants.PlaceholderNA {
+			counts.HasMinor++
+		}
+		if res.Patch != "" && res.Patch != constants.PlaceholderNA {
+			counts.HasPatch++
+		}
+	}
+
+	return counts
 }
 
 // PrintUpdateRow prints a single update result row using the shared table formatter.
@@ -319,6 +364,7 @@ func PrintUpdatePreview(plans []*PlannedUpdate, table *output.Table, selection o
 }
 
 // FormatSummaryStrings formats the summary counts into display strings for cmd layer.
+// Always shows major/minor/patch counts (even zeros) for regex-friendly output.
 func FormatSummaryStrings(counts UpdateSummaryCounts, mode UpdateSummaryMode) (summaryLine, availableLine string) {
 	var actionVerb string
 	switch mode {
@@ -328,14 +374,22 @@ func FormatSummaryStrings(counts UpdateSummaryCounts, mode UpdateSummaryMode) (s
 		actionVerb = "updated"
 	case SummaryModeDryRun:
 		actionVerb = "planned"
+	case SummaryModeOutdated:
+		actionVerb = "outdated"
 	}
 
 	var parts []string
-	if counts.ToUpdate > 0 {
-		parts = append(parts, fmt.Sprintf("%d %s", counts.ToUpdate, actionVerb))
-	}
-	if counts.UpToDate > 0 {
+	if mode == SummaryModeOutdated {
+		// For outdated mode, show outdated count instead of "to update"
+		parts = append(parts, fmt.Sprintf("%d outdated", counts.ToUpdate))
 		parts = append(parts, fmt.Sprintf("%d up-to-date", counts.UpToDate))
+	} else {
+		if counts.ToUpdate > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", counts.ToUpdate, actionVerb))
+		}
+		if counts.UpToDate > 0 {
+			parts = append(parts, fmt.Sprintf("%d up-to-date", counts.UpToDate))
+		}
 	}
 	if counts.Failed > 0 {
 		parts = append(parts, fmt.Sprintf("%d failed", counts.Failed))
@@ -345,24 +399,16 @@ func FormatSummaryStrings(counts UpdateSummaryCounts, mode UpdateSummaryMode) (s
 		summaryLine = fmt.Sprintf("Summary: %s", strings.Join(parts, ", "))
 	}
 
-	if counts.HasMajor > 0 || counts.HasMinor > 0 || counts.HasPatch > 0 {
-		var remaining []string
-		if counts.HasMajor > 0 {
-			remaining = append(remaining, fmt.Sprintf("%d have major", counts.HasMajor))
-		}
-		if counts.HasMinor > 0 {
-			remaining = append(remaining, fmt.Sprintf("%d have minor", counts.HasMinor))
-		}
-		if counts.HasPatch > 0 {
-			remaining = append(remaining, fmt.Sprintf("%d have patch", counts.HasPatch))
-		}
-
-		suffix := "available"
-		if mode != SummaryModePreview {
-			suffix = "updates still available"
-		}
-		availableLine = fmt.Sprintf("         (%s %s)", strings.Join(remaining, ", "), suffix)
+	// Always show major/minor/patch counts for regex-friendly parsing
+	// This makes it easier to grep for specific update types
+	suffix := "available"
+	if mode == SummaryModeOutdated || mode == SummaryModePreview {
+		suffix = "available"
+	} else {
+		suffix = "updates still available"
 	}
+	availableLine = fmt.Sprintf("         (%d major, %d minor, %d patch %s)",
+		counts.HasMajor, counts.HasMinor, counts.HasPatch, suffix)
 
 	return summaryLine, availableLine
 }
