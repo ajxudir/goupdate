@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ajxudir/goupdate/pkg/verbose"
 	"gopkg.in/yaml.v3"
 )
 
@@ -122,16 +121,13 @@ func parseGroupSequence(nodes []*yaml.Node) ([]string, error) {
 // Returns:
 //   - error: error if any package is assigned to multiple groups
 func validateGroupMembership(cfg *Config) error {
-	verbose.Debugf("Group validation: checking for packages in multiple groups")
 	for ruleName, rule := range cfg.Rules {
 		if len(rule.Groups) == 0 {
 			continue
 		}
 
-		verbose.Tracef("Group validation: rule %q has %d groups", ruleName, len(rule.Groups))
 		packages := make(map[string]map[string]struct{})
 		for groupName, group := range rule.Groups {
-			verbose.Tracef("Group validation: group %q has %d packages", groupName, len(group.Packages))
 			for _, pkg := range group.Packages {
 				name := strings.TrimSpace(pkg)
 				if name == "" {
@@ -158,7 +154,6 @@ func validateGroupMembership(cfg *Config) error {
 			}
 			sort.Strings(groupNames)
 
-			verbose.Printf("Group validation ERROR: package %q is in multiple groups: %v\n", pkg, groupNames)
 			conflicts = append(conflicts, fmt.Sprintf("%s (%s)", pkg, strings.Join(groupNames, ", ")))
 		}
 
@@ -168,6 +163,5 @@ func validateGroupMembership(cfg *Config) error {
 		}
 	}
 
-	verbose.Debugf("Group validation: passed - no conflicts found")
 	return nil
 }

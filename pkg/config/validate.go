@@ -182,8 +182,6 @@ type schemaInfo struct {
 func ValidateConfigFile(data []byte) *ValidationResult {
 	result := &ValidationResult{}
 
-	verbose.Debugf("Config validation: starting YAML parsing with strict field checking")
-
 	// First, check for unknown fields using strict YAML parsing
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	decoder.KnownFields(true)
@@ -283,9 +281,7 @@ func (c *Config) Validate() *ValidationResult {
 //   - result: validation result to append errors and warnings to
 func validateConfigStruct(cfg *Config, result *ValidationResult) {
 	// Validate rules
-	verbose.Debugf("Config validation: checking %d rules", len(cfg.Rules))
 	for ruleName, rule := range cfg.Rules {
-		verbose.Tracef("Config validation: validating rule %q", ruleName)
 		validateRule(ruleName, &rule, result)
 	}
 
@@ -349,7 +345,6 @@ func validateSystemTests(st *SystemTestsCfg, result *ValidationResult) {
 		result.Warnings = append(result.Warnings, "system_tests: no tests defined but system tests are enabled")
 	}
 
-	verbose.Debugf("Config validation: checking %d system tests", len(st.Tests))
 	for i, test := range st.Tests {
 		prefix := fmt.Sprintf("system_tests.tests[%d]", i)
 
