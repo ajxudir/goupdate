@@ -105,7 +105,6 @@ var ExecuteWithContext ExecuteWithContextFunc = executeCommandsWithContext
 //   - []byte: Output from the last executed command group
 //   - error: Error from the first failed command, or nil if all succeeded
 func executeCommands(commands string, env map[string]string, dir string, timeoutSeconds int, replacements map[string]string) ([]byte, error) {
-	verbose.Printf("Command execution: starting (timeout=%ds, dir=%s)\n", timeoutSeconds, dir)
 	if strings.TrimSpace(commands) == "" {
 		verbose.Printf("Command execution ERROR: no commands provided\n")
 		return nil, fmt.Errorf("no commands provided")
@@ -113,27 +112,20 @@ func executeCommands(commands string, env map[string]string, dir string, timeout
 
 	// Apply template replacements
 	cmd := applyReplacements(commands, replacements)
-	if len(replacements) > 0 {
-		verbose.Printf("Command execution: applied %d template replacements\n", len(replacements))
-	}
 
 	// Parse into command groups (piped commands are one group, sequential are separate)
 	groups := parseCommandGroups(cmd)
-	verbose.Printf("Command execution: parsed %d command group(s)\n", len(groups))
 
 	var lastOutput []byte
 	for i, group := range groups {
-		verbose.Printf("Command execution: running group %d/%d (%d commands)\n", i+1, len(groups), len(group))
 		output, err := executePipedCommands(group, env, dir, timeoutSeconds)
 		if err != nil {
 			verbose.Printf("Command execution ERROR: group %d failed: %v\n", i+1, err)
 			return output, err
 		}
-		verbose.Printf("Command execution: group %d completed, output=%d bytes\n", i+1, len(output))
 		lastOutput = output
 	}
 
-	verbose.Printf("Command execution: completed successfully\n")
 	return lastOutput, nil
 }
 
@@ -159,46 +151,38 @@ func executeCommands(commands string, env map[string]string, dir string, timeout
 //   - []byte: Output from the last executed command group
 //   - error: Error from the first failed command or context cancellation, nil if all succeeded
 func executeCommandsWithContext(ctx context.Context, commands string, env map[string]string, dir string, timeoutSeconds int, replacements map[string]string) ([]byte, error) {
-	verbose.Printf("Command execution (ctx): starting (timeout=%ds, dir=%s)\n", timeoutSeconds, dir)
 	if strings.TrimSpace(commands) == "" {
-		verbose.Printf("Command execution (ctx) ERROR: no commands provided\n")
+		verbose.Printf("Command execution ERROR: no commands provided\n")
 		return nil, fmt.Errorf("no commands provided")
 	}
 
 	// Check if context is already cancelled
 	if ctx.Err() != nil {
-		verbose.Printf("Command execution (ctx): context already cancelled: %v\n", ctx.Err())
+		verbose.Printf("Command execution ERROR: context already cancelled: %v\n", ctx.Err())
 		return nil, ctx.Err()
 	}
 
 	// Apply template replacements
 	cmd := applyReplacements(commands, replacements)
-	if len(replacements) > 0 {
-		verbose.Printf("Command execution (ctx): applied %d template replacements\n", len(replacements))
-	}
 
 	// Parse into command groups (piped commands are one group, sequential are separate)
 	groups := parseCommandGroups(cmd)
-	verbose.Printf("Command execution (ctx): parsed %d command group(s)\n", len(groups))
 
 	var lastOutput []byte
 	for i, group := range groups {
 		// Check context before each command group
 		if ctx.Err() != nil {
-			verbose.Printf("Command execution (ctx): context cancelled before group %d: %v\n", i+1, ctx.Err())
+			verbose.Printf("Command execution ERROR: context cancelled before group %d: %v\n", i+1, ctx.Err())
 			return lastOutput, ctx.Err()
 		}
-		verbose.Printf("Command execution (ctx): running group %d/%d (%d commands)\n", i+1, len(groups), len(group))
 		output, err := executePipedCommandsWithContext(ctx, group, env, dir, timeoutSeconds)
 		if err != nil {
-			verbose.Printf("Command execution (ctx) ERROR: group %d failed: %v\n", i+1, err)
+			verbose.Printf("Command execution ERROR: group %d failed: %v\n", i+1, err)
 			return output, err
 		}
-		verbose.Printf("Command execution (ctx): group %d completed, output=%d bytes\n", i+1, len(output))
 		lastOutput = output
 	}
 
-	verbose.Printf("Command execution (ctx): completed successfully\n")
 	return lastOutput, nil
 }
 
