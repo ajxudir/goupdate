@@ -389,7 +389,7 @@ func UpdatePackage(p formats.Package, target string, cfg *config.Config, workDir
 		return originalErr
 	}
 
-	verbose.Printf("Updating %s: %s → %s\n", p.Name, p.Version, target)
+	verbose.Debugf("Updating %s: %s → %s", p.Name, p.Version, target)
 
 	// Step 1: Update declared version in manifest file
 	applyErr := updateDeclaredVersionFunc(p, target, cfg, scopeDir, dryRun)

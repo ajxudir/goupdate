@@ -46,7 +46,7 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 		return nil, fmt.Errorf("configuration is required")
 	}
 
-	verbose.Printf("Checking for updates: %s (current: %s, constraint: %q)\n",
+	verbose.Debugf("Checking for updates: %s (current: %s, constraint: %q)",
 		p.Name, CurrentVersionForOutdated(p), p.Constraint)
 
 	outdatedCfg, err := resolveOutdatedCfg(p, cfg)
