@@ -119,7 +119,7 @@ func writeFilePreservingPermissions(path string, content []byte, defaultMode os.
 	if origPerms != nil && origPerms.uid >= 0 && origPerms.gid >= 0 {
 		if chownErr := chownFile(path, origPerms.uid, origPerms.gid); chownErr != nil {
 			// Only warn, don't fail - chown may fail if not running as root
-			verbose.Printf("Unable to preserve file ownership for %s: %v\n", path, chownErr)
+			verbose.Tracef("Unable to preserve file ownership for %s: %v", path, chownErr)
 		}
 	}
 
@@ -160,14 +160,14 @@ func RunGroupLockCommand(cfg *config.UpdateCfg, workDir string, withAllDeps bool
 		return &errors.UnsupportedError{Reason: "no lock command configured"}
 	}
 
-	verbose.Printf("Lock command: running group lock (withAllDeps=%v)\n", withAllDeps)
+	verbose.Debugf("Lock command: running group lock (withAllDeps=%v)", withAllDeps)
 
 	// Run lock command without package-specific replacements (group-level)
 	_, err := execCommandFunc(cfg, "", "", "", workDir, withAllDeps)
 	if err != nil {
 		verbose.Printf("Lock command FAILED: %v\n", err)
 	} else {
-		verbose.Printf("Lock command completed successfully\n")
+		verbose.Debugf("Lock command completed successfully")
 	}
 	return err
 }
@@ -230,7 +230,7 @@ func writeFileWithBackupMode(path string, content []byte, mode os.FileMode) erro
 	// Restore ownership if we had the original info
 	if origPerms != nil && origPerms.uid >= 0 && origPerms.gid >= 0 {
 		if chownErr := chownFile(path, origPerms.uid, origPerms.gid); chownErr != nil {
-			verbose.Printf("Unable to preserve file ownership for %s: %v\n", path, chownErr)
+			verbose.Tracef("Unable to preserve file ownership for %s: %v", path, chownErr)
 		}
 	}
 
@@ -257,7 +257,7 @@ func restoreBackups(backups []fileBackup) []error {
 		if err := writeFileWithBackupMode(backup.path, backup.content, backup.mode); err != nil {
 			errs = append(errs, fmt.Errorf("failed to restore %s: %w", backup.path, err))
 		} else {
-			verbose.Printf("Restored %s from backup\n", backup.path)
+			verbose.Tracef("Restored %s from backup", backup.path)
 		}
 	}
 	return errs
@@ -332,10 +332,10 @@ func UpdatePackage(p formats.Package, target string, cfg *config.Config, workDir
 		if len(lockFilePaths) > 0 {
 			lockFileBackups, err = backupFiles(lockFilePaths)
 			if err != nil {
-				verbose.Printf("Warning: failed to backup lock files: %v\n", err)
+				verbose.Tracef("Warning: failed to backup lock files: %v", err)
 				// Continue anyway - we'll still have the manifest backup
 			} else {
-				verbose.Printf("Backed up %d lock file(s) for rollback\n", len(lockFileBackups))
+				verbose.Tracef("Backed up %d lock file(s) for rollback", len(lockFileBackups))
 			}
 		}
 	}
@@ -343,7 +343,7 @@ func UpdatePackage(p formats.Package, target string, cfg *config.Config, workDir
 	// Check if this package needs -W flag (with all dependencies)
 	withAllDeps := ruleCfg.ShouldUpdateWithAllDependencies(p.Name)
 	if withAllDeps {
-		verbose.Printf("Package %s configured with with_all_dependencies\n", p.Name)
+		verbose.Tracef("Package %s configured with with_all_dependencies", p.Name)
 	}
 
 	runLockCommand := func(version string) error {
@@ -351,26 +351,26 @@ func UpdatePackage(p formats.Package, target string, cfg *config.Config, workDir
 			return &errors.UnsupportedError{Reason: fmt.Sprintf("lock update missing for %s", p.Rule)}
 		}
 
-		verbose.Printf("Running lock command for %s in %s\n", p.Name, scopeDir)
+		verbose.Debugf("Running lock command for %s in %s", p.Name, scopeDir)
 		if _, err := execCommandFunc(effectiveCfg, p.Name, version, p.Constraint, scopeDir, withAllDeps); err != nil {
 			verbose.Printf("Lock command failed for %s: %v\n", p.Name, err)
 			return err
 		}
-		verbose.Printf("Lock command completed for %s\n", p.Name)
+		verbose.Debugf("Lock command completed for %s", p.Name)
 
 		return nil
 	}
 
 	// performRollback restores both manifest and lock files to their original state
 	performRollback := func(originalErr error) error {
-		verbose.Printf("Rolling back %s due to failure\n", p.Name)
+		verbose.Debugf("Rolling back %s due to failure", p.Name)
 		var rollbackErrs []error
 
 		// Restore manifest file
 		if restoreErr := writeFileFunc(p.Source, originalContent, 0o644); restoreErr != nil {
 			rollbackErrs = append(rollbackErrs, fmt.Errorf("manifest restore failed: %w", restoreErr))
 		} else {
-			verbose.Printf("Restored manifest %s\n", p.Source)
+			verbose.Tracef("Restored manifest %s", p.Source)
 		}
 
 		// Restore lock files from backup (if we have backups)
@@ -389,7 +389,7 @@ func UpdatePackage(p formats.Package, target string, cfg *config.Config, workDir
 		return originalErr
 	}
 
-	verbose.Printf("Updating %s: %s -> %s (source: %s)\n", p.Name, p.Version, target, p.Source)
+	verbose.Printf("Updating %s: %s → %s\n", p.Name, p.Version, target)
 
 	// Step 1: Update declared version in manifest file
 	applyErr := updateDeclaredVersionFunc(p, target, cfg, scopeDir, dryRun)
@@ -397,10 +397,10 @@ func UpdatePackage(p formats.Package, target string, cfg *config.Config, workDir
 		verbose.Printf("Failed to update declared version for %s: %v\n", p.Name, applyErr)
 		return applyErr
 	}
-	verbose.Printf("Updated declared version for %s in manifest\n", p.Name)
+	verbose.Tracef("Updated declared version for %s in manifest", p.Name)
 
 	if dryRun || skipLock {
-		verbose.Printf("Skipping lock command for %s (dryRun=%v, skipLock=%v)\n", p.Name, dryRun, skipLock)
+		verbose.Tracef("Skipping lock command for %s (dryRun=%v, skipLock=%v)", p.Name, dryRun, skipLock)
 		return nil
 	}
 
@@ -409,7 +409,7 @@ func UpdatePackage(p formats.Package, target string, cfg *config.Config, workDir
 		return performRollback(err)
 	}
 
-	verbose.Printf("Successfully updated %s to %s\n", p.Name, target)
+	verbose.Debugf("Successfully updated %s to %s", p.Name, target)
 	return nil
 }
 

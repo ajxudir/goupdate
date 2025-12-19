@@ -363,7 +363,7 @@ func planVersionUpdate(
 	// opts.IncrementalMode flag forces incremental mode for all packages
 	incremental := opts.IncrementalMode || configIncremental
 
-	verbose.Printf("Planning update for %s: incremental=%v (flag=%v, config=%v)\n",
+	verbose.Tracef("Planning update for %s: incremental=%v (flag=%v, config=%v)",
 		p.Name, incremental, opts.IncrementalMode, configIncremental)
 
 	if err != nil {
@@ -412,7 +412,7 @@ func planVersionUpdate(
 	res.Target = target
 
 	if target != "" {
-		verbose.Printf("Package %s: update planned %s → %s (constraint: %q)\n",
+		verbose.Debugf("Package %s: update planned %s → %s (constraint: %q)",
 			p.Name, outdated.CurrentVersionForOutdated(p), target, p.Constraint)
 	}
 

@@ -122,16 +122,16 @@ func parseGroupSequence(nodes []*yaml.Node) ([]string, error) {
 // Returns:
 //   - error: error if any package is assigned to multiple groups
 func validateGroupMembership(cfg *Config) error {
-	verbose.Printf("Group validation: checking for packages in multiple groups\n")
+	verbose.Debugf("Group validation: checking for packages in multiple groups")
 	for ruleName, rule := range cfg.Rules {
 		if len(rule.Groups) == 0 {
 			continue
 		}
 
-		verbose.Printf("Group validation: rule %q has %d groups\n", ruleName, len(rule.Groups))
+		verbose.Tracef("Group validation: rule %q has %d groups", ruleName, len(rule.Groups))
 		packages := make(map[string]map[string]struct{})
 		for groupName, group := range rule.Groups {
-			verbose.Printf("Group validation: group %q has %d packages\n", groupName, len(group.Packages))
+			verbose.Tracef("Group validation: group %q has %d packages", groupName, len(group.Packages))
 			for _, pkg := range group.Packages {
 				name := strings.TrimSpace(pkg)
 				if name == "" {
@@ -168,6 +168,6 @@ func validateGroupMembership(cfg *Config) error {
 		}
 	}
 
-	verbose.Printf("Group validation: passed - no conflicts found\n")
+	verbose.Debugf("Group validation: passed - no conflicts found")
 	return nil
 }

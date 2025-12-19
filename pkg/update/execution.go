@@ -42,7 +42,7 @@ func ValidateUpdatedPackage(plan *PlannedUpdate, reloadList func() ([]formats.Pa
 		return nil
 	}
 
-	verbose.Printf("Post-update drift check: verifying %s updated to %s\n", plan.Res.Pkg.Name, plan.Res.Target)
+	verbose.Debugf("Post-update drift check: verifying %s updated to %s", plan.Res.Pkg.Name, plan.Res.Target)
 
 	// Suppress verbose output during reload to reduce noise
 	verbose.Suppress()
@@ -65,22 +65,22 @@ func ValidateUpdatedPackage(plan *PlannedUpdate, reloadList func() ([]formats.Pa
 	}
 
 	if found == nil {
-		verbose.Printf("Drift check FAILED: package %s not found after reload\n", plan.Res.Pkg.Name)
+		verbose.Printf("Drift check FAILED: %s not found after reload\n", plan.Res.Pkg.Name)
 		return fmt.Errorf("package %s (%s/%s) missing after update validation", plan.Res.Pkg.Name, plan.Res.Pkg.PackageType, plan.Res.Pkg.Rule)
 	}
 
-	verbose.Printf("Drift check: %s - declared=%s, installed=%s (expected=%s)\n",
+	verbose.Tracef("Drift check: %s - declared=%s, installed=%s (expected=%s)",
 		plan.Res.Pkg.Name, found.Version, found.InstalledVersion, plan.Res.Target)
 
 	if !versionsMatch(found.Version, plan.Res.Target) {
-		verbose.Printf("Drift check MISMATCH (declared): %s expected %s, got %s\n",
+		verbose.Printf("Drift check MISMATCH: %s expected %s, got %s\n",
 			plan.Res.Pkg.Name, plan.Res.Target, found.Version)
 		return fmt.Errorf("version mismatch after update: expected %s, found %s", plan.Res.Target, found.Version)
 	}
 
 	if found.InstalledVersion != "" && found.InstalledVersion != constants.PlaceholderNA && !versionsMatch(found.InstalledVersion, plan.Res.Target) {
-		verbose.Printf("Drift check MISMATCH (installed): %s expected %s, got %s (lock file not updated)\n",
-			plan.Res.Pkg.Name, plan.Res.Target, found.InstalledVersion)
+		verbose.Printf("Drift check MISMATCH: %s installed=%s, expected %s (lock file not updated)\n",
+			plan.Res.Pkg.Name, found.InstalledVersion, plan.Res.Target)
 		return fmt.Errorf("installed version mismatch after update: expected %s, got %s (lock file may not have been updated)", plan.Res.Target, found.InstalledVersion)
 	}
 
@@ -88,7 +88,7 @@ func ValidateUpdatedPackage(plan *PlannedUpdate, reloadList func() ([]formats.Pa
 	plan.Res.Pkg.Version = found.Version
 	plan.Res.Pkg.InstalledVersion = found.InstalledVersion
 
-	verbose.Printf("Drift check PASSED: %s correctly at %s\n", plan.Res.Pkg.Name, plan.Res.Target)
+	verbose.Debugf("Drift check: %s at expected version %s ✓", plan.Res.Pkg.Name, plan.Res.Target)
 	return nil
 }
 
@@ -99,7 +99,7 @@ func ValidatePreUpdateState(plan *PlannedUpdate, reloadList func() ([]formats.Pa
 		return nil
 	}
 
-	verbose.Printf("Pre-update drift check: verifying %s is still at %s\n", plan.Res.Pkg.Name, plan.Original)
+	verbose.Debugf("Pre-update drift check: verifying %s is still at %s", plan.Res.Pkg.Name, plan.Original)
 
 	// Suppress verbose output during reload to reduce noise
 	verbose.Suppress()
@@ -107,7 +107,7 @@ func ValidatePreUpdateState(plan *PlannedUpdate, reloadList func() ([]formats.Pa
 	verbose.Unsuppress()
 
 	if err != nil {
-		verbose.Printf("Drift check: failed to reload packages: %v\n", err)
+		verbose.Tracef("Drift check: failed to reload packages: %v", err)
 		return nil // Non-fatal - continue with update
 	}
 
@@ -122,21 +122,21 @@ func ValidatePreUpdateState(plan *PlannedUpdate, reloadList func() ([]formats.Pa
 	}
 
 	if found == nil {
-		verbose.Printf("Pre-update drift check WARNING: package %s not found\n", plan.Res.Pkg.Name)
+		verbose.Tracef("Pre-update drift check WARNING: package %s not found", plan.Res.Pkg.Name)
 		return nil // Non-fatal
 	}
 
-	verbose.Printf("Pre-update drift check: %s - current=%s, expected=%s\n",
+	verbose.Tracef("Pre-update drift check: %s - current=%s, expected=%s",
 		plan.Res.Pkg.Name, found.Version, plan.Original)
 
 	if !versionsMatch(found.Version, plan.Original) {
-		verbose.Printf("Pre-update drift check DETECTED: %s changed from %s to %s (external modification?)\n",
+		verbose.Printf("Pre-update drift DETECTED: %s changed %s → %s (external modification?)\n",
 			plan.Res.Pkg.Name, plan.Original, found.Version)
 		// Update the Original to match current state so rollback works correctly
 		plan.Original = found.Version
-		verbose.Printf("Pre-update drift check: adjusted original version to %s\n", plan.Original)
+		verbose.Tracef("Pre-update drift check: adjusted original version to %s", plan.Original)
 	} else {
-		verbose.Printf("Pre-update drift check PASSED: %s at expected version %s\n", plan.Res.Pkg.Name, plan.Original)
+		verbose.Debugf("Pre-update drift check: %s at expected version %s ✓", plan.Res.Pkg.Name, plan.Original)
 	}
 
 	return nil
@@ -149,7 +149,7 @@ func RollbackPlans(plans []*PlannedUpdate, cfg *config.Config, workDir string, c
 	var rollbackErrors []error
 
 	for _, plan := range plans {
-		verbose.Printf("Rolling back %s: %s → %s\n", plan.Res.Pkg.Name, plan.Res.Target, plan.Original)
+		verbose.Debugf("Rolling back %s: %s → %s", plan.Res.Pkg.Name, plan.Res.Target, plan.Original)
 		rollbackErr := updater(plan.Res.Pkg, plan.Original, cfg, workDir, dryRun, skipLock)
 		if rollbackErr != nil {
 			wrappedErr := fmt.Errorf("%s (%s/%s) rollback failed: %w", plan.Res.Pkg.Name, plan.Res.Pkg.PackageType, plan.Res.Pkg.Rule, rollbackErr)
@@ -157,7 +157,7 @@ func RollbackPlans(plans []*PlannedUpdate, cfg *config.Config, workDir string, c
 			rollbackErrors = append(rollbackErrors, wrappedErr)
 			verbose.Printf("Rollback FAILED for %s: %v\n", plan.Res.Pkg.Name, rollbackErr)
 		} else {
-			verbose.Printf("Rolled back %s to %s successfully\n", plan.Res.Pkg.Name, plan.Original)
+			verbose.Debugf("Rolled back %s to %s successfully", plan.Res.Pkg.Name, plan.Original)
 			// Verify rollback with drift check
 			if ctx.ReloadList != nil && !dryRun {
 				driftErr := verifyRollbackDrift(plan, ctx.ReloadList)
@@ -179,7 +179,7 @@ func RollbackPlans(plans []*PlannedUpdate, cfg *config.Config, workDir string, c
 		verbose.Printf("Rollback completed with %d errors\n", len(rollbackErrors))
 		return stderrors.Join(rollbackErrors...)
 	}
-	verbose.Printf("Rollback completed successfully for all %d packages\n", len(plans))
+	verbose.Debugf("Rollback completed successfully for all %d packages", len(plans))
 	return nil
 }
 
@@ -190,7 +190,7 @@ func verifyRollbackDrift(plan *PlannedUpdate, reloadList func() ([]formats.Packa
 		return nil
 	}
 
-	verbose.Printf("Drift check: verifying %s rolled back to %s\n", plan.Res.Pkg.Name, plan.Original)
+	verbose.Debugf("Drift check: verifying %s rolled back to %s", plan.Res.Pkg.Name, plan.Original)
 
 	// Suppress verbose output during reload to reduce noise
 	verbose.Suppress()
@@ -213,11 +213,11 @@ func verifyRollbackDrift(plan *PlannedUpdate, reloadList func() ([]formats.Packa
 	}
 
 	if found == nil {
-		verbose.Printf("Drift check: package %s not found after reload\n", plan.Res.Pkg.Name)
+		verbose.Printf("Drift check: %s not found after reload\n", plan.Res.Pkg.Name)
 		return fmt.Errorf("drift check failed: package %s missing after rollback", plan.Res.Pkg.Name)
 	}
 
-	verbose.Printf("Drift check: %s - current declared=%s, expected=%s\n",
+	verbose.Tracef("Drift check: %s - current declared=%s, expected=%s",
 		plan.Res.Pkg.Name, found.Version, plan.Original)
 
 	if !versionsMatch(found.Version, plan.Original) {
@@ -227,7 +227,7 @@ func verifyRollbackDrift(plan *PlannedUpdate, reloadList func() ([]formats.Packa
 			plan.Res.Pkg.Name, plan.Original, found.Version)
 	}
 
-	verbose.Printf("Drift check PASSED: %s correctly at %s\n", plan.Res.Pkg.Name, plan.Original)
+	verbose.Debugf("Drift check: %s at expected version %s ✓", plan.Res.Pkg.Name, plan.Original)
 	return nil
 }
 
@@ -304,10 +304,12 @@ func ProcessGroupedPlansLive(ctx *UpdateContext, plans []*PlannedUpdate, results
 	}
 
 	// Log the processing order for debugging
-	verbose.Printf("Package processing order (%d packages):\n", len(plans))
-	for i, plan := range plans {
-		verbose.Printf("  [%d] %s: %s → %s (group: %s)\n",
-			i+1, plan.Res.Pkg.Name, plan.Original, plan.Res.Target, plan.GroupKey)
+	verbose.Debugf("Package processing order (%d packages)", len(plans))
+	if verbose.IsTrace() {
+		for i, plan := range plans {
+			verbose.Tracef("  [%d] %s: %s → %s (group: %s)",
+				i+1, plan.Res.Pkg.Name, plan.Original, plan.Res.Target, plan.GroupKey)
+		}
 	}
 
 	start := 0
@@ -437,7 +439,7 @@ func processGroupWithGroupLock(ctx *UpdateContext, plans []*PlannedUpdate, group
 				}
 			}
 		}
-		verbose.Printf("Post-manifest drift check: running group lock command to sync lock file\n")
+		verbose.Debugf("Post-manifest drift check: running group lock command to sync lock file")
 		lockErr := RunGroupLockCommand(groupUpdateCfg, ctx.WorkDir, withAllDeps)
 		if lockErr != nil {
 			groupErr = lockErr
@@ -576,7 +578,7 @@ func processGroupPerPackage(ctx *UpdateContext, plans []*PlannedUpdate, applied 
 // Returns:
 //   - This function does not return a value; it modifies results in place
 func handleSkippedUpdate(ctx *UpdateContext, res *UpdateResult, results *[]UpdateResult, callbacks ExecutionCallbacks) {
-	verbose.Printf("Skipping %s: status=%s, target=%q\n", res.Pkg.Name, res.Status, res.Target)
+	verbose.Tracef("Skipping %s: status=%s, target=%q", res.Pkg.Name, res.Status, res.Target)
 	if ShouldTrackUnsupported(res.Status) {
 		ctx.Unsupported.Add(res.Pkg, callbacks.DeriveReason(res.Pkg, ctx.Cfg, res.Err, false))
 	}
@@ -627,7 +629,7 @@ func appendResultAndPrint(ctx *UpdateContext, res *UpdateResult, results *[]Upda
 // Returns:
 //   - error: Returns error if critical tests fail and stop-on-fail is enabled; returns nil otherwise
 func runGroupSystemTests(ctx *UpdateContext, applied []*PlannedUpdate, systemTestFailures *[]SystemTestFailure) error {
-	verbose.Printf("Running system tests after group update (%d packages)\n", len(applied))
+	verbose.Debugf("Running system tests after group update (%d packages)", len(applied))
 	testResult := ctx.SystemTestRunner.RunAfterUpdate()
 	for _, plan := range applied {
 		plan.Res.SystemTestResult = testResult
@@ -644,14 +646,14 @@ func runGroupSystemTests(ctx *UpdateContext, applied []*PlannedUpdate, systemTes
 		return err
 	}
 	if !testResult.Passed() {
-		verbose.Printf("System tests have non-critical failures (continue_on_fail enabled)\n")
+		verbose.Debugf("System tests have non-critical failures (continue_on_fail enabled)")
 		*systemTestFailures = append(*systemTestFailures, SystemTestFailure{
 			PkgName:    "group",
 			Result:     testResult,
 			IsCritical: isCritical,
 		})
 	} else {
-		verbose.Printf("System tests passed for group\n")
+		verbose.Debugf("System tests passed for group")
 	}
 	return nil
 }
@@ -674,7 +676,7 @@ func runGroupSystemTests(ctx *UpdateContext, applied []*PlannedUpdate, systemTes
 // Returns:
 //   - error: Returns nil; errors are tracked via context and groupErr pointer
 func runPackageSystemTests(ctx *UpdateContext, plan *PlannedUpdate, groupErr *error, systemTestFailures *[]SystemTestFailure) error {
-	verbose.Printf("Running system tests after %s update\n", plan.Res.Pkg.Name)
+	verbose.Debugf("Running system tests after %s update", plan.Res.Pkg.Name)
 	testResult := ctx.SystemTestRunner.RunAfterUpdate()
 	plan.Res.SystemTestResult = testResult
 	isCritical := testResult.HasCriticalFailure() && ctx.SystemTestRunner.StopOnFail()
@@ -685,7 +687,7 @@ func runPackageSystemTests(ctx *UpdateContext, plan *PlannedUpdate, groupErr *er
 			verbose.Printf("Rollback failed for %s: %v\n", plan.Res.Pkg.Name, rollbackErr)
 			ctx.AppendFailure(fmt.Errorf("%s: rollback failed: %w", plan.Res.Pkg.Name, rollbackErr))
 		} else {
-			verbose.Printf("Rollback successful for %s\n", plan.Res.Pkg.Name)
+			verbose.Debugf("Rollback successful for %s", plan.Res.Pkg.Name)
 			// Verify rollback with drift check
 			if ctx.ReloadList != nil && !ctx.DryRun {
 				driftErr := verifyRollbackDrift(plan, ctx.ReloadList)
@@ -701,14 +703,14 @@ func runPackageSystemTests(ctx *UpdateContext, plan *PlannedUpdate, groupErr *er
 		*groupErr = stderrors.Join(*groupErr, plan.Res.Err)
 	}
 	if !testResult.Passed() {
-		verbose.Printf("System tests have failures for %s (critical=%v)\n", plan.Res.Pkg.Name, isCritical)
+		verbose.Debugf("System tests have failures for %s (critical=%v)", plan.Res.Pkg.Name, isCritical)
 		*systemTestFailures = append(*systemTestFailures, SystemTestFailure{
 			PkgName:    plan.Res.Pkg.Name,
 			Result:     testResult,
 			IsCritical: isCritical,
 		})
 	} else {
-		verbose.Printf("System tests passed for %s\n", plan.Res.Pkg.Name)
+		verbose.Debugf("System tests passed for %s", plan.Res.Pkg.Name)
 	}
 	return nil
 }
@@ -737,10 +739,12 @@ func ProcessGroupedPlansWithProgress(ctx *UpdateContext, plans []*PlannedUpdate,
 	}
 
 	// Log the processing order for debugging
-	verbose.Printf("Package processing order (%d packages):\n", len(plans))
-	for i, plan := range plans {
-		verbose.Printf("  [%d] %s: %s → %s (group: %s)\n",
-			i+1, plan.Res.Pkg.Name, plan.Original, plan.Res.Target, plan.GroupKey)
+	verbose.Debugf("Package processing order (%d packages)", len(plans))
+	if verbose.IsTrace() {
+		for i, plan := range plans {
+			verbose.Tracef("  [%d] %s: %s → %s (group: %s)",
+				i+1, plan.Res.Pkg.Name, plan.Original, plan.Res.Target, plan.GroupKey)
+		}
 	}
 
 	start := 0
@@ -877,7 +881,7 @@ func processGroupWithGroupLockProgress(ctx *UpdateContext, plans []*PlannedUpdat
 				}
 			}
 		}
-		verbose.Printf("Post-manifest drift check: running group lock command to sync lock file\n")
+		verbose.Debugf("Post-manifest drift check: running group lock command to sync lock file")
 		lockErr := RunGroupLockCommand(groupUpdateCfg, ctx.WorkDir, withAllDeps)
 		if lockErr != nil {
 			groupErr = lockErr

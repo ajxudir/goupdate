@@ -9,10 +9,27 @@ import (
 	"sync"
 )
 
+// Level represents the verbosity level for debug output.
+type Level int
+
+const (
+	// LevelQuiet suppresses all debug output
+	LevelQuiet Level = iota
+	// LevelNormal is the default level with no debug output
+	LevelNormal
+	// LevelVerbose (-v) shows key decisions, summaries, and important actions
+	LevelVerbose
+	// LevelDebug (-vv) adds shell commands, drift checks, per-package details
+	LevelDebug
+	// LevelTrace (-vvv) shows full lists, all parsed packages, all tags
+	LevelTrace
+)
+
 var (
 	mu         sync.RWMutex
 	enabled    bool
 	suppressed bool // Temporarily suppress verbose output (for drift checks, etc.)
+	level      Level = LevelVerbose // Default to verbose when enabled
 	writer     io.Writer = os.Stderr
 )
 
@@ -60,6 +77,47 @@ func Unsuppress() {
 	mu.Lock()
 	defer mu.Unlock()
 	suppressed = false
+}
+
+// SetLevel sets the verbosity level.
+// Level 1 = Verbose (-v), Level 2 = Debug (-vv), Level 3 = Trace (-vvv)
+func SetLevel(l int) {
+	mu.Lock()
+	defer mu.Unlock()
+	switch {
+	case l <= 0:
+		level = LevelVerbose
+	case l == 1:
+		level = LevelVerbose
+	case l == 2:
+		level = LevelDebug
+	default:
+		level = LevelTrace
+	}
+}
+
+// GetLevel returns the current verbosity level.
+func GetLevel() Level {
+	mu.RLock()
+	defer mu.RUnlock()
+	return level
+}
+
+// AtLevel returns true if the current level is at least the specified level.
+func AtLevel(l Level) bool {
+	mu.RLock()
+	defer mu.RUnlock()
+	return enabled && !suppressed && level >= l
+}
+
+// IsDebug returns true if debug level (-vv) or higher is enabled.
+func IsDebug() bool {
+	return AtLevel(LevelDebug)
+}
+
+// IsTrace returns true if trace level (-vvv) is enabled.
+func IsTrace() bool {
+	return AtLevel(LevelTrace)
 }
 
 // IsSuppressed returns whether verbose output is currently suppressed.
@@ -186,6 +244,22 @@ func Info(msg string) {
 //   - None
 func Infof(format string, args ...any) {
 	if isEnabled() {
+		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] "+format+"\n", args...)
+	}
+}
+
+// Debugf prints a formatted debug message if debug level (-vv) or higher is enabled.
+// Use for shell commands, drift checks, per-package details.
+func Debugf(format string, args ...any) {
+	if AtLevel(LevelDebug) {
+		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] "+format+"\n", args...)
+	}
+}
+
+// Tracef prints a formatted trace message if trace level (-vvv) is enabled.
+// Use for full version lists, all parsed packages, pattern details.
+func Tracef(format string, args ...any) {
+	if AtLevel(LevelTrace) {
 		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] "+format+"\n", args...)
 	}
 }
@@ -351,25 +425,20 @@ func UnsupportedHelp(rule, feature string) {
 	_, _ = fmt.Fprintf(w, "        📖 See: docs/configuration.md#rules\n")
 }
 
-// CommandExec logs command execution details if enabled.
-//
-// It performs the following operations:
-//   - Checks if verbose logging is enabled
-//   - Prints the command being executed
-//   - Prints the working directory where the command will run
-//   - Does nothing if verbose logging is disabled
+// CommandExec logs command execution details if debug level (-vv) or higher is enabled.
+// Only logs working directory if it's not the default (".").
 //
 // Parameters:
 //   - cmd: The command string being executed
 //   - workDir: The working directory path for command execution
-//
-// Returns:
-//   - None
 func CommandExec(cmd, workDir string) {
-	if isEnabled() {
+	if AtLevel(LevelDebug) {
 		w := getWriter()
 		_, _ = fmt.Fprintf(w, "[DEBUG] Executing: %s\n", cmd)
-		_, _ = fmt.Fprintf(w, "        Working dir: %s\n", workDir)
+		// Only log working directory if non-default
+		if workDir != "" && workDir != "." {
+			_, _ = fmt.Fprintf(w, "        Working dir: %s\n", workDir)
+		}
 	}
 }
 

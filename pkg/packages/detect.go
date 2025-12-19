@@ -47,12 +47,12 @@ func DetectFiles(cfg *config.Config, baseDir string) (map[string][]string, error
 	}
 
 	verbose.Printf("Starting file detection in base directory: %s\n", baseDir)
-	verbose.Printf("Processing %d configured rules\n", len(cfg.Rules))
+	verbose.Debugf("Processing %d configured rules", len(cfg.Rules))
 
 	for ruleKey, rule := range cfg.Rules {
 		// Skip disabled rules
 		if !rule.IsEnabled() {
-			verbose.Printf("Rule %q: skipped (disabled)\n", ruleKey)
+			verbose.Tracef("Rule %q: skipped (disabled)", ruleKey)
 			continue
 		}
 
@@ -61,7 +61,7 @@ func DetectFiles(cfg *config.Config, baseDir string) (map[string][]string, error
 			continue
 		}
 
-		verbose.Printf("Rule %q: scanning with include=%v, exclude=%v\n", ruleKey, rule.Include, rule.Exclude)
+		verbose.Tracef("Rule %q: scanning with include=%v, exclude=%v", ruleKey, rule.Include, rule.Exclude)
 
 		files, err := detectForRule(baseDir, rule)
 		if err != nil {
@@ -70,12 +70,14 @@ func DetectFiles(cfg *config.Config, baseDir string) (map[string][]string, error
 
 		if len(files) > 0 {
 			detected[ruleKey] = files
-			verbose.Printf("Rule %q: found %d matching files\n", ruleKey, len(files))
-			for _, f := range files {
-				verbose.Printf("  - %s\n", f)
+			verbose.Debugf("Rule %q: found %d matching files", ruleKey, len(files))
+			if verbose.IsTrace() {
+				for _, f := range files {
+					verbose.Tracef("  - %s", f)
+				}
 			}
 		} else {
-			verbose.Printf("Rule %q: no matching files found\n", ruleKey)
+			verbose.Tracef("Rule %q: no matching files found", ruleKey)
 		}
 	}
 
@@ -192,10 +194,8 @@ func resolveRuleConflicts(cfg *config.Config, detected map[string][]string) map[
 		}
 		conflictCount++
 
-		verbose.Printf("Conflict: file %q matched by multiple rules: %v\n", file, rules)
-
 		selected := selectRuleForFile(cfg, file, rules)
-		verbose.Printf("Conflict resolved: selected rule %q for %q\n", selected, file)
+		verbose.Printf("Conflict: %s matched %v → selected %s\n", filepath.Base(file), rules, selected)
 
 		for _, rule := range rules {
 			if rule == selected {
@@ -234,7 +234,7 @@ func selectRuleForFile(cfg *config.Config, file string, rules []string) string {
 	dir := filepath.Dir(file)
 
 	prioritized := prioritizeRules(rules)
-	verbose.Printf("Prioritized rule order for %q: %v\n", file, prioritized)
+	verbose.Debugf("Prioritized rule order for %q: %v", file, prioritized)
 
 	for _, ruleName := range prioritized {
 		rule, ok := cfg.Rules[ruleName]
@@ -242,12 +242,12 @@ func selectRuleForFile(cfg *config.Config, file string, rules []string) string {
 			continue
 		}
 		if hasLockFile(dir, rule.LockFiles) {
-			verbose.Printf("Rule %q selected: lock file found in %s\n", ruleName, dir)
+			verbose.Debugf("Rule %q selected: lock file found in %s", ruleName, dir)
 			return ruleName
 		}
 	}
 
-	verbose.Printf("Rule %q selected: no lock files found, using highest priority\n", prioritized[0])
+	verbose.Debugf("Rule %q selected: no lock files found, using highest priority", prioritized[0])
 	return prioritized[0]
 }
 

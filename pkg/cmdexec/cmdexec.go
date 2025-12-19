@@ -106,7 +106,7 @@ var ExecuteWithContext ExecuteWithContextFunc = executeCommandsWithContext
 //   - error: Error from the first failed command, or nil if all succeeded
 func executeCommands(commands string, env map[string]string, dir string, timeoutSeconds int, replacements map[string]string) ([]byte, error) {
 	if strings.TrimSpace(commands) == "" {
-		verbose.Printf("Command execution ERROR: no commands provided\n")
+		verbose.Debugf("Command execution ERROR: no commands provided")
 		return nil, fmt.Errorf("no commands provided")
 	}
 
@@ -120,7 +120,7 @@ func executeCommands(commands string, env map[string]string, dir string, timeout
 	for i, group := range groups {
 		output, err := executePipedCommands(group, env, dir, timeoutSeconds)
 		if err != nil {
-			verbose.Printf("Command execution ERROR: group %d failed: %v\n", i+1, err)
+			verbose.Debugf("Command execution ERROR: group %d failed: %v", i+1, err)
 			return output, err
 		}
 		lastOutput = output
@@ -152,13 +152,13 @@ func executeCommands(commands string, env map[string]string, dir string, timeout
 //   - error: Error from the first failed command or context cancellation, nil if all succeeded
 func executeCommandsWithContext(ctx context.Context, commands string, env map[string]string, dir string, timeoutSeconds int, replacements map[string]string) ([]byte, error) {
 	if strings.TrimSpace(commands) == "" {
-		verbose.Printf("Command execution ERROR: no commands provided\n")
+		verbose.Debugf("Command execution ERROR: no commands provided")
 		return nil, fmt.Errorf("no commands provided")
 	}
 
 	// Check if context is already cancelled
 	if ctx.Err() != nil {
-		verbose.Printf("Command execution ERROR: context already cancelled: %v\n", ctx.Err())
+		verbose.Debugf("Command execution ERROR: context already cancelled: %v", ctx.Err())
 		return nil, ctx.Err()
 	}
 
@@ -172,12 +172,12 @@ func executeCommandsWithContext(ctx context.Context, commands string, env map[st
 	for i, group := range groups {
 		// Check context before each command group
 		if ctx.Err() != nil {
-			verbose.Printf("Command execution ERROR: context cancelled before group %d: %v\n", i+1, ctx.Err())
+			verbose.Debugf("Command execution ERROR: context cancelled before group %d: %v", i+1, ctx.Err())
 			return lastOutput, ctx.Err()
 		}
 		output, err := executePipedCommandsWithContext(ctx, group, env, dir, timeoutSeconds)
 		if err != nil {
-			verbose.Printf("Command execution ERROR: group %d failed: %v\n", i+1, err)
+			verbose.Debugf("Command execution ERROR: group %d failed: %v", i+1, err)
 			return output, err
 		}
 		lastOutput = output
@@ -514,10 +514,7 @@ func executeCommand(ctx context.Context, cmdStr string, environ []string, dir st
 	args := append(shellArgs, cmdStr)
 
 	// Log the actual command being executed
-	verbose.Printf("Executing shell command: %s %s %q\n", shell, strings.Join(shellArgs, " "), cmdStr)
-	if dir != "" {
-		verbose.Printf("Working directory: %s\n", dir)
-	}
+	verbose.CommandExec(cmdStr, dir)
 
 	cmd := exec.CommandContext(ctx, shell, args...)
 	cmd.Env = environ
