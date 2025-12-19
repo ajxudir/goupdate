@@ -189,8 +189,9 @@ func executeCommandsWithContext(ctx context.Context, commands string, env map[st
 // applyReplacements applies template replacements to the command string.
 //
 // Template placeholders in the format {{key}} are replaced with their corresponding
-// values from the replacements map. All values are shell-escaped to prevent command
-// injection vulnerabilities.
+// values from the replacements map. Non-empty values are shell-escaped to prevent
+// command injection. Empty values are removed entirely (not quoted as '') to avoid
+// passing empty arguments to commands.
 //
 // Parameters:
 //   - commands: Command string containing template placeholders
@@ -202,9 +203,15 @@ func applyReplacements(commands string, replacements map[string]string) string {
 	result := commands
 	for key, value := range replacements {
 		placeholder := "{{" + key + "}}"
-		// Shell escape the value to prevent injection
-		escapedValue := shellEscape(value)
-		result = strings.ReplaceAll(result, placeholder, escapedValue)
+		// Empty values should be removed entirely, not turned into ''
+		// This prevents passing empty arguments to commands like composer
+		if value == "" {
+			result = strings.ReplaceAll(result, placeholder, "")
+		} else {
+			// Shell escape non-empty values to prevent injection
+			escapedValue := shellEscape(value)
+			result = strings.ReplaceAll(result, placeholder, escapedValue)
+		}
 	}
 	return result
 }

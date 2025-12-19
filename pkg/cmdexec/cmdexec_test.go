@@ -16,15 +16,44 @@ import (
 //
 // It verifies:
 //   - Template placeholders are correctly replaced with values
+//   - Empty values remove the placeholder entirely (not quoted as '')
 func TestApplyReplacements(t *testing.T) {
-	cmd := `curl -s "https://registry.npmjs.org/{{package}}" | jq -r '.versions["{{version}}"]'`
-	replacements := map[string]string{
-		"package": "react",
-		"version": "18.2.0",
-	}
+	t.Run("basic replacement", func(t *testing.T) {
+		cmd := `curl -s "https://registry.npmjs.org/{{package}}" | jq -r '.versions["{{version}}"]'`
+		replacements := map[string]string{
+			"package": "react",
+			"version": "18.2.0",
+		}
 
-	result := applyReplacements(cmd, replacements)
-	assert.Equal(t, `curl -s "https://registry.npmjs.org/react" | jq -r '.versions["18.2.0"]'`, result)
+		result := applyReplacements(cmd, replacements)
+		assert.Equal(t, `curl -s "https://registry.npmjs.org/react" | jq -r '.versions["18.2.0"]'`, result)
+	})
+
+	t.Run("empty value removes placeholder", func(t *testing.T) {
+		// This tests the fix for composer getting '' as an empty argument
+		cmd := `composer update {{package}} {{with_all_deps_flag}} --no-interaction`
+		replacements := map[string]string{
+			"package":            "laravel/framework",
+			"with_all_deps_flag": "", // Empty value should be removed, not become ''
+		}
+
+		result := applyReplacements(cmd, replacements)
+		// Empty value should be removed, resulting in double space which is fine for shell
+		assert.Equal(t, `composer update laravel/framework  --no-interaction`, result)
+		// Most importantly, it should NOT contain ''
+		assert.NotContains(t, result, "''")
+	})
+
+	t.Run("non-empty flag value", func(t *testing.T) {
+		cmd := `composer update {{package}} {{with_all_deps_flag}} --no-interaction`
+		replacements := map[string]string{
+			"package":            "laravel/framework",
+			"with_all_deps_flag": "-W",
+		}
+
+		result := applyReplacements(cmd, replacements)
+		assert.Equal(t, `composer update laravel/framework -W --no-interaction`, result)
+	})
 }
 
 // TestGetShell tests the behavior of getShell.

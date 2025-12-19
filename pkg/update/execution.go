@@ -522,6 +522,10 @@ func processGroupPerPackage(ctx *UpdateContext, plans []*PlannedUpdate, applied 
 				groupErr = stderrors.Join(groupErr, updateErr)
 			}
 			appendResultAndPrint(ctx, res, results, callbacks)
+			// Stop on first error unless ContinueOnError is set
+			if !ctx.ContinueOnError && !errors.IsUnsupported(updateErr) {
+				return groupErr
+			}
 			continue
 		}
 
@@ -534,6 +538,10 @@ func processGroupPerPackage(ctx *UpdateContext, plans []*PlannedUpdate, applied 
 				ctx.AppendFailure(fmt.Errorf("%s (%s/%s): %w", res.Pkg.Name, res.Pkg.PackageType, res.Pkg.Rule, validateErr))
 				groupErr = stderrors.Join(groupErr, validateErr)
 				appendResultAndPrint(ctx, res, results, callbacks)
+				// Stop on first validation error unless ContinueOnError is set
+				if !ctx.ContinueOnError {
+					return groupErr
+				}
 				continue
 			}
 		}
@@ -968,6 +976,10 @@ func processGroupPerPackageProgress(ctx *UpdateContext, plans []*PlannedUpdate, 
 			if progress != nil {
 				progress.Increment()
 			}
+			// Stop on first error unless ContinueOnError is set
+			if !ctx.ContinueOnError && !errors.IsUnsupported(updateErr) {
+				return groupErr
+			}
 			continue
 		}
 
@@ -985,6 +997,10 @@ func processGroupPerPackageProgress(ctx *UpdateContext, plans []*PlannedUpdate, 
 				*results = append(*results, *res)
 				if progress != nil {
 					progress.Increment()
+				}
+				// Stop on first validation error unless ContinueOnError is set
+				if !ctx.ContinueOnError {
+					return groupErr
 				}
 				continue
 			}
