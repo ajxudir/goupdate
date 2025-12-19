@@ -536,8 +536,20 @@ func executeCommand(ctx context.Context, cmdStr string, environ []string, dir st
 				warnings.Warnf("Warning: failed to kill process group on timeout: %v\n", killErr)
 			}
 			warnings.Warnf("command timed out after %d seconds\n", timeoutSeconds)
+			verbose.CommandResult(cmdStr, -1, "timeout")
 			return nil, fmt.Errorf("command timed out after %d seconds: %w", timeoutSeconds, err)
 		}
+
+		// Log command failure with output
+		exitCode := 1
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		}
+		errOutput := strings.TrimSpace(stderr.String())
+		if errOutput == "" {
+			errOutput = strings.TrimSpace(stdout.String())
+		}
+		verbose.CommandResult(cmdStr, exitCode, errOutput)
 
 		errMsg := strings.TrimSpace(stderr.String())
 		if errMsg == "" {
@@ -548,6 +560,9 @@ func executeCommand(ctx context.Context, cmdStr string, environ []string, dir st
 		}
 		return nil, err
 	}
+
+	// Log successful command with output
+	verbose.CommandResult(cmdStr, 0, strings.TrimSpace(stdout.String()))
 
 	return stdout.Bytes(), nil
 }

@@ -78,7 +78,15 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 	}
 
 	verbose.Debugf("Parsed %d available versions for %s", len(versions), p.Name)
-	if verbose.IsTrace() && len(versions) > 0 {
+	// Show all retrieved versions at DEBUG level for debugging version issues
+	if len(versions) > 0 {
+		if len(versions) <= 10 {
+			verbose.Debugf("Raw versions for %s: %v", p.Name, versions)
+		} else {
+			verbose.Debugf("Raw versions for %s: %v... (%d more)", p.Name, versions[:10], len(versions)-10)
+		}
+	}
+	if verbose.IsTrace() && len(versions) > 10 {
 		verbose.Tracef("All retrieved tags for %s: %v", p.Name, versions)
 	}
 
@@ -89,22 +97,35 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 	}
 
 	if beforeExclusions != len(versionsAfterExclusions) {
+		excluded := findExcludedVersions(versions, versionsAfterExclusions)
 		verbose.Debugf("Excluded %d versions (before: %d, after: %d)",
 			beforeExclusions-len(versionsAfterExclusions), beforeExclusions, len(versionsAfterExclusions))
-		// Show which versions were excluded for debugging
-		if verbose.IsTrace() {
-			excluded := findExcludedVersions(versions, versionsAfterExclusions)
-			if len(excluded) > 0 {
-				verbose.Tracef("Excluded versions for %s: %v", p.Name, excluded)
+		// Show excluded versions at DEBUG level for debugging
+		if len(excluded) > 0 {
+			if len(excluded) <= 10 {
+				verbose.Debugf("Excluded versions for %s: %v", p.Name, excluded)
+			} else {
+				verbose.Debugf("Excluded versions for %s: %v... (%d more)", p.Name, excluded[:10], len(excluded)-10)
 			}
+		}
+		if verbose.IsTrace() && len(excluded) > 10 {
+			verbose.Tracef("All excluded versions for %s: %v", p.Name, excluded)
 		}
 	}
 	versions = versionsAfterExclusions
 
 	filtered := filterNewerVersionsWithStrategy(CurrentVersionForOutdated(p), versions, strategy)
-	verbose.Debugf("Found %d newer versions for %s", len(filtered), p.Name)
-	if verbose.IsTrace() && len(filtered) > 0 {
-		verbose.Tracef("Newer versions for %s: %v", p.Name, filtered)
+	verbose.Debugf("Found %d newer versions for %s (current: %s)", len(filtered), p.Name, CurrentVersionForOutdated(p))
+	// Show newer versions at DEBUG level
+	if len(filtered) > 0 {
+		if len(filtered) <= 10 {
+			verbose.Debugf("Newer versions for %s: %v", p.Name, filtered)
+		} else {
+			verbose.Debugf("Newer versions for %s: %v... (%d more)", p.Name, filtered[:10], len(filtered)-10)
+		}
+	}
+	if verbose.IsTrace() && len(filtered) > 10 {
+		verbose.Tracef("All newer versions for %s: %v", p.Name, filtered)
 	}
 
 	return filtered, nil
@@ -731,6 +752,7 @@ func FilterVersionsByConstraint(p formats.Package, versions []string, flags Upda
 	constraint := NormalizeConstraint(p.Constraint)
 	constraintSegments := countConstraintSegments(p.Version)
 
+	originalConstraint := constraint
 	switch {
 	case flags.Major:
 		constraint = ""
@@ -757,6 +779,10 @@ func FilterVersionsByConstraint(p formats.Package, versions []string, flags Upda
 	if constraint == "*" {
 		constraint = ""
 	}
+
+	// Log constraint filtering details
+	verbose.Debugf("FilterVersionsByConstraint for %s: input=%d versions, constraint=%q (original=%q), reference=%s, flags={major=%v, minor=%v, patch=%v}",
+		p.Name, len(versions), constraint, originalConstraint, reference, flags.Major, flags.Minor, flags.Patch)
 
 	allowed := make([]string, 0, len(versions))
 
@@ -815,6 +841,17 @@ func FilterVersionsByConstraint(p formats.Package, versions []string, flags Upda
 		default:
 			allowed = append(allowed, raw)
 		}
+	}
+
+	// Log filtering results
+	filtered := len(versions) - len(allowed)
+	if filtered > 0 {
+		verbose.Debugf("FilterVersionsByConstraint for %s: filtered out %d versions, %d remaining", p.Name, filtered, len(allowed))
+		if verbose.IsTrace() && len(allowed) > 0 {
+			verbose.Tracef("Allowed versions for %s after constraint filter: %v", p.Name, allowed)
+		}
+	} else {
+		verbose.Debugf("FilterVersionsByConstraint for %s: all %d versions allowed", p.Name, len(allowed))
 	}
 
 	return allowed
