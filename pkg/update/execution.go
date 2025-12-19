@@ -305,9 +305,9 @@ func ProcessGroupedPlansLive(ctx *UpdateContext, plans []*PlannedUpdate, results
 
 	// Log the processing order for debugging
 	verbose.Debugf("Package processing order (%d packages)", len(plans))
-	if verbose.IsTrace() {
+	if verbose.IsEnabled() {
 		for i, plan := range plans {
-			verbose.Tracef("  [%d] %s: %s → %s (group: %s)",
+			verbose.Printf("  [%d] %s: %s → %s (group: %s)",
 				i+1, plan.Res.Pkg.Name, plan.Original, plan.Res.Target, plan.GroupKey)
 		}
 	}
@@ -740,9 +740,9 @@ func ProcessGroupedPlansWithProgress(ctx *UpdateContext, plans []*PlannedUpdate,
 
 	// Log the processing order for debugging
 	verbose.Debugf("Package processing order (%d packages)", len(plans))
-	if verbose.IsTrace() {
+	if verbose.IsEnabled() {
 		for i, plan := range plans {
-			verbose.Tracef("  [%d] %s: %s → %s (group: %s)",
+			verbose.Printf("  [%d] %s: %s → %s (group: %s)",
 				i+1, plan.Res.Pkg.Name, plan.Original, plan.Res.Target, plan.GroupKey)
 		}
 	}

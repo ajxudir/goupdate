@@ -248,18 +248,18 @@ func Infof(format string, args ...any) {
 	}
 }
 
-// Debugf prints a formatted debug message if debug level (-vv) or higher is enabled.
+// Debugf prints a formatted debug message if verbose is enabled.
 // Use for shell commands, drift checks, per-package details.
 func Debugf(format string, args ...any) {
-	if AtLevel(LevelDebug) {
+	if isEnabled() {
 		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] "+format+"\n", args...)
 	}
 }
 
-// Tracef prints a formatted trace message if trace level (-vvv) is enabled.
+// Tracef prints a formatted trace message if verbose is enabled.
 // Use for full version lists, all parsed packages, pattern details.
 func Tracef(format string, args ...any) {
-	if AtLevel(LevelTrace) {
+	if isEnabled() {
 		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] "+format+"\n", args...)
 	}
 }
@@ -425,14 +425,14 @@ func UnsupportedHelp(rule, feature string) {
 	_, _ = fmt.Fprintf(w, "        📖 See: docs/configuration.md#rules\n")
 }
 
-// CommandExec logs command execution details if debug level (-vv) or higher is enabled.
+// CommandExec logs command execution details if verbose is enabled.
 // Only logs working directory if it's not the default (".").
 //
 // Parameters:
 //   - cmd: The command string being executed
 //   - workDir: The working directory path for command execution
 func CommandExec(cmd, workDir string) {
-	if AtLevel(LevelDebug) {
+	if isEnabled() {
 		w := getWriter()
 		_, _ = fmt.Fprintf(w, "[DEBUG] Executing: %s\n", cmd)
 		// Only log working directory if non-default
@@ -545,6 +545,89 @@ func PackageFiltered(name, reason string) {
 func VersionSelected(pkg, current, target, reason string) {
 	if isEnabled() {
 		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] Version selected for '%s': %s → %s (%s)\n", pkg, current, target, reason)
+	}
+}
+
+// VersionCheck logs that a package is being checked for updates.
+func VersionCheck(pkg, current, constraint string) {
+	if isEnabled() {
+		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] Checking for updates: %s (current: %s, constraint: %q)\n", pkg, current, constraint)
+	}
+}
+
+// VersionStrategy logs the versioning strategy being used.
+func VersionStrategy(format, sort string) {
+	if isEnabled() {
+		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] Versioning strategy: format=%q, sort=%q\n", format, sort)
+	}
+}
+
+// VersionsRetrieved logs the raw versions retrieved from a registry.
+func VersionsRetrieved(pkg string, versions []string) {
+	if !isEnabled() {
+		return
+	}
+	w := getWriter()
+	_, _ = fmt.Fprintf(w, "[DEBUG] Parsed %d available versions for %s\n", len(versions), pkg)
+	if len(versions) > 0 {
+		if len(versions) <= 10 {
+			_, _ = fmt.Fprintf(w, "[DEBUG] Raw versions for %s: %v\n", pkg, versions)
+		} else {
+			_, _ = fmt.Fprintf(w, "[DEBUG] Raw versions for %s: %v... (%d more)\n", pkg, versions[:10], len(versions)-10)
+		}
+	}
+}
+
+// VersionsExcluded logs versions that were excluded by patterns.
+func VersionsExcluded(pkg string, before, after int, excluded []string) {
+	if !isEnabled() || before == after {
+		return
+	}
+	w := getWriter()
+	_, _ = fmt.Fprintf(w, "[DEBUG] Excluded %d versions (before: %d, after: %d)\n", before-after, before, after)
+	if len(excluded) > 0 {
+		if len(excluded) <= 10 {
+			_, _ = fmt.Fprintf(w, "[DEBUG] Excluded versions for %s: %v\n", pkg, excluded)
+		} else {
+			_, _ = fmt.Fprintf(w, "[DEBUG] Excluded versions for %s: %v... (%d more)\n", pkg, excluded[:10], len(excluded)-10)
+		}
+	}
+}
+
+// VersionsFiltered logs the newer versions found after filtering.
+func VersionsFiltered(pkg, current string, filtered []string) {
+	if !isEnabled() {
+		return
+	}
+	w := getWriter()
+	_, _ = fmt.Fprintf(w, "[DEBUG] Found %d newer versions for %s (current: %s)\n", len(filtered), pkg, current)
+	if len(filtered) > 0 {
+		if len(filtered) <= 10 {
+			_, _ = fmt.Fprintf(w, "[DEBUG] Newer versions for %s: %v\n", pkg, filtered)
+		} else {
+			_, _ = fmt.Fprintf(w, "[DEBUG] Newer versions for %s: %v... (%d more)\n", pkg, filtered[:10], len(filtered)-10)
+		}
+	}
+}
+
+// ConstraintFilter logs constraint filtering details.
+func ConstraintFilter(pkg string, inputCount int, constraint, originalConstraint, reference string, major, minor, patch bool) {
+	if isEnabled() {
+		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] FilterVersionsByConstraint for %s: input=%d versions, constraint=%q (original=%q), reference=%s, flags={major=%v, minor=%v, patch=%v}\n",
+			pkg, inputCount, constraint, originalConstraint, reference, major, minor, patch)
+	}
+}
+
+// ConstraintFilterResult logs the result of constraint filtering.
+func ConstraintFilterResult(pkg string, inputCount, outputCount int) {
+	if !isEnabled() {
+		return
+	}
+	filtered := inputCount - outputCount
+	if filtered > 0 {
+		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] FilterVersionsByConstraint for %s: filtered out %d versions, %d remaining\n", pkg, filtered, outputCount)
+	} else {
+		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] FilterVersionsByConstraint for %s: all %d versions allowed\n", pkg, outputCount)
 	}
 }
 

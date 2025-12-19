@@ -84,9 +84,9 @@ func (dp *DynamicParser) ParseFile(filePath string, cfg *config.PackageManagerCf
 	}
 
 	verbose.Printf("Parsed %d packages from %s\n", len(packages), filePath)
-	if verbose.IsTrace() {
+	if verbose.IsEnabled() {
 		for _, pkg := range packages {
-			verbose.Tracef("  - %s @ %s", pkg.Name, pkg.Version)
+			verbose.Printf("  - %s @ %s", pkg.Name, pkg.Version)
 		}
 	}
 

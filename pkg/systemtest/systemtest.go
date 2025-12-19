@@ -201,12 +201,12 @@ func (r *Runner) runSingleTest(test *config.SystemTestCfg) TestResult {
 		testResult.Error = fmt.Errorf("%s: %w", test.Name, err)
 		// Log full output on failure for debugging
 		verbose.Printf("System test %q failed with error: %v\n", test.Name, err)
-		if verbose.IsTrace() && len(output) > 0 {
-			verbose.Tracef("System test %q output:\n%s", test.Name, string(output))
+		if verbose.IsEnabled() && len(output) > 0 {
+			verbose.Printf("System test %q output:\n%s", test.Name, string(output))
 		}
 	} else {
 		testResult.Passed = true
-		verbose.Debugf("System test %q passed (%v)", test.Name, duration)
+		verbose.Printf("System test %q passed (%v)", test.Name, duration)
 	}
 
 	return testResult

@@ -46,8 +46,7 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 		return nil, fmt.Errorf("configuration is required")
 	}
 
-	verbose.Debugf("Checking for updates: %s (current: %s, constraint: %q)",
-		p.Name, CurrentVersionForOutdated(p), p.Constraint)
+	verbose.VersionCheck(p.Name, CurrentVersionForOutdated(p), p.Constraint)
 
 	outdatedCfg, err := resolveOutdatedCfg(p, cfg)
 	if err != nil {
@@ -60,12 +59,11 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 	}
 
 	if outdatedCfg.Versioning != nil {
-		verbose.Debugf("Versioning strategy: format=%q, sort=%q",
-			outdatedCfg.Versioning.Format, outdatedCfg.Versioning.Sort)
+		verbose.VersionStrategy(outdatedCfg.Versioning.Format, outdatedCfg.Versioning.Sort)
 	}
 
 	scopeDir := resolveOutdatedScope(p, cfg, baseDir)
-	verbose.Debugf("Running outdated command in directory: %s", scopeDir)
+	verbose.Printf("Running outdated command in directory: %s", scopeDir)
 
 	output, err := runOutdatedCommand(ctx, outdatedCfg, p, scopeDir)
 	if err != nil {
@@ -77,18 +75,7 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 		return nil, err
 	}
 
-	verbose.Debugf("Parsed %d available versions for %s", len(versions), p.Name)
-	// Show all retrieved versions at DEBUG level for debugging version issues
-	if len(versions) > 0 {
-		if len(versions) <= 10 {
-			verbose.Debugf("Raw versions for %s: %v", p.Name, versions)
-		} else {
-			verbose.Debugf("Raw versions for %s: %v... (%d more)", p.Name, versions[:10], len(versions)-10)
-		}
-	}
-	if verbose.IsTrace() && len(versions) > 10 {
-		verbose.Tracef("All retrieved tags for %s: %v", p.Name, versions)
-	}
+	verbose.VersionsRetrieved(p.Name, versions)
 
 	beforeExclusions := len(versions)
 	versionsAfterExclusions, err := applyVersionExclusions(versions, outdatedCfg, cfg.Security)
@@ -98,35 +85,12 @@ func ListNewerVersions(ctx context.Context, p formats.Package, cfg *config.Confi
 
 	if beforeExclusions != len(versionsAfterExclusions) {
 		excluded := findExcludedVersions(versions, versionsAfterExclusions)
-		verbose.Debugf("Excluded %d versions (before: %d, after: %d)",
-			beforeExclusions-len(versionsAfterExclusions), beforeExclusions, len(versionsAfterExclusions))
-		// Show excluded versions at DEBUG level for debugging
-		if len(excluded) > 0 {
-			if len(excluded) <= 10 {
-				verbose.Debugf("Excluded versions for %s: %v", p.Name, excluded)
-			} else {
-				verbose.Debugf("Excluded versions for %s: %v... (%d more)", p.Name, excluded[:10], len(excluded)-10)
-			}
-		}
-		if verbose.IsTrace() && len(excluded) > 10 {
-			verbose.Tracef("All excluded versions for %s: %v", p.Name, excluded)
-		}
+		verbose.VersionsExcluded(p.Name, beforeExclusions, len(versionsAfterExclusions), excluded)
 	}
 	versions = versionsAfterExclusions
 
 	filtered := filterNewerVersionsWithStrategy(CurrentVersionForOutdated(p), versions, strategy)
-	verbose.Debugf("Found %d newer versions for %s (current: %s)", len(filtered), p.Name, CurrentVersionForOutdated(p))
-	// Show newer versions at DEBUG level
-	if len(filtered) > 0 {
-		if len(filtered) <= 10 {
-			verbose.Debugf("Newer versions for %s: %v", p.Name, filtered)
-		} else {
-			verbose.Debugf("Newer versions for %s: %v... (%d more)", p.Name, filtered[:10], len(filtered)-10)
-		}
-	}
-	if verbose.IsTrace() && len(filtered) > 10 {
-		verbose.Tracef("All newer versions for %s: %v", p.Name, filtered)
-	}
+	verbose.VersionsFiltered(p.Name, CurrentVersionForOutdated(p), filtered)
 
 	return filtered, nil
 }
@@ -156,7 +120,7 @@ func resolveOutdatedCfg(p formats.Package, cfg *config.Config) (*config.Outdated
 		return nil, &errors.UnsupportedError{Reason: fmt.Sprintf("outdated configuration missing for %s", p.Rule)}
 	}
 
-	verbose.Tracef("Using outdated config from rule %q for package %s", p.Rule, p.Name)
+	verbose.Printf("Using outdated config from rule %q for package %s", p.Rule, p.Name)
 
 	effective := cloneOutdatedCfg(ruleCfg.Outdated)
 
@@ -164,29 +128,29 @@ func resolveOutdatedCfg(p formats.Package, cfg *config.Config) (*config.Outdated
 	if ruleCfg.PackageOverrides != nil {
 		if override, ok := ruleCfg.PackageOverrides[p.Name]; ok {
 			overrideCfg = override.Outdated
-			verbose.Tracef("Package %s has package_overrides configured", p.Name)
+			verbose.Printf("Package %s has package_overrides configured", p.Name)
 		}
 	}
 
 	if overrideCfg != nil {
 		if overrideCfg.Versioning != nil {
 			effective.Versioning = overrideCfg.Versioning
-			verbose.Tracef("Package %s: using custom versioning from override", p.Name)
+			verbose.Printf("Package %s: using custom versioning from override", p.Name)
 		}
 
 		if overrideCfg.ExcludeVersions != nil {
 			effective.ExcludeVersions = cloneStringSlice(overrideCfg.ExcludeVersions)
-			verbose.Tracef("Package %s: using custom exclude_versions from override", p.Name)
+			verbose.Printf("Package %s: using custom exclude_versions from override", p.Name)
 		}
 
 		if overrideCfg.ExcludeVersionPatterns != nil {
 			effective.ExcludeVersionPatterns = cloneStringSlice(overrideCfg.ExcludeVersionPatterns)
-			verbose.Tracef("Package %s: using custom exclude_version_patterns from override", p.Name)
+			verbose.Printf("Package %s: using custom exclude_version_patterns from override", p.Name)
 		}
 
 		if overrideCfg.TimeoutSeconds != nil {
 			effective.TimeoutSeconds = *overrideCfg.TimeoutSeconds
-			verbose.Tracef("Package %s: using custom timeout %ds from override", p.Name, *overrideCfg.TimeoutSeconds)
+			verbose.Printf("Package %s: using custom timeout %ds from override", p.Name, *overrideCfg.TimeoutSeconds)
 		}
 	}
 
@@ -575,7 +539,7 @@ func SummarizeAvailableVersions(current string, versions []string, cfg *config.V
 
 	base, ok := strategy.parseVersion(current)
 	if !ok {
-		verbose.Debugf("Version summarization: could not parse current version %q", current)
+		verbose.Printf("Version summarization: could not parse current version %q", current)
 		return "#N/A", "#N/A", "#N/A", nil
 	}
 
@@ -644,7 +608,7 @@ func SummarizeAvailableVersions(current string, versions []string, cfg *config.V
 		patch = patchCandidate.raw
 	}
 
-	verbose.Debugf("Version candidates: major=%s, minor=%s, patch=%s (incremental=%v)",
+	verbose.Printf("Version candidates: major=%s, minor=%s, patch=%s (incremental=%v)",
 		major, minor, patch, incremental)
 
 	return major, minor, patch, nil
@@ -781,8 +745,7 @@ func FilterVersionsByConstraint(p formats.Package, versions []string, flags Upda
 	}
 
 	// Log constraint filtering details
-	verbose.Debugf("FilterVersionsByConstraint for %s: input=%d versions, constraint=%q (original=%q), reference=%s, flags={major=%v, minor=%v, patch=%v}",
-		p.Name, len(versions), constraint, originalConstraint, reference, flags.Major, flags.Minor, flags.Patch)
+	verbose.ConstraintFilter(p.Name, len(versions), constraint, originalConstraint, reference, flags.Major, flags.Minor, flags.Patch)
 
 	allowed := make([]string, 0, len(versions))
 
@@ -844,15 +807,7 @@ func FilterVersionsByConstraint(p formats.Package, versions []string, flags Upda
 	}
 
 	// Log filtering results
-	filtered := len(versions) - len(allowed)
-	if filtered > 0 {
-		verbose.Debugf("FilterVersionsByConstraint for %s: filtered out %d versions, %d remaining", p.Name, filtered, len(allowed))
-		if verbose.IsTrace() && len(allowed) > 0 {
-			verbose.Tracef("Allowed versions for %s after constraint filter: %v", p.Name, allowed)
-		}
-	} else {
-		verbose.Debugf("FilterVersionsByConstraint for %s: all %d versions allowed", p.Name, len(allowed))
-	}
+	verbose.ConstraintFilterResult(p.Name, len(versions), len(allowed))
 
 	return allowed
 }
@@ -1017,10 +972,10 @@ func SelectTargetVersion(major, minor, patch string, flags UpdateSelectionFlags,
 	scope := determineScope(flags, constraint)
 	candidates := getVersionCandidates(major, minor, patch, scope, incremental)
 
-	verbose.Debugf("Target selection: scope=%s, incremental=%v, candidates=%v", scope, incremental, candidates)
+	verbose.Printf("Target selection: scope=%s, incremental=%v, candidates=%v", scope, incremental, candidates)
 
 	if v, ok := selectFirstValid(candidates...); ok {
-		verbose.Debugf("Selected target version: %s", v)
+		verbose.Printf("Selected target version: %s", v)
 		return v, nil
 	}
 	return "", fmt.Errorf("no suitable version found")

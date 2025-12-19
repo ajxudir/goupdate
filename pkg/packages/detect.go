@@ -71,13 +71,13 @@ func DetectFiles(cfg *config.Config, baseDir string) (map[string][]string, error
 		if len(files) > 0 {
 			detected[ruleKey] = files
 			verbose.Debugf("Rule %q: found %d matching files", ruleKey, len(files))
-			if verbose.IsTrace() {
+			if verbose.IsEnabled() {
 				for _, f := range files {
-					verbose.Tracef("  - %s", f)
+					verbose.Printf("  - %s", f)
 				}
 			}
 		} else {
-			verbose.Tracef("Rule %q: no matching files found", ruleKey)
+			verbose.Printf("Rule %q: no matching files found", ruleKey)
 		}
 	}
 
