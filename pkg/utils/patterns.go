@@ -155,24 +155,19 @@ func matchesDetect(content, detectPattern string) bool {
 func ExtractWithPatterns(content string, cfg *config.ExtractionCfg) ([]map[string]string, error) {
 	patterns := SelectPatterns(content, cfg)
 	if len(patterns) == 0 {
-		verbose.Printf("Pattern extraction: no patterns selected from config\n")
 		return nil, nil
 	}
 
-	verbose.Printf("Pattern extraction: applying %d pattern(s)\n", len(patterns))
 	var allMatches []map[string]string
 	for i, pattern := range patterns {
-		verbose.Printf("Pattern extraction: applying pattern %d/%d\n", i+1, len(patterns))
 		matches, err := ExtractAllMatches(pattern, content)
 		if err != nil {
-			verbose.Printf("Pattern extraction ERROR: pattern %d failed: %v\n", i+1, err)
+			verbose.Printf("Pattern extraction ERROR: pattern %d/%d failed: %v\n", i+1, len(patterns), err)
 			return nil, err
 		}
-		verbose.Printf("Pattern extraction: pattern %d matched %d entries\n", i+1, len(matches))
 		allMatches = append(allMatches, matches...)
 	}
 
-	verbose.Printf("Pattern extraction: total %d matches from all patterns\n", len(allMatches))
 	return allMatches, nil
 }
 

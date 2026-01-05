@@ -206,15 +206,48 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 			return reloadPackages(cfg, args, workDir, unsupported)
 		})
 
-	// Build grouped plans
+	// Build grouped plans with progress feedback for table mode
 	opts := update.PlanningOptions{IncrementalMode: updateIncrementalFlag}
+	useStructuredOutput := output.IsStructuredFormat(outputFormat)
+
+	// Build outdated-style table for progress display during planning phase
+	var outdatedCheckTable *output.Table
+	if !useStructuredOutput && len(resolvedPkgs) > 0 {
+		fmt.Println()
+		fmt.Println("Checking for available updates...")
+		fmt.Println(strings.Repeat("═", 70))
+
+		outdatedCheckTable = update.BuildOutdatedCheckTable(resolvedPkgs, selection)
+		fmt.Println(outdatedCheckTable.HeaderRow())
+		fmt.Println(outdatedCheckTable.SeparatorRow())
+
+		opts.OnPackageChecked = func(plan *update.PlannedUpdate, current, total int) {
+			update.PrintOutdatedCheckRow(plan, outdatedCheckTable, selection)
+		}
+	}
+
 	groupedPlans := update.BuildGroupedPlans(cmdCtx, resolved, updateCtx, opts, listNewerVersionsFunc, supervision.DeriveUnsupportedReason)
+
+	if !useStructuredOutput && len(resolvedPkgs) > 0 {
+		// Print summary for the outdated checking phase
+		summaryData := make([]update.OutdatedResultData, len(groupedPlans))
+		for i, plan := range groupedPlans {
+			summaryData[i] = update.OutdatedResultData{
+				Status: update.DeriveOutdatedStatus(plan),
+				Major:  plan.Res.Major,
+				Minor:  plan.Res.Minor,
+				Patch:  plan.Res.Patch,
+				Err:    plan.Res.Err,
+			}
+		}
+		fmt.Printf("\nTotal packages: %d\n", len(groupedPlans))
+		counts := update.ComputeSummaryFromOutdatedResults(summaryData)
+		update.PrintUpdateSummaryLines(counts, update.SummaryModeOutdated)
+	}
 
 	// Calculate column widths
 	table := update.BuildUpdateTableFromPackages(resolvedPkgs, selection)
 	pendingUpdates := update.CountPendingUpdates(groupedPlans)
-
-	useStructuredOutput := output.IsStructuredFormat(outputFormat)
 
 	// Show preview and confirm for non-dry-run updates
 	if !updateDryRunFlag && !useStructuredOutput && pendingUpdates > 0 {

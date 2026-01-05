@@ -182,10 +182,10 @@ func (r *Runner) runSingleTest(test *config.SystemTestCfg) TestResult {
 		timeout = 0
 	}
 
-	// Log the system test command being executed
-	verbose.Debugf("Running system test %q: %s", test.Name, test.Commands)
-
+	// Suppress verbose during command execution to avoid duplicate logging
+	verbose.Suppress()
 	output, err := cmdexec.Execute(test.Commands, test.Env, r.workDir, timeout, nil)
+	verbose.Unsuppress()
 
 	duration := time.Since(startTime)
 
@@ -199,14 +199,10 @@ func (r *Runner) runSingleTest(test *config.SystemTestCfg) TestResult {
 	if err != nil {
 		testResult.Passed = false
 		testResult.Error = fmt.Errorf("%s: %w", test.Name, err)
-		// Log full output on failure for debugging
-		verbose.Printf("System test %q failed with error: %v\n", test.Name, err)
-		if verbose.IsTrace() && len(output) > 0 {
-			verbose.Tracef("System test %q output:\n%s", test.Name, string(output))
-		}
+		verbose.Printf("System test %q FAILED: %v\n", test.Name, err)
 	} else {
 		testResult.Passed = true
-		verbose.Debugf("System test %q passed (%v)", test.Name, duration)
+		// Success is logged as a summary by the caller, not per-test
 	}
 
 	return testResult

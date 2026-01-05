@@ -11,6 +11,7 @@ import (
 	"github.com/ajxudir/goupdate/pkg/filtering"
 	"github.com/ajxudir/goupdate/pkg/output"
 	"github.com/ajxudir/goupdate/pkg/packages"
+	"github.com/ajxudir/goupdate/pkg/verbose"
 	"github.com/spf13/cobra"
 )
 
@@ -308,7 +309,8 @@ func buildScanTable(entries []scannedEntry) *output.Table {
 // validateFile attempts to parse a file and returns its validation status.
 //
 // Attempts to parse the file using the dynamic parser and reports whether
-// the file is valid or contains syntax/format errors.
+// the file is valid or contains syntax/format errors. Suppresses verbose
+// output during validation since scan only needs to report file validity.
 //
 // Parameters:
 //   - parser: Dynamic parser instance for file parsing
@@ -319,7 +321,10 @@ func buildScanTable(entries []scannedEntry) *output.Table {
 //   - status: ValidationValid if file parses successfully, ValidationInvalid if it fails
 //   - errMsg: Empty string on success, error message on failure
 func validateFile(parser *packages.DynamicParser, filePath string, cfg *config.PackageManagerCfg) (status string, errMsg string) {
+	// Suppress verbose output during validation - scan only needs to validate, not log parsing details
+	verbose.Suppress()
 	_, err := parser.ParseFile(filePath, cfg)
+	verbose.Unsuppress()
 	if err != nil {
 		return constants.ValidationInvalid, err.Error()
 	}

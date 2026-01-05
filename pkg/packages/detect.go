@@ -47,12 +47,10 @@ func DetectFiles(cfg *config.Config, baseDir string) (map[string][]string, error
 	}
 
 	verbose.Printf("Starting file detection in base directory: %s\n", baseDir)
-	verbose.Debugf("Processing %d configured rules", len(cfg.Rules))
 
 	for ruleKey, rule := range cfg.Rules {
 		// Skip disabled rules
 		if !rule.IsEnabled() {
-			verbose.Tracef("Rule %q: skipped (disabled)", ruleKey)
 			continue
 		}
 
@@ -61,8 +59,6 @@ func DetectFiles(cfg *config.Config, baseDir string) (map[string][]string, error
 			continue
 		}
 
-		verbose.Tracef("Rule %q: scanning with include=%v, exclude=%v", ruleKey, rule.Include, rule.Exclude)
-
 		files, err := detectForRule(baseDir, rule)
 		if err != nil {
 			return nil, err
@@ -70,15 +66,17 @@ func DetectFiles(cfg *config.Config, baseDir string) (map[string][]string, error
 
 		if len(files) > 0 {
 			detected[ruleKey] = files
-			verbose.Debugf("Rule %q: found %d matching files", ruleKey, len(files))
-			if verbose.IsTrace() {
-				for _, f := range files {
-					verbose.Tracef("  - %s", f)
-				}
-			}
-		} else {
-			verbose.Tracef("Rule %q: no matching files found", ruleKey)
 		}
+	}
+
+	// Log summary of detection results
+	if len(detected) > 0 {
+		matchedCount := len(detected)
+		totalFiles := 0
+		for _, files := range detected {
+			totalFiles += len(files)
+		}
+		verbose.Printf("File detection: %d/%d rules matched, %d files found", matchedCount, len(cfg.Rules), totalFiles)
 	}
 
 	return resolveRuleConflicts(cfg, detected), nil
@@ -234,7 +232,6 @@ func selectRuleForFile(cfg *config.Config, file string, rules []string) string {
 	dir := filepath.Dir(file)
 
 	prioritized := prioritizeRules(rules)
-	verbose.Debugf("Prioritized rule order for %q: %v", file, prioritized)
 
 	for _, ruleName := range prioritized {
 		rule, ok := cfg.Rules[ruleName]
@@ -242,12 +239,10 @@ func selectRuleForFile(cfg *config.Config, file string, rules []string) string {
 			continue
 		}
 		if hasLockFile(dir, rule.LockFiles) {
-			verbose.Debugf("Rule %q selected: lock file found in %s", ruleName, dir)
 			return ruleName
 		}
 	}
 
-	verbose.Debugf("Rule %q selected: no lock files found, using highest priority", prioritized[0])
 	return prioritized[0]
 }
 

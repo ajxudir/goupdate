@@ -248,18 +248,18 @@ func Infof(format string, args ...any) {
 	}
 }
 
-// Debugf prints a formatted debug message if debug level (-vv) or higher is enabled.
+// Debugf prints a formatted debug message if verbose is enabled.
 // Use for shell commands, drift checks, per-package details.
 func Debugf(format string, args ...any) {
-	if AtLevel(LevelDebug) {
+	if isEnabled() {
 		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] "+format+"\n", args...)
 	}
 }
 
-// Tracef prints a formatted trace message if trace level (-vvv) is enabled.
+// Tracef prints a formatted trace message if verbose is enabled.
 // Use for full version lists, all parsed packages, pattern details.
 func Tracef(format string, args ...any) {
-	if AtLevel(LevelTrace) {
+	if isEnabled() {
 		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] "+format+"\n", args...)
 	}
 }
@@ -425,14 +425,14 @@ func UnsupportedHelp(rule, feature string) {
 	_, _ = fmt.Fprintf(w, "        📖 See: docs/configuration.md#rules\n")
 }
 
-// CommandExec logs command execution details if debug level (-vv) or higher is enabled.
+// CommandExec logs command execution details if verbose is enabled.
 // Only logs working directory if it's not the default (".").
 //
 // Parameters:
 //   - cmd: The command string being executed
 //   - workDir: The working directory path for command execution
 func CommandExec(cmd, workDir string) {
-	if AtLevel(LevelDebug) {
+	if isEnabled() {
 		w := getWriter()
 		_, _ = fmt.Fprintf(w, "[DEBUG] Executing: %s\n", cmd)
 		// Only log working directory if non-default
@@ -443,42 +443,21 @@ func CommandExec(cmd, workDir string) {
 }
 
 // CommandResult logs command execution results if enabled.
-//
-// It performs the following operations:
-//   - Checks if verbose logging is enabled
-//   - Prints the command status (succeeded or failed) with exit code
-//   - Truncates long command strings to 60 characters for readability
-//   - If output is provided, prints up to 5 lines with truncation
-//   - Does nothing if verbose logging is disabled
-//
-// Parameters:
-//   - cmd: The command string that was executed
-//   - exitCode: The exit code returned by the command (0 for success)
-//   - output: The command output (stdout/stderr)
-//
-// Returns:
-//   - None
+// Only logs failures with output for debugging.
 func CommandResult(cmd string, exitCode int, output string) {
-	if !isEnabled() {
+	if !isEnabled() || exitCode == 0 {
 		return
 	}
 	w := getWriter()
-	if exitCode == 0 {
-		_, _ = fmt.Fprintf(w, "[DEBUG] Command succeeded: %s\n", truncate(cmd, 60))
-	} else {
-		_, _ = fmt.Fprintf(w, "[DEBUG] Command failed (exit %d): %s\n", exitCode, truncate(cmd, 60))
-	}
-	if output != "" && len(output) > 0 {
+	_, _ = fmt.Fprintf(w, "[DEBUG] Command failed (exit %d): %s\n", exitCode, truncate(cmd, 80))
+	if output != "" {
 		lines := strings.Split(strings.TrimSpace(output), "\n")
-		if len(lines) > 5 {
-			for _, line := range lines[:3] {
-				_, _ = fmt.Fprintf(w, "        | %s\n", truncate(line, 100))
-			}
-			_, _ = fmt.Fprintf(w, "        | ... (%d more lines)\n", len(lines)-3)
-		} else {
-			for _, line := range lines {
-				_, _ = fmt.Fprintf(w, "        | %s\n", truncate(line, 100))
-			}
+		maxLines := 5
+		if len(lines) > maxLines {
+			lines = lines[:maxLines]
+		}
+		for _, line := range lines {
+			_, _ = fmt.Fprintf(w, "        | %s\n", truncate(line, 100))
 		}
 	}
 }
@@ -547,6 +526,24 @@ func VersionSelected(pkg, current, target, reason string) {
 		_, _ = fmt.Fprintf(getWriter(), "[DEBUG] Version selected for '%s': %s → %s (%s)\n", pkg, current, target, reason)
 	}
 }
+
+
+// VersionsExcluded logs versions that were excluded by patterns.
+func VersionsExcluded(pkg string, excluded []string) {
+	if !isEnabled() || len(excluded) == 0 {
+		return
+	}
+	_, _ = fmt.Fprintf(getWriter(), "[DEBUG] Excluded versions for %s: %v\n", pkg, excluded)
+}
+
+// VersionsFiltered logs the newer versions found after filtering.
+func VersionsFiltered(pkg string, filtered []string) {
+	if !isEnabled() || len(filtered) == 0 {
+		return
+	}
+	_, _ = fmt.Fprintf(getWriter(), "[DEBUG] Newer versions for %s: %v\n", pkg, filtered)
+}
+
 
 // truncate shortens a string to the specified maximum length.
 //

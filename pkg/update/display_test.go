@@ -393,16 +393,56 @@ func TestFormatSummaryStrings(t *testing.T) {
 	t.Run("available updates line", func(t *testing.T) {
 		counts := UpdateSummaryCounts{HasMajor: 1, HasMinor: 2}
 		_, available := FormatSummaryStrings(counts, SummaryModeResult)
-		assert.Contains(t, available, "1 have major")
-		assert.Contains(t, available, "2 have minor")
-		assert.Contains(t, available, "still available")
+		// New format: always shows all three counts for regex-friendly parsing
+		assert.Contains(t, available, "1 major")
+		assert.Contains(t, available, "2 minor")
+		assert.Contains(t, available, "0 patch")
+		assert.Contains(t, available, "updates still available")
 	})
 
 	t.Run("preview mode available suffix", func(t *testing.T) {
 		counts := UpdateSummaryCounts{HasMajor: 1}
 		_, available := FormatSummaryStrings(counts, SummaryModePreview)
+		assert.Contains(t, available, "1 major")
 		assert.Contains(t, available, "available")
 		assert.NotContains(t, available, "still")
+	})
+
+	t.Run("outdated mode", func(t *testing.T) {
+		counts := UpdateSummaryCounts{ToUpdate: 3, UpToDate: 5, HasMajor: 2, HasMinor: 1, HasPatch: 3}
+		summary, available := FormatSummaryStrings(counts, SummaryModeOutdated)
+		assert.Contains(t, summary, "3 outdated")
+		assert.Contains(t, summary, "5 up-to-date")
+		assert.Contains(t, available, "2 major")
+		assert.Contains(t, available, "1 minor")
+		assert.Contains(t, available, "3 patch")
+		assert.Contains(t, available, "available")
+		assert.NotContains(t, available, "still")
+	})
+
+	t.Run("zero counts shown for regex-friendly parsing", func(t *testing.T) {
+		counts := UpdateSummaryCounts{ToUpdate: 1, HasMajor: 0, HasMinor: 0, HasPatch: 0}
+		_, available := FormatSummaryStrings(counts, SummaryModeResult)
+		// All counts should be shown, even zeros
+		assert.Contains(t, available, "0 major")
+		assert.Contains(t, available, "0 minor")
+		assert.Contains(t, available, "0 patch")
+	})
+
+	t.Run("zero outdated and up-to-date always shown", func(t *testing.T) {
+		// Even with all zeros, counts should be shown for regex-friendly parsing
+		counts := UpdateSummaryCounts{ToUpdate: 0, UpToDate: 0}
+		summary, _ := FormatSummaryStrings(counts, SummaryModeOutdated)
+		assert.Contains(t, summary, "0 outdated")
+		assert.Contains(t, summary, "0 up-to-date")
+	})
+
+	t.Run("result mode always shows up-to-date count", func(t *testing.T) {
+		// Even with zero up-to-date, it should still be shown
+		counts := UpdateSummaryCounts{ToUpdate: 5, UpToDate: 0}
+		summary, _ := FormatSummaryStrings(counts, SummaryModeResult)
+		assert.Contains(t, summary, "5 updated")
+		assert.Contains(t, summary, "0 up-to-date")
 	})
 }
 

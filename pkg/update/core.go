@@ -160,14 +160,10 @@ func RunGroupLockCommand(cfg *config.UpdateCfg, workDir string, withAllDeps bool
 		return &errors.UnsupportedError{Reason: "no lock command configured"}
 	}
 
-	verbose.Debugf("Lock command: running group lock (withAllDeps=%v)", withAllDeps)
-
 	// Run lock command without package-specific replacements (group-level)
 	_, err := execCommandFunc(cfg, "", "", "", workDir, withAllDeps)
 	if err != nil {
-		verbose.Printf("Lock command FAILED: %v\n", err)
-	} else {
-		verbose.Debugf("Lock command completed successfully")
+		verbose.Printf("Group lock FAILED: %v\n", err)
 	}
 	return err
 }
@@ -342,21 +338,16 @@ func UpdatePackage(p formats.Package, target string, cfg *config.Config, workDir
 
 	// Check if this package needs -W flag (with all dependencies)
 	withAllDeps := ruleCfg.ShouldUpdateWithAllDependencies(p.Name)
-	if withAllDeps {
-		verbose.Tracef("Package %s configured with with_all_dependencies", p.Name)
-	}
 
 	runLockCommand := func(version string) error {
 		if strings.TrimSpace(effectiveCfg.Commands) == "" {
 			return &errors.UnsupportedError{Reason: fmt.Sprintf("lock update missing for %s", p.Rule)}
 		}
 
-		verbose.Debugf("Running lock command for %s in %s", p.Name, scopeDir)
 		if _, err := execCommandFunc(effectiveCfg, p.Name, version, p.Constraint, scopeDir, withAllDeps); err != nil {
 			verbose.Printf("Lock command failed for %s: %v\n", p.Name, err)
 			return err
 		}
-		verbose.Debugf("Lock command completed for %s", p.Name)
 
 		return nil
 	}
@@ -397,10 +388,8 @@ func UpdatePackage(p formats.Package, target string, cfg *config.Config, workDir
 		verbose.Printf("Failed to update declared version for %s: %v\n", p.Name, applyErr)
 		return applyErr
 	}
-	verbose.Tracef("Updated declared version for %s in manifest", p.Name)
 
 	if dryRun || skipLock {
-		verbose.Tracef("Skipping lock command for %s (dryRun=%v, skipLock=%v)", p.Name, dryRun, skipLock)
 		return nil
 	}
 
@@ -408,8 +397,6 @@ func UpdatePackage(p formats.Package, target string, cfg *config.Config, workDir
 	if err := runLockCommand(target); err != nil {
 		return performRollback(err)
 	}
-
-	verbose.Debugf("Successfully updated %s to %s", p.Name, target)
 	return nil
 }
 

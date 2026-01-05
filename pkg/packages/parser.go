@@ -60,13 +60,6 @@ func (dp *DynamicParser) ParseFile(filePath string, cfg *config.PackageManagerCf
 		return nil, fmt.Errorf("fields configuration missing for %s", filePath)
 	}
 
-	verbose.Printf("Parsing file: %s\n", filePath)
-	verbose.Tracef("Format: %s, Fields config: name=%q, version=%q",
-		cfg.Format, cfg.Fields["name"], cfg.Fields["version"])
-	if root, ok := cfg.Fields["root"]; ok && root != "" {
-		verbose.Tracef("Root path: %s", root)
-	}
-
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
@@ -84,11 +77,6 @@ func (dp *DynamicParser) ParseFile(filePath string, cfg *config.PackageManagerCf
 	}
 
 	verbose.Printf("Parsed %d packages from %s\n", len(packages), filePath)
-	if verbose.IsTrace() {
-		for _, pkg := range packages {
-			verbose.Tracef("  - %s @ %s", pkg.Name, pkg.Version)
-		}
-	}
 
 	return &formats.PackageList{
 		Packages: packages,

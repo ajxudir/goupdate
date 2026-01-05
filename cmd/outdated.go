@@ -18,6 +18,7 @@ import (
 	"github.com/ajxudir/goupdate/pkg/output"
 	"github.com/ajxudir/goupdate/pkg/preflight"
 	"github.com/ajxudir/goupdate/pkg/supervision"
+	"github.com/ajxudir/goupdate/pkg/update"
 	"github.com/ajxudir/goupdate/pkg/utils"
 	"github.com/ajxudir/goupdate/pkg/verbose"
 	"github.com/ajxudir/goupdate/pkg/warnings"
@@ -299,7 +300,21 @@ func runOutdated(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	} else {
+		// Convert results to summary format
+		summaryData := make([]update.OutdatedResultData, len(results))
+		for i, res := range results {
+			summaryData[i] = update.OutdatedResultData{
+				Status: res.status,
+				Major:  res.major,
+				Minor:  res.minor,
+				Patch:  res.patch,
+				Err:    res.err,
+			}
+		}
+
 		fmt.Printf("\nTotal packages: %d\n", len(results))
+		counts := update.ComputeSummaryFromOutdatedResults(summaryData)
+		update.PrintUpdateSummaryLines(counts, update.SummaryModeOutdated)
 		display.PrintUnsupportedMessages(os.Stdout, unsupported.Messages())
 		display.PrintWarnings(os.Stdout, collector.Messages())
 		printOutdatedErrorsWithHints(errs)
