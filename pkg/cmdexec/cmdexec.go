@@ -190,7 +190,7 @@ func executeCommandsWithContext(ctx context.Context, commands string, env map[st
 //
 // Template placeholders in the format {{key}} are replaced with their corresponding
 // values from the replacements map. Non-empty values are shell-escaped to prevent
-// command injection. Empty values are removed entirely (not quoted as '') to avoid
+// command injection. Empty values are removed entirely (not quoted as ”) to avoid
 // passing empty arguments to commands.
 //
 // Parameters:

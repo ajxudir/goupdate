@@ -28,8 +28,8 @@ const (
 var (
 	mu         sync.RWMutex
 	enabled    bool
-	suppressed bool // Temporarily suppress verbose output (for drift checks, etc.)
-	level      Level = LevelVerbose // Default to verbose when enabled
+	suppressed bool                     // Temporarily suppress verbose output (for drift checks, etc.)
+	level      Level     = LevelVerbose // Default to verbose when enabled
 	writer     io.Writer = os.Stderr
 )
 
@@ -527,7 +527,6 @@ func VersionSelected(pkg, current, target, reason string) {
 	}
 }
 
-
 // VersionsExcluded logs versions that were excluded by patterns.
 func VersionsExcluded(pkg string, excluded []string) {
 	if !isEnabled() || len(excluded) == 0 {
@@ -543,7 +542,6 @@ func VersionsFiltered(pkg string, filtered []string) {
 	}
 	_, _ = fmt.Fprintf(getWriter(), "[DEBUG] Newer versions for %s: %v\n", pkg, filtered)
 }
-
 
 // truncate shortens a string to the specified maximum length.
 //
