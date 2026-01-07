@@ -3303,3 +3303,416 @@ func TestProcessGroupWithGroupLockProgressSystemTests(t *testing.T) {
 		assert.Equal(t, constants.StatusFailed, results[0].Status)
 	})
 }
+
+// TestProcessGroupPerPackageContinueOnError tests ContinueOnError behavior.
+func TestProcessGroupPerPackageContinueOnError(t *testing.T) {
+	mockDeriveReason := func(p formats.Package, cfg *config.Config, err error, latestMissing bool) string {
+		return "test reason"
+	}
+
+	t.Run("continues after update error when ContinueOnError is true", func(t *testing.T) {
+		callCount := 0
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			callCount++
+			if p.Name == "react" {
+				return errors.New("update failed")
+			}
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, true, false) // dry run + continue on error
+		plans := []*PlannedUpdate{
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("react", "17.0.0", "17.0.0"), Target: "18.0.0", Status: constants.StatusPlanned}},
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("lodash", "4.0.0", "4.0.0"), Target: "4.17.21", Status: constants.StatusPlanned}},
+		}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupPerPackage(ctx, plans, &applied, &results, &failures, callbacks)
+
+		assert.Error(t, err)
+		assert.Equal(t, 2, callCount, "both packages should be processed")
+		assert.Len(t, results, 2)
+	})
+
+	t.Run("continues after validation error when ContinueOnError is true", func(t *testing.T) {
+		callCount := 0
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			callCount++
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(false, true, false). // not dry run + continue on error
+			WithReloadList(func() ([]formats.Package, error) {
+				// Return empty to cause validation failure
+				return []formats.Package{}, nil
+			})
+		plans := []*PlannedUpdate{
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("react", "17.0.0", "17.0.0"), Target: "18.0.0", Status: constants.StatusPlanned}},
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("lodash", "4.0.0", "4.0.0"), Target: "4.17.21", Status: constants.StatusPlanned}},
+		}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupPerPackage(ctx, plans, &applied, &results, &failures, callbacks)
+
+		assert.Error(t, err)
+		assert.Equal(t, 2, callCount, "both packages should be processed")
+		assert.Len(t, results, 2)
+	})
+}
+
+// TestProcessGroupWithGroupLockContinueOnError tests ContinueOnError behavior for group lock.
+func TestProcessGroupWithGroupLockContinueOnError(t *testing.T) {
+	mockDeriveReason := func(p formats.Package, cfg *config.Config, err error, latestMissing bool) string {
+		return "test reason"
+	}
+
+	t.Run("continues after update error when ContinueOnError is true", func(t *testing.T) {
+		callCount := 0
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			callCount++
+			if p.Name == "react" {
+				return errors.New("update failed")
+			}
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, true, false) // dry run + continue on error
+		plans := []*PlannedUpdate{
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("react", "17.0.0", "17.0.0"), Target: "18.0.0", Status: constants.StatusPlanned}},
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("lodash", "4.0.0", "4.0.0"), Target: "4.17.21", Status: constants.StatusPlanned}},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLock(ctx, plans, groupCfg, &applied, &results, &failures, callbacks)
+
+		assert.Error(t, err)
+		assert.Equal(t, 2, callCount, "both packages should be processed")
+	})
+
+	t.Run("tracks unsupported packages with OnResultReady callback", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		tracker := &mockUnsupportedTracker{}
+		ctx := NewUpdateContext(cfg, "/test", tracker).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, false, false) // dry run
+		plans := []*PlannedUpdate{
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("react", "17.0.0", "17.0.0"), Target: "18.0.0", Status: constants.StatusPlanned}},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+		callbackInvoked := false
+		callbacks := ExecutionCallbacks{
+			DeriveReason: mockDeriveReason,
+			OnResultReady: func(res UpdateResult, dryRun bool) {
+				callbackInvoked = true
+			},
+		}
+
+		err := processGroupWithGroupLock(ctx, plans, groupCfg, &applied, &results, &failures, callbacks)
+
+		assert.NoError(t, err)
+		assert.True(t, callbackInvoked)
+	})
+}
+
+// TestProcessGroupWithGroupLockProgressContinueOnError tests ContinueOnError behavior for progress variant.
+func TestProcessGroupWithGroupLockProgressContinueOnError(t *testing.T) {
+	mockDeriveReason := func(p formats.Package, cfg *config.Config, err error, latestMissing bool) string {
+		return "test reason"
+	}
+
+	t.Run("continues after update error when ContinueOnError is true", func(t *testing.T) {
+		callCount := 0
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			callCount++
+			if p.Name == "react" {
+				return errors.New("update failed")
+			}
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, true, false) // dry run + continue on error
+		plans := []*PlannedUpdate{
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("react", "17.0.0", "17.0.0"), Target: "18.0.0", Status: constants.StatusPlanned}},
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("lodash", "4.0.0", "4.0.0"), Target: "4.17.21", Status: constants.StatusPlanned}},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		// Use nil progress reporter
+		err := processGroupWithGroupLockProgress(ctx, plans, groupCfg, &applied, &results, nil, callbacks)
+
+		assert.Error(t, err)
+		assert.Equal(t, 2, callCount, "both packages should be processed")
+	})
+
+	t.Run("increments progress for skipped packages", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		tracker := &mockUnsupportedTracker{}
+		ctx := NewUpdateContext(cfg, "/test", tracker).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, false, false)
+		plans := []*PlannedUpdate{
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("react", "17.0.0", "17.0.0"), Target: "18.0.0", Status: lock.InstallStatusFloating}},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+		progressCount := 0
+		mockProgress := &testProgressReporter{incrementFn: func() { progressCount++ }}
+
+		err := processGroupWithGroupLockProgress(ctx, plans, groupCfg, &applied, &results, mockProgress, callbacks)
+
+		assert.NoError(t, err)
+		assert.Equal(t, 1, progressCount, "progress should be incremented for skipped package")
+	})
+}
+
+// testProgressReporter is a mock progress reporter for testing.
+type testProgressReporter struct {
+	incrementFn func()
+}
+
+func (r *testProgressReporter) Increment() {
+	if r.incrementFn != nil {
+		r.incrementFn()
+	}
+}
+
+// TestProcessGroupWithGroupLockValidation tests validation paths.
+func TestProcessGroupWithGroupLockValidation(t *testing.T) {
+	mockDeriveReason := func(p formats.Package, cfg *config.Config, err error, latestMissing bool) string {
+		return "test reason"
+	}
+
+	t.Run("validates packages with reload list in dry run", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, false, false). // dry run
+			WithReloadList(func() ([]formats.Package, error) {
+				return []formats.Package{
+					testutil.NPMPackage("react", "18.0.0", "18.0.0"),
+				}, nil
+			})
+		plans := []*PlannedUpdate{
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("react", "17.0.0", "17.0.0"), Target: "18.0.0", Status: constants.StatusPlanned}},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLock(ctx, plans, groupCfg, &applied, &results, &failures, callbacks)
+
+		assert.NoError(t, err)
+		assert.Len(t, results, 1)
+		assert.Equal(t, constants.StatusUpdated, results[0].Status)
+	})
+
+	t.Run("handles validation failure in dry run", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, false, false). // dry run
+			WithReloadList(func() ([]formats.Package, error) {
+				// Return wrong version to cause validation failure
+				return []formats.Package{
+					testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+				}, nil
+			})
+		plans := []*PlannedUpdate{
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("react", "17.0.0", "17.0.0"), Target: "18.0.0", Status: constants.StatusPlanned}},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLock(ctx, plans, groupCfg, &applied, &results, &failures, callbacks)
+
+		assert.Error(t, err)
+		assert.Len(t, results, 1)
+		assert.Equal(t, constants.StatusFailed, results[0].Status)
+	})
+
+	t.Run("tracks unsupported status packages", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		tracker := &mockUnsupportedTracker{}
+		ctx := NewUpdateContext(cfg, "/test", tracker).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, false, false) // dry run
+		plans := []*PlannedUpdate{
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("react", "17.0.0", "17.0.0"), Target: "18.0.0", Status: lock.InstallStatusNotConfigured}},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		var failures []SystemTestFailure
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+
+		err := processGroupWithGroupLock(ctx, plans, groupCfg, &applied, &results, &failures, callbacks)
+
+		assert.NoError(t, err)
+		assert.Len(t, tracker.packages, 1, "unsupported package should be tracked")
+	})
+}
+
+// TestProcessGroupWithGroupLockProgressValidation tests validation paths for progress variant.
+func TestProcessGroupWithGroupLockProgressValidation(t *testing.T) {
+	mockDeriveReason := func(p formats.Package, cfg *config.Config, err error, latestMissing bool) string {
+		return "test reason"
+	}
+
+	t.Run("validates packages with reload list in dry run", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, false, false). // dry run
+			WithReloadList(func() ([]formats.Package, error) {
+				return []formats.Package{
+					testutil.NPMPackage("react", "18.0.0", "18.0.0"),
+				}, nil
+			})
+		plans := []*PlannedUpdate{
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("react", "17.0.0", "17.0.0"), Target: "18.0.0", Status: constants.StatusPlanned}},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+		progressCount := 0
+		mockProgress := &testProgressReporter{incrementFn: func() { progressCount++ }}
+
+		err := processGroupWithGroupLockProgress(ctx, plans, groupCfg, &applied, &results, mockProgress, callbacks)
+
+		assert.NoError(t, err)
+		assert.Len(t, results, 1)
+		assert.Equal(t, constants.StatusUpdated, results[0].Status)
+		assert.Equal(t, 1, progressCount)
+	})
+
+	t.Run("handles validation failure in dry run", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		ctx := NewUpdateContext(cfg, "/test", nil).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, false, false). // dry run
+			WithReloadList(func() ([]formats.Package, error) {
+				// Return wrong version to cause validation failure
+				return []formats.Package{
+					testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+				}, nil
+			})
+		plans := []*PlannedUpdate{
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("react", "17.0.0", "17.0.0"), Target: "18.0.0", Status: constants.StatusPlanned}},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+		progressCount := 0
+		mockProgress := &testProgressReporter{incrementFn: func() { progressCount++ }}
+
+		err := processGroupWithGroupLockProgress(ctx, plans, groupCfg, &applied, &results, mockProgress, callbacks)
+
+		assert.Error(t, err)
+		assert.Len(t, results, 1)
+		assert.Equal(t, constants.StatusFailed, results[0].Status)
+	})
+
+	t.Run("tracks unsupported status packages", func(t *testing.T) {
+		mockUpdater := func(p formats.Package, target string, cfg *config.Config, workDir string, dryRun bool, skipLock bool) error {
+			return nil
+		}
+
+		cfg := testutil.NewConfig().WithRule("npm", testutil.NPMRule()).Build()
+		tracker := &mockUnsupportedTracker{}
+		ctx := NewUpdateContext(cfg, "/test", tracker).
+			WithUpdaterFunc(mockUpdater).
+			WithFlags(true, false, false) // dry run
+		plans := []*PlannedUpdate{
+			{Res: UpdateResult{Pkg: testutil.NPMPackage("react", "17.0.0", "17.0.0"), Target: "18.0.0", Status: lock.InstallStatusNotConfigured}},
+		}
+		groupCfg := &config.UpdateCfg{Commands: "npm install"}
+
+		applied := make([]*PlannedUpdate, 0)
+		var results []UpdateResult
+		callbacks := ExecutionCallbacks{DeriveReason: mockDeriveReason}
+		progressCount := 0
+		mockProgress := &testProgressReporter{incrementFn: func() { progressCount++ }}
+
+		err := processGroupWithGroupLockProgress(ctx, plans, groupCfg, &applied, &results, mockProgress, callbacks)
+
+		assert.NoError(t, err)
+		assert.Len(t, tracker.packages, 1, "unsupported package should be tracked")
+		assert.Equal(t, 1, progressCount)
+	})
+}
