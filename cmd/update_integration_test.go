@@ -1796,7 +1796,7 @@ func TestIntegration_ComposerGroupUpdate_OnlyGroupedPackagesUpdated(t *testing.T
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "goupdate-composer-group-*")
 	require.NoError(t, err)
-	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 	// Create composer.json with multiple packages - some grouped, some not
 	// Using older versions that can be updated
@@ -1938,7 +1938,7 @@ func TestIntegration_NPMGroupUpdate_OnlyGroupedPackagesUpdated(t *testing.T) {
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "goupdate-npm-group-*")
 	require.NoError(t, err)
-	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 	// Create package.json with multiple packages - some grouped, some not
 	packageJSON := `{
@@ -2083,7 +2083,7 @@ func TestIntegration_GoModGroupUpdate_OnlyGroupedPackagesUpdated(t *testing.T) {
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "goupdate-gomod-group-*")
 	require.NoError(t, err)
-	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 	// Create go.mod with multiple packages - some grouped, some not
 	goMod := `module testmod
@@ -2254,7 +2254,7 @@ func TestIntegration_PNPMGroupUpdate_OnlyGroupedPackagesUpdated(t *testing.T) {
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "goupdate-pnpm-group-*")
 	require.NoError(t, err)
-	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 	// Create package.json with multiple packages - some grouped, some not
 	packageJSON := `{
@@ -2424,7 +2424,7 @@ func TestIntegration_YarnGroupUpdate_OnlyGroupedPackagesUpdated(t *testing.T) {
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "goupdate-yarn-group-*")
 	require.NoError(t, err)
-	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 	// Create package.json with multiple packages - some grouped, some not
 	packageJSON := `{
@@ -2606,7 +2606,7 @@ func TestIntegration_SystemTests_AfterEach_RollbackOnFailure(t *testing.T) {
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "goupdate-systemtest-rollback-*")
 	require.NoError(t, err)
-	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 	// Create package.json with an old version that can be updated
 	packageJSON := `{
@@ -2744,7 +2744,7 @@ func TestIntegration_SystemTests_AfterEach_RunsPerPackage(t *testing.T) {
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "goupdate-systemtest-perpackage-*")
 	require.NoError(t, err)
-	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 	// Create a file to track how many times the system test runs
 	testCounterPath := filepath.Join(tmpDir, "test-counter.txt")
@@ -2866,7 +2866,7 @@ func TestIntegration_SystemTests_AfterAll_RunsOnce(t *testing.T) {
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "goupdate-systemtest-afterall-*")
 	require.NoError(t, err)
-	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 	// Create a file to track how many times the system test runs
 	testCounterPath := filepath.Join(tmpDir, "test-counter.txt")
@@ -2980,7 +2980,7 @@ func TestIntegration_ManifestRollback_OnLockFailure(t *testing.T) {
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "goupdate-rollback-lockfail-*")
 	require.NoError(t, err)
-	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 	// Create package.json
 	packageJSON := `{
@@ -3108,7 +3108,7 @@ func TestIntegration_UpdateSequence_OneAtATime(t *testing.T) {
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "goupdate-sequence-*")
 	require.NoError(t, err)
-	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 	// Create a log file to track update sequence
 	sequenceLogPath := filepath.Join(tmpDir, "sequence-log.txt")
