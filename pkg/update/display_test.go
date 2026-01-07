@@ -1274,11 +1274,11 @@ func TestPrintOutdatedCheckRow(t *testing.T) {
 
 		plan := &PlannedUpdate{
 			Res: UpdateResult{
-				Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
-				Major:  "18.0.0",
-				Minor:  constants.PlaceholderNA,
-				Patch:  constants.PlaceholderNA,
-				Group:  "",
+				Pkg:   testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+				Major: "18.0.0",
+				Minor: constants.PlaceholderNA,
+				Patch: constants.PlaceholderNA,
+				Group: "",
 			},
 		}
 

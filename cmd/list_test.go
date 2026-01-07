@@ -1495,4 +1495,3 @@ func TestPrintPackagesWithWarningsOutput(t *testing.T) {
 	assert.Contains(t, out, "test-pkg-warn")
 	assert.Contains(t, out, "Total packages: 1")
 }
-
