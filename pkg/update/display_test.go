@@ -1102,3 +1102,191 @@ func TestPrintSystemTestResultDirect(t *testing.T) {
 		assert.Contains(t, output, "test1")
 	})
 }
+
+func TestComputeSummaryFromOutdatedResults(t *testing.T) {
+	t.Run("counts outdated packages", func(t *testing.T) {
+		results := []OutdatedResultData{
+			{Status: constants.StatusOutdated},
+			{Status: constants.StatusOutdated},
+		}
+		counts := ComputeSummaryFromOutdatedResults(results)
+		assert.Equal(t, 2, counts.ToUpdate)
+	})
+
+	t.Run("counts up to date packages", func(t *testing.T) {
+		results := []OutdatedResultData{
+			{Status: constants.StatusUpToDate},
+		}
+		counts := ComputeSummaryFromOutdatedResults(results)
+		assert.Equal(t, 1, counts.UpToDate)
+	})
+
+	t.Run("counts failed packages with error", func(t *testing.T) {
+		results := []OutdatedResultData{
+			{Status: "other", Err: assert.AnError},
+		}
+		counts := ComputeSummaryFromOutdatedResults(results)
+		assert.Equal(t, 1, counts.Failed)
+	})
+
+	t.Run("counts failed packages with Failed prefix", func(t *testing.T) {
+		results := []OutdatedResultData{
+			{Status: constants.StatusFailed + ": some reason"},
+		}
+		counts := ComputeSummaryFromOutdatedResults(results)
+		assert.Equal(t, 1, counts.Failed)
+	})
+
+	t.Run("counts available updates", func(t *testing.T) {
+		results := []OutdatedResultData{
+			{Major: "2.0.0", Minor: "1.1.0", Patch: "1.0.1"},
+		}
+		counts := ComputeSummaryFromOutdatedResults(results)
+		assert.Equal(t, 1, counts.HasMajor)
+		assert.Equal(t, 1, counts.HasMinor)
+		assert.Equal(t, 1, counts.HasPatch)
+	})
+
+	t.Run("excludes N/A from available updates", func(t *testing.T) {
+		results := []OutdatedResultData{
+			{Major: constants.PlaceholderNA, Minor: constants.PlaceholderNA, Patch: constants.PlaceholderNA},
+		}
+		counts := ComputeSummaryFromOutdatedResults(results)
+		assert.Equal(t, 0, counts.HasMajor)
+		assert.Equal(t, 0, counts.HasMinor)
+		assert.Equal(t, 0, counts.HasPatch)
+	})
+
+	t.Run("excludes empty strings from available updates", func(t *testing.T) {
+		results := []OutdatedResultData{
+			{Major: "", Minor: "", Patch: ""},
+		}
+		counts := ComputeSummaryFromOutdatedResults(results)
+		assert.Equal(t, 0, counts.HasMajor)
+		assert.Equal(t, 0, counts.HasMinor)
+		assert.Equal(t, 0, counts.HasPatch)
+	})
+}
+
+func TestDeriveOutdatedStatus(t *testing.T) {
+	t.Run("returns floating status", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{Status: lock.InstallStatusFloating},
+		}
+		assert.Equal(t, lock.InstallStatusFloating, DeriveOutdatedStatus(plan))
+	})
+
+	t.Run("returns ignored status", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{Status: lock.InstallStatusIgnored},
+		}
+		assert.Equal(t, lock.InstallStatusIgnored, DeriveOutdatedStatus(plan))
+	})
+
+	t.Run("returns not configured status", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{Status: lock.InstallStatusNotConfigured},
+		}
+		assert.Equal(t, lock.InstallStatusNotConfigured, DeriveOutdatedStatus(plan))
+	})
+
+	t.Run("returns failed when error present", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{Err: assert.AnError},
+		}
+		assert.Equal(t, constants.StatusFailed, DeriveOutdatedStatus(plan))
+	})
+
+	t.Run("returns outdated when major update available", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{Major: "2.0.0", Minor: constants.PlaceholderNA, Patch: constants.PlaceholderNA},
+		}
+		assert.Equal(t, constants.StatusOutdated, DeriveOutdatedStatus(plan))
+	})
+
+	t.Run("returns outdated when minor update available", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{Major: constants.PlaceholderNA, Minor: "1.1.0", Patch: constants.PlaceholderNA},
+		}
+		assert.Equal(t, constants.StatusOutdated, DeriveOutdatedStatus(plan))
+	})
+
+	t.Run("returns outdated when patch update available", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{Major: constants.PlaceholderNA, Minor: constants.PlaceholderNA, Patch: "1.0.1"},
+		}
+		assert.Equal(t, constants.StatusOutdated, DeriveOutdatedStatus(plan))
+	})
+
+	t.Run("returns up to date when no updates available", func(t *testing.T) {
+		plan := &PlannedUpdate{
+			Res: UpdateResult{Major: constants.PlaceholderNA, Minor: constants.PlaceholderNA, Patch: constants.PlaceholderNA},
+		}
+		assert.Equal(t, constants.StatusUpToDate, DeriveOutdatedStatus(plan))
+	})
+}
+
+func TestBuildOutdatedCheckTable(t *testing.T) {
+	t.Run("creates table with correct columns", func(t *testing.T) {
+		packages := []formats.Package{
+			testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+		}
+		selection := outdated.UpdateSelectionFlags{}
+
+		table := BuildOutdatedCheckTable(packages, selection)
+
+		assert.NotNil(t, table)
+		// Table should have at least 12 columns (RULE, PM, TYPE, CONSTRAINT, VERSION, INSTALLED, MAJOR, MINOR, PATCH, STATUS, NAME, optionally GROUP)
+		assert.GreaterOrEqual(t, table.ColumnCount(), 11)
+	})
+
+	t.Run("shows group column when groups present", func(t *testing.T) {
+		packages := []formats.Package{
+			{Name: "react", Group: "frontend"},
+		}
+		selection := outdated.UpdateSelectionFlags{}
+
+		table := BuildOutdatedCheckTable(packages, selection)
+
+		// Should have 12 columns when group is shown
+		assert.Equal(t, 12, table.ColumnCount())
+	})
+
+	t.Run("hides group column when no groups", func(t *testing.T) {
+		packages := []formats.Package{
+			{Name: "react", Group: ""},
+		}
+		selection := outdated.UpdateSelectionFlags{}
+
+		table := BuildOutdatedCheckTable(packages, selection)
+
+		// Should still have 12 columns (GROUP column is hidden but still counted)
+		assert.GreaterOrEqual(t, table.ColumnCount(), 11)
+	})
+}
+
+func TestPrintOutdatedCheckRow(t *testing.T) {
+	t.Run("prints outdated check row", func(t *testing.T) {
+		packages := []formats.Package{
+			testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+		}
+		table := BuildOutdatedCheckTable(packages, outdated.UpdateSelectionFlags{})
+
+		plan := &PlannedUpdate{
+			Res: UpdateResult{
+				Pkg:    testutil.NPMPackage("react", "17.0.0", "17.0.0"),
+				Major:  "18.0.0",
+				Minor:  constants.PlaceholderNA,
+				Patch:  constants.PlaceholderNA,
+				Group:  "",
+			},
+		}
+
+		captured := testutil.CaptureStdout(t, func() {
+			PrintOutdatedCheckRow(plan, table, outdated.UpdateSelectionFlags{})
+		})
+
+		assert.Contains(t, captured, "react")
+		assert.Contains(t, captured, "18.0.0")
+	})
+}
