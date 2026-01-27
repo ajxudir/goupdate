@@ -199,3 +199,29 @@ func TestCreateSystemTestRunner(t *testing.T) {
 		assert.True(t, runner.HasTests())
 	})
 }
+
+func TestComposerRule(t *testing.T) {
+	rule := ComposerRule()
+
+	assert.Equal(t, "php", rule.Manager)
+	assert.Equal(t, "json", rule.Format)
+	assert.NotNil(t, rule.Fields)
+	assert.Equal(t, "prod", rule.Fields["require"])
+	assert.Equal(t, "dev", rule.Fields["require-dev"])
+	assert.NotNil(t, rule.Update)
+	assert.Contains(t, rule.Update.Commands, "composer require")
+	assert.NotNil(t, rule.Outdated)
+	assert.Contains(t, rule.Outdated.Commands, "composer show")
+}
+
+func TestComposerPackage(t *testing.T) {
+	pkg := ComposerPackage("psr/log", "1.1.0", "1.1.4")
+
+	assert.Equal(t, "psr/log", pkg.Name)
+	assert.Equal(t, "composer", pkg.Rule)
+	assert.Equal(t, "php", pkg.PackageType)
+	assert.Equal(t, "prod", pkg.Type)
+	assert.Equal(t, "1.1.0", pkg.Version)
+	assert.Equal(t, "1.1.4", pkg.InstalledVersion)
+	assert.Equal(t, "^", pkg.Constraint)
+}

@@ -490,7 +490,7 @@ func FormatSummaryStrings(counts UpdateSummaryCounts, mode UpdateSummaryMode) (s
 
 	// Always show major/minor/patch counts for regex-friendly parsing
 	// This makes it easier to grep for specific update types
-	suffix := "available"
+	var suffix string
 	if mode == SummaryModeOutdated || mode == SummaryModePreview {
 		suffix = "available"
 	} else {

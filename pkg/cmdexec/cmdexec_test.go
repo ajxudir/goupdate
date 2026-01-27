@@ -16,7 +16,7 @@ import (
 //
 // It verifies:
 //   - Template placeholders are correctly replaced with values
-//   - Empty values remove the placeholder entirely (not quoted as '')
+//   - Empty values remove the placeholder entirely (not quoted as ”)
 func TestApplyReplacements(t *testing.T) {
 	t.Run("basic replacement", func(t *testing.T) {
 		cmd := `curl -s "https://registry.npmjs.org/{{package}}" | jq -r '.versions["{{version}}"]'`

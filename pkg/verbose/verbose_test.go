@@ -370,3 +370,152 @@ func TestTruncate(t *testing.T) {
 	// Very short maxLen
 	assert.Equal(t, "...", truncate("test", 3))
 }
+
+func TestSuppressUnsuppress(t *testing.T) {
+	// Start with known state
+	Disable()
+	Unsuppress()
+
+	// Test Suppress
+	assert.False(t, IsSuppressed())
+	Suppress()
+	assert.True(t, IsSuppressed())
+
+	// Test Unsuppress
+	Unsuppress()
+	assert.False(t, IsSuppressed())
+}
+
+func TestSetLevelAndGetLevel(t *testing.T) {
+	// Reset to known state
+	Disable()
+
+	tests := []struct {
+		input    int
+		expected Level
+	}{
+		{-1, LevelVerbose},
+		{0, LevelVerbose},
+		{1, LevelVerbose},
+		{2, LevelDebug},
+		{3, LevelTrace},
+		{100, LevelTrace}, // anything > 3 is trace
+	}
+
+	for _, tt := range tests {
+		SetLevel(tt.input)
+		assert.Equal(t, tt.expected, GetLevel(), "SetLevel(%d) should set level to %d", tt.input, tt.expected)
+	}
+}
+
+func TestAtLevel(t *testing.T) {
+	// When disabled, AtLevel returns false
+	Disable()
+	SetLevel(3) // Trace level
+	assert.False(t, AtLevel(LevelVerbose))
+
+	// When enabled but suppressed, AtLevel returns false
+	Enable()
+	Suppress()
+	assert.False(t, AtLevel(LevelVerbose))
+
+	// When enabled and not suppressed
+	Unsuppress()
+	SetLevel(2) // Debug level
+	assert.True(t, AtLevel(LevelVerbose), "Debug level should satisfy Verbose")
+	assert.True(t, AtLevel(LevelDebug), "Debug level should satisfy Debug")
+	assert.False(t, AtLevel(LevelTrace), "Debug level should not satisfy Trace")
+
+	Disable()
+}
+
+func TestIsDebugIsTrace(t *testing.T) {
+	// When disabled
+	Disable()
+	assert.False(t, IsDebug())
+	assert.False(t, IsTrace())
+
+	// When enabled at verbose level
+	Enable()
+	SetLevel(1)
+	assert.False(t, IsDebug())
+	assert.False(t, IsTrace())
+
+	// When enabled at debug level
+	SetLevel(2)
+	assert.True(t, IsDebug())
+	assert.False(t, IsTrace())
+
+	// When enabled at trace level
+	SetLevel(3)
+	assert.True(t, IsDebug())
+	assert.True(t, IsTrace())
+
+	Disable()
+}
+
+func TestDebugfTracef(t *testing.T) {
+	buf := &bytes.Buffer{}
+	SetWriter(buf)
+
+	// When disabled, no output
+	Disable()
+	Debugf("debug message %d", 42)
+	Tracef("trace message %s", "test")
+	assert.Empty(t, buf.String())
+
+	// When enabled, output appears
+	Enable()
+	Debugf("debug message %d", 42)
+	assert.Contains(t, buf.String(), "[DEBUG] debug message 42")
+
+	buf.Reset()
+	Tracef("trace message %s", "test")
+	assert.Contains(t, buf.String(), "[DEBUG] trace message test")
+
+	Disable()
+}
+
+func TestVersionsExcluded(t *testing.T) {
+	buf := &bytes.Buffer{}
+	SetWriter(buf)
+
+	// When disabled, no output
+	Disable()
+	VersionsExcluded("lodash", []string{"4.17.20", "4.17.19"})
+	assert.Empty(t, buf.String())
+
+	// When empty list, no output even when enabled
+	Enable()
+	VersionsExcluded("lodash", []string{})
+	assert.Empty(t, buf.String())
+
+	// When enabled with versions
+	VersionsExcluded("lodash", []string{"4.17.20", "4.17.19"})
+	assert.Contains(t, buf.String(), "[DEBUG] Excluded versions for lodash")
+	assert.Contains(t, buf.String(), "4.17.20")
+
+	Disable()
+}
+
+func TestVersionsFiltered(t *testing.T) {
+	buf := &bytes.Buffer{}
+	SetWriter(buf)
+
+	// When disabled, no output
+	Disable()
+	VersionsFiltered("react", []string{"18.0.0", "17.0.2"})
+	assert.Empty(t, buf.String())
+
+	// When empty list, no output even when enabled
+	Enable()
+	VersionsFiltered("react", []string{})
+	assert.Empty(t, buf.String())
+
+	// When enabled with versions
+	VersionsFiltered("react", []string{"18.0.0", "17.0.2"})
+	assert.Contains(t, buf.String(), "[DEBUG] Newer versions for react")
+	assert.Contains(t, buf.String(), "18.0.0")
+
+	Disable()
+}

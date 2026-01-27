@@ -269,6 +269,38 @@ func TestExtractWithPatterns_MultiplePatterns(t *testing.T) {
 	}
 }
 
+func TestExtractWithPatterns_NilConfig(t *testing.T) {
+	result, err := ExtractWithPatterns("content", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Errorf("expected nil, got %v", result)
+	}
+}
+
+func TestExtractWithPatterns_EmptyConfig(t *testing.T) {
+	cfg := &config.ExtractionCfg{}
+	result, err := ExtractWithPatterns("content", cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Errorf("expected nil, got %v", result)
+	}
+}
+
+func TestExtractWithPatterns_InvalidPattern(t *testing.T) {
+	cfg := &config.ExtractionCfg{
+		Pattern: `[invalid(regex`,
+	}
+
+	_, err := ExtractWithPatterns("content", cfg)
+	if err == nil {
+		t.Error("expected error for invalid regex")
+	}
+}
+
 func TestMatchesAnyExcludePattern_SimplePatterns(t *testing.T) {
 	patterns := []string{`(?i)-alpha`, `(?i)-beta`}
 
