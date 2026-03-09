@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/iancoleman/orderedmap v0.3.0
-	github.com/mattn/go-runewidth v0.0.20
+	github.com/mattn/go-runewidth v0.0.21
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/mod v0.33.0
